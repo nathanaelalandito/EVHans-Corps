@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import './Registrasi.css';
+import './registrasi.css';
 
-export default function Registrasi() {
+export default function Registrasi({ onBackToWelcome }) { // <--- Tambahkan { onBackToWelcome } di sini
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -57,6 +57,9 @@ export default function Registrasi() {
     return (
         <div className="register-container">
             <div className="register-card">
+                <button type="button" onClick={onBackToWelcome} className="btn-back">
+                    ← Kembali ke Beranda
+                </button>
                 <h2>Buat Akun Baru</h2>
                 <p className="subtitle">Masukkan data diri kamu dengan lengkap</p>
 

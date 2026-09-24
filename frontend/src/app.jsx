@@ -1,12 +1,18 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import Registrasi from './Registrasi.jsx';
+import React, { useState } from 'react';
+import Welcome from './Welcome';
+import Registrasi from './Registrasi';
 
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/register" />} />
-      <Route path="/register" element={<Registrasi />} />
-    </Routes>
-  );
+    const [currentPage, setCurrentPage] = useState('welcome');
+
+    return (
+        <div>
+            {currentPage === 'welcome' && (
+                <Welcome onNavigateToRegister={() => setCurrentPage('register')} />
+            )}
+            {currentPage === 'register' && (
+                <Registrasi onBackToWelcome={() => setCurrentPage('welcome')} />
+            )}
+        </div>
+    );
 }
