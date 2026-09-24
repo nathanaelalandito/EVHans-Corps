@@ -2,114 +2,153 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './Registrasi.css';
 
-function Registrasi() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: ''
-  });
-
-  const [message, setMessage] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage('');
-    setLoading(true);
-
-    try {
-      // Mengirim data ke backend Laravel API (role diatur otomatis oleh backend)
-      const response = await axios.post('http://127.0.0.1:8000/api/register', formData);
-      
-      setIsSuccess(true);
-      setMessage(response.data.message || 'Registrasi akun berhasil!');
-      
-      // Reset form
-      setFormData({
+export default function Registrasi() {
+    const [formData, setFormData] = useState({
         name: '',
         email: '',
-        password: ''
-      });
-    } catch (error) {
-      setIsSuccess(false);
-      if (error.response && error.response.data.errors) {
-        const errorList = error.response.data.errors;
-        const firstError = Object.values(errorList)[0][0];
-        setMessage(firstError);
-      } else {
-        setMessage('Gagal terhubung ke server backend Laravel.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+        password: '',
+        nomor_telepon: '',
+        alamat: '',
+        tanggal_lahir: '',
+    });
 
-  return (
-    <div className="ev-container">
-      <div className="ev-card">
-        <div className="ev-header">
-          <h2>EV ChargeHub</h2>
-          <p>Sistem Manajemen & Charging Kendaraan Listrik</p>
+    const [errors, setErrors] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [serverMessage, setServerMessage] = useState('');
+
+    const handleChange = (e) => {
+        setFormData({
+            ...formData,
+            [e.target.name]: e.target.value,
+        });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setErrors({});
+        setServerMessage('');
+
+        try {
+            const response = await axios.post('http://127.0.0.1:8000/api/register', formData);
+            setServerMessage(response.data.message);
+            
+            // Kosongkan form setelah berhasil registrasi
+            setFormData({
+                name: '',
+                email: '',
+                password: '',
+                nomor_telepon: '',
+                alamat: '',
+                tanggal_lahir: '',
+            });
+
+        } catch (error) {
+            if (error.response && error.response.status === 422) {
+                setErrors(error.response.data.errors);
+            } else {
+                setServerMessage('Terjadi kesalahan pada server. Silakan coba lagi.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="register-container">
+            <div className="register-card">
+                <h2>Buat Akun Baru</h2>
+                <p className="subtitle">Masukkan data diri kamu dengan lengkap</p>
+
+                {serverMessage && (
+                    <div className={`alert ${serverMessage.includes('berhasil') ? 'alert-success' : 'alert-error'}`}>
+                        {serverMessage}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label>Nama Panjang</label>
+                        <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            required
+                            placeholder="Nama Lengkap Kamu"
+                        />
+                        {errors.name && <span className="error-text">{errors.name[0]}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label>Email</label>
+                        <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                            placeholder="nama@email.com (atau @admin.ac.id / @ops.ac.id)"
+                        />
+                        {errors.email && <span className="error-text">{errors.email[0]}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label>Password</label>
+                        <input
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            placeholder="Minimal 6 karakter"
+                        />
+                        {errors.password && <span className="error-text">{errors.password[0]}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label>Nomor Telepon</label>
+                        <input
+                            type="text"
+                            name="nomor_telepon"
+                            value={formData.nomor_telepon}
+                            onChange={handleChange}
+                            required
+                            placeholder="08123456789"
+                        />
+                        {errors.nomor_telepon && <span className="error-text">{errors.nomor_telepon[0]}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label>Alamat</label>
+                        <textarea
+                            name="alamat"
+                            value={formData.alamat}
+                            onChange={handleChange}
+                            required
+                            rows="2"
+                            placeholder="Alamat domisili saat ini"
+                        />
+                        {errors.alamat && <span className="error-text">{errors.alamat[0]}</span>}
+                    </div>
+
+                    <div className="form-group">
+                        <label>Tanggal Lahir</label>
+                        <input
+                            type="date"
+                            name="tanggal_lahir"
+                            value={formData.tanggal_lahir}
+                            onChange={handleChange}
+                            required
+                        />
+                        {errors.tanggal_lahir && <span className="error-text">{errors.tanggal_lahir[0]}</span>}
+                    </div>
+
+                    <button type="submit" disabled={loading} className="btn-submit">
+                        {loading ? 'Memproses...' : 'Daftar Sekarang'}
+                    </button>
+                </form>
+            </div>
         </div>
-
-        {message && (
-          <div className={`ev-alert ${isSuccess ? 'success' : 'error'}`}>
-            {message}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="ev-form">
-          <div className="input-group">
-            <label>Nama Lengkap</label>
-            <input 
-              type="text" 
-              name="name" 
-              value={formData.name} 
-              onChange={handleChange} 
-              placeholder="Masukkan nama lengkap"
-              required 
-            />
-          </div>
-
-          <div className="input-group">
-            <label>Alamat Email</label>
-            <input 
-              type="email" 
-              name="email" 
-              value={formData.email} 
-              onChange={handleChange} 
-              placeholder="nama@email.com"
-              required 
-            />
-          </div>
-
-          <div className="input-group">
-            <label>Password</label>
-            <input 
-              type="password" 
-              name="password" 
-              value={formData.password} 
-              onChange={handleChange} 
-              placeholder="Minimal 6 karakter"
-              required 
-            />
-          </div>
-
-          <button type="submit" className="ev-button" disabled={loading}>
-            {loading ? 'Memproses...' : 'Daftar Akun'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+    );
 }
-
-export default Registrasi;

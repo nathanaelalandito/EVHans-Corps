@@ -1,195 +1,128 @@
-/* Styling Tema Biru Modern Digital & Animasi EV ChargeHub */
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #050b14;
-  color: #f8fafc;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* Membuat latar belakang animasi titik cahaya digital (Glow Orbs) */
-.ev-container {
-  position: relative;
+.register-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  background: linear-gradient(135deg, #0d0f18 0%, #171033 50%, #0f172a 100%);
   padding: 20px;
-  background: linear-gradient(135deg, #050b14, #0f172a, #1e293b);
-  overflow: hidden;
 }
 
-/* Lingkaran cahaya animasi pertama */
-.ev-container::before {
-  content: '';
-  position: absolute;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, rgba(2, 132, 199, 0) 70%);
-  top: 10%;
-  left: 15%;
-  border-radius: 50%;
-  animation: floatOrb 8s ease-in-out infinite alternate;
-  z-index: 0;
-}
-
-/* Lingkaran cahaya animasi kedua */
-.ev-container::after {
-  content: '';
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, rgba(30, 58, 138, 0) 70%);
-  bottom: 5%;
-  right: 15%;
-  border-radius: 50%;
-  animation: floatOrb2 10s ease-in-out infinite alternate;
-  z-index: 0;
-}
-
-/* Keyframes untuk animasi melayang */
-@keyframes floatOrb {
-  0% {
-    transform: translateY(0px) scale(1);
-  }
-  100% {
-    transform: translateY(-40px) scale(1.1);
-  }
-}
-
-@keyframes floatOrb2 {
-  0% {
-    transform: translateY(0px) scale(1);
-  }
-  100% {
-    transform: translateY(50px) scale(1.15);
-  }
-}
-
-/* Kartu Form Register dengan Efek Kaca (Glassmorphism) dan Z-Index di atas animasi */
-.ev-card {
-  position: relative;
-  z-index: 1;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  padding: 40px;
-  border-radius: 20px;
+.register-card {
+  background: rgba(20, 24, 39, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  padding: 35px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(79, 70, 229, 0.15);
   width: 100%;
-  max-width: 420px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.1);
-  animation: fadeInCard 0.8s ease-out;
+  max-width: 460px;
 }
 
-@keyframes fadeInCard {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.ev-header {
+.register-card h2 {
   text-align: center;
-  margin-bottom: 25px;
-}
-
-.ev-header h2 {
-  margin: 0;
-  font-size: 28px;
-  color: #38bdf8;
+  margin-bottom: 8px;
+  color: #f3f4f6;
   font-weight: 700;
   letter-spacing: 0.5px;
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
-.ev-header p {
-  margin: 8px 0 0;
+.subtitle {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
   font-size: 13px;
-  color: #94a3b8;
+  font-weight: 500;
+  color: #d1d5db;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.ev-alert {
-  padding: 12px;
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 11px 14px;
+  background-color: rgba(15, 23, 42, 0.6);
+  border: 1px solid #374151;
   border-radius: 8px;
   font-size: 14px;
-  margin-bottom: 20px;
-  text-align: center;
-  animation: fadeInCard 0.4s ease-out;
-}
-
-.ev-alert.success {
-  background-color: rgba(16, 185, 129, 0.2);
-  border: 1px solid #10b981;
-  color: #34d399;
-}
-
-.ev-alert.error {
-  background-color: rgba(239, 68, 68, 0.2);
-  border: 1px solid #ef4444;
-  color: #f87171;
-}
-
-.input-group {
-  margin-bottom: 18px;
-}
-
-.input-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  color: #cbd5e1;
-  font-weight: 500;
-}
-
-.input-group input {
-  width: 100%;
-  padding: 12px 14px;
-  background-color: rgba(15, 23, 42, 0.9);
-  border: 1px solid #334155;
-  border-radius: 10px;
-  color: #f8fafc;
-  font-size: 14px;
+  color: #ffffff;
   box-sizing: border-box;
   transition: all 0.3s ease;
 }
 
-.input-group input:focus {
-  outline: none;
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
-  background-color: #0f172a;
+.form-group input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 
-.ev-button {
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+  background-color: rgba(15, 23, 42, 0.9);
+}
+
+.error-text {
+  color: #f87171;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}
+
+.btn-submit {
   width: 100%;
-  padding: 13px;
-  background: linear-gradient(135deg, #0284c7, #0369a1);
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
+  padding: 12px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  margin-top: 15px;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
   transition: all 0.3s ease;
-  margin-top: 10px;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
 }
 
-.ev-button:hover {
-  background: linear-gradient(135deg, #0369a1, #075985);
-  box-shadow: 0 6px 16px rgba(56, 189, 248, 0.4);
+.btn-submit:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
   transform: translateY(-1px);
 }
 
-.ev-button:disabled {
-  opacity: 0.6;
+.btn-submit:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+}
+
+.alert {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.alert-success {
+  background-color: rgba(6, 95, 70, 0.4);
+  border: 1px solid #059669;
+  color: #34d399;
+}
+
+.alert-error {
+  background-color: rgba(153, 27, 27, 0.4);
+  border: 1px solid #dc2626;
+  color: #fca5a5;
 }
