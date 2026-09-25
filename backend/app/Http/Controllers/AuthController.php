@@ -54,7 +54,9 @@ class AuthController extends Controller
             $nextNumber = 1;
         }
 
-        $customId = $prefix . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+        $year = date('Y'); // Mengambil tahun saat ini (misal: 2026)
+        $paddedNumber = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $customId = "{$prefix}-{$year}-{$paddedNumber}";
 
         // 2. Simpan ke tabel Users
         $user = User::create([
@@ -88,5 +90,53 @@ class AuthController extends Controller
             'error' => $e->getMessage()
         ], 500);
     }
+    }
+
+    public function login(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email',
+            'password' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'message' => 'Email atau password salah.'
+            ], 401);
+        }
+
+        if ($user->status_akun !== 'aktif') {
+            return response()->json([
+                'message' => 'Akun Anda tidak aktif. Hubungi admin.'
+            ], 403);
+        }
+
+        // Hapus token lama supaya tidak menumpuk setiap kali login
+        $user->tokens()->delete();
+
+        $token = $user->createToken('web')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login berhasil!',
+            'token' => $token,
+            'user' => $user->load('profile'),
+        ]);
+    }
+
+    public function logout(Request $request)
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Berhasil keluar.'
+        ]);
     }
 }
