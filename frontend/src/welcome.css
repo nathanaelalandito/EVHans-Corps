@@ -1,0 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+.welcome-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #769826 10%, #A1CB35 90%);
+    padding: 30px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Kartu dibuat lebih besar dan luas */
+.welcome-card {
+    background: #fffdf5;
+    border: 1px solid #e6dfc7;
+    padding: 50px 40px;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+}
+
+.logo-wrapper {
+    margin-bottom: 25px;
+}
+
+/* Logo diperbesar dengan proporsi yang pas */
+.welcome-logo {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
+    border-radius: 50%;
+    box-shadow: 0 10px 25px rgba(46, 125, 50, 0.2);
+    background: #ffffff;
+    padding: 10px;
+    border: 3px solid #76C457;
+}
+
+.welcome-title {
+    font-size: 40px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+    color: #1b4d2e;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+
+.welcome-tagline {
+    font-size: 20px;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    color: #2e7d32;
+    margin-bottom: 20px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+}
+
+.welcome-desc {
+    font-size: 20px;
+    font-family: 'Outfit', sans-serif;
+    color: #555555;
+    line-height: 1.7;
+    margin-bottom: 35px;
+}
+
+.btn-primary {
+    width: 100%;
+    background: #2e7d32;
+    color: white;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    font-size: 25px;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(46, 125, 50, 0.35);
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: #1b4d2e;
+    box-shadow: 0 8px 25px rgba(27, 77, 46, 0.45);
+    transform: translateY(-2px);
+}
