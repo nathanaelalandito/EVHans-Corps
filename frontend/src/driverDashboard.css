@@ -1425,3 +1425,97 @@
     font-size: 14px;
     cursor: pointer;
 }
+
+/* ==================================================================
+   DETAIL PROFIL — sub-layar di dalam panel Pengaturan.
+   ================================================================== */
+
+.settings-profile-detail-avatar-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 0 20px;
+}
+
+.settings-profile-avatar-lg {
+    font-size: 40px;
+}
+
+.settings-profile-detail-name {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.settings-profile-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-profile-detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.settings-profile-detail-value {
+    color: #444;
+    text-align: right;
+}
+
+/* Reset tampilan default <button> supaya tetap terlihat seperti div lama */
+.settings-profile {
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.profile-screen {
+    position: absolute;
+    inset: 0;
+    background: #f4f6f4;
+    display: flex;
+    flex-direction: column;
+}
+.profile-screen.is-hidden { display: none; }
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #1b3a1e;
+}
+.profile-header-title {
+    color: #fff;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.profile-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.profile-avatar-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 0 24px;
+}
+
+.profile-text-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.profile-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+}
