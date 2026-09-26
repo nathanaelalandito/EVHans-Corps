@@ -18,6 +18,7 @@ class UpdateProfileDriverRequest extends FormRequest
             'nomor_telepon' => ['sometimes', 'string', 'max:13'],
             'alamat' => ['sometimes', 'nullable', 'string'],
             'tanggal_lahir' => ['sometimes', 'date'],
+            'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,' . $this->user()->id_user . ',id_user']
         ];
     }
 }

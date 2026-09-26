@@ -17,11 +17,21 @@ class ProfileDriverController extends Controller
 
     public function update(UpdateProfileDriverRequest $request)
     {
-        $user = $request->user();
-        $profile = $user->profile;
+    $user = $request->user();
+    $profile = $user->profile;
+    $validated = $request->validated();
 
-        $profile->update($request->validated());
-
-        return new ProfileDriverResource($user->fresh('profile'));
+    // Pisahkan email (kolom di tabel users) dari field profil lainnya
+    if (array_key_exists('email', $validated)) {
+        $newEmail = $validated['email'];
+        if ($newEmail !== $user->email) {
+            $user->email = $newEmail;
+             $user->email_verified_at = now(); // ✅ langsung dianggap terverifikasi
+            $user->save();
+        }
+        unset($validated['email']);
+    }
+    $profile->update($validated);   // ⬅️ diganti dari $request->validated()
+    return new ProfileDriverResource($user->fresh('profile'));
     }
 }
