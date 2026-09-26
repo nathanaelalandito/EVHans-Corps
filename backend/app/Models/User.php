@@ -2,29 +2,16 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use App\Models\UserProfile;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
 
-<<<<<<< HEAD
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-=======
     protected $table = 'users'; // Sesuaikan dengan nama tabel di DB
     protected $primaryKey = 'id_user'; // Beritahu Laravel kalau primary key-nya id_user
     
@@ -37,12 +24,8 @@ class User extends Authenticatable
 
     // Relasi ke UserProfile (One to One)
     public function profile()
->>>>>>> ba992e2 (feat: tambah backend ProfilDriver (controller, resource, request, model))
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->hasOne(UserProfile::class, 'id_user', 'id_user');
     }
 
       public function vehicles()

@@ -13,7 +13,10 @@ return new class extends Migration
     {
         Schema::create('personal_access_tokens', function (Blueprint $table) {
             $table->id();
-            $table->morphs('tokenable');
+             // JABARKAN MANUAL JIKA ID USER BERUPA STRING / NIM
+            $table->string('tokenable_type');
+            $table->string('tokenable_id'); // sesuaikan panjangnya jika diperlukan, misal string('tokenable_id', 20)
+            $table->index(['tokenable_type', 'tokenable_id']); // Membuat index kombinasi yang tadi fail
             $table->text('name');
             $table->string('token', 64)->unique();
             $table->text('abilities')->nullable();

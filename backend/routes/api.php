@@ -2,11 +2,12 @@
 use App\Http\Controllers\Api\ProfileDriverController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Api\DompetPinController;
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return $request->user()->load('profile');
 })->middleware('auth:sanctum');
-
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -27,4 +28,3 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/driver/profile', [ProfileDriverController::class, 'show']);
     Route::put('/driver/profile', [ProfileDriverController::class, 'update']);
 });
-
