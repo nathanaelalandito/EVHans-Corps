@@ -3,6 +3,7 @@ import Welcome from './Welcome';
 import Registrasi from './Registrasi';
 import Login from './Login';
 import DriverDashboard from './DriverDashboard';
+import KelolaKendaraan from './KelolaKendaraan';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
 
 export default function App() {
@@ -44,7 +45,14 @@ export default function App() {
                 />
             )}
             {currentPage === 'dashboard' && (
-                <DriverDashboard user={user} onLogout={handleLogout} />
+                <DriverDashboard
+                    user={user}
+                    onLogout={handleLogout}
+                    onNavigateToVehicles={() => setCurrentPage('vehicles')}
+                />
+            )}
+            {currentPage === 'vehicles' && (
+                <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />
             )}
         </div>
     );

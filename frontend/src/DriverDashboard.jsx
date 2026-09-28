@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import './driverDashboard.css';
 import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
+import { getVehicles } from './api/vehicle';
 
 // Ambil pesan error yang enak dibaca dari response axios (baik yang
 // bentuknya {message} maupun {errors: {field: [..]}} ala Laravel).
@@ -28,10 +29,10 @@ const DUMMY_USER = {
     saldo_dompet: 185000,
 };
 
-const DUMMY_VEHICLES = [
-    { id_vehicle: 1, merek: 'Hyundai', model: 'Ioniq 5', nomor_polisi: 'B 1234 EV', tipe_konektor: 'CCS2' },
-    { id_vehicle: 2, merek: 'Wuling', model: 'Air EV', nomor_polisi: 'B 5678 EV', tipe_konektor: 'Type 2' },
-];
+// Label tampilan tipe konektor dari backend (enum) — sama dengan KelolaKendaraan.
+const KONEKTOR_LABEL = { type_2: 'Type 2', ccs2: 'CCS2', chademo: 'CHAdeMO', gbt: 'GB/T' };
+const konektorLabel = (v) => KONEKTOR_LABEL[v] ?? v;
+const ACTIVE_VEHICLE_KEY = 'ev_active_vehicle';
 
 // Ringkasan aktivitas bulan berjalan — di production diambil dari
 // agregat tabel Charging Session & Payment milik user yang login.
@@ -152,15 +153,21 @@ const DRIVER_ICON = L.divIcon({
     iconAnchor: [11, 11],
 });
 
-export default function DriverDashboard({ user: authUser, onLogout }) {
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles }) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
     // saldo selalu ditarik live dari GET /api/wallet (lihat effect di bawah)
     // supaya selalu sinkron dengan database.
     const user = {
         nama: authUser?.profile?.nama_lengkap || authUser?.email || DUMMY_USER.nama,
     };
-    const [vehicles] = useState(DUMMY_VEHICLES);
-    const [activeVehicleId, setActiveVehicleId] = useState(vehicles[0].id_vehicle);
+    // --- Kendaraan (data asli dari backend, GET /api/vehicles) ---------
+    const [vehicles, setVehicles] = useState([]);
+    const [vehiclesLoading, setVehiclesLoading] = useState(true);
+    const [vehiclesError, setVehiclesError] = useState('');
+    const [activeVehicleId, setActiveVehicleId] = useState(() => {
+        const saved = Number(localStorage.getItem(ACTIVE_VEHICLE_KEY));
+        return saved || null;
+    });
     const [stations] = useState(DUMMY_STATIONS);
     const [connectorFilter, setConnectorFilter] = useState('Semua');
     const [activeSession, setActiveSession] = useState(DUMMY_ACTIVE_SESSION);
@@ -283,7 +290,47 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
     // 'map'   -> peta pencarian station (dibuka atas permintaan driver)
     const [view, setView] = useState('home');
 
-    const activeVehicle = vehicles.find((v) => v.id_vehicle === activeVehicleId);
+    // Tarik daftar kendaraan dari backend. `silent` = tanpa spinner (dipakai
+    // saat sinkron ulang di latar belakang).
+    const fetchVehicles = async (silent = false) => {
+        if (!silent) setVehiclesLoading(true);
+        setVehiclesError('');
+        try {
+            const data = await getVehicles();
+            setVehicles(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Gagal memuat kendaraan:', err);
+            setVehiclesError(extractErrorMessage(err, 'Gagal memuat kendaraan.'));
+        } finally {
+            setVehiclesLoading(false);
+        }
+    };
+
+    // Sinkron saat dashboard dibuka (termasuk kembali dari Kelola Kendaraan)
+    // dan setiap tab/aplikasi kembali difokuskan.
+    useEffect(() => {
+        fetchVehicles();
+        const onFocus = () => fetchVehicles(true);
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, []);
+
+    // Jaga kendaraan aktif tetap valid: kalau yang tersimpan sudah dihapus
+    // (atau belum ada pilihan), pakai kendaraan pertama; kosong -> null.
+    useEffect(() => {
+        if (vehiclesLoading) return;
+        const stillExists = vehicles.some((v) => v.id_vehicle === activeVehicleId);
+        if (!stillExists) {
+            setActiveVehicleId(vehicles[0]?.id_vehicle ?? null);
+        }
+    }, [vehicles, vehiclesLoading, activeVehicleId]);
+
+    // Ingat pilihan kendaraan aktif antar sesi.
+    useEffect(() => {
+        if (activeVehicleId) localStorage.setItem(ACTIVE_VEHICLE_KEY, String(activeVehicleId));
+    }, [activeVehicleId]);
+
+    const activeVehicle = vehicles.find((v) => v.id_vehicle === activeVehicleId) ?? null;
 
     const mapNodeRef = useRef(null);
     const mapRef = useRef(null);
@@ -572,6 +619,10 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
     };
 
     const cycleVehicle = () => {
+        if (vehicles.length === 0) {
+            onNavigateToVehicles();
+            return;
+        }
         const idx = vehicles.findIndex((v) => v.id_vehicle === activeVehicleId);
         const next = vehicles[(idx + 1) % vehicles.length];
         setActiveVehicleId(next.id_vehicle);
@@ -631,7 +682,13 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                             title={vehicles.length > 1 ? 'Ketuk untuk ganti kendaraan' : undefined}
                         >
                             <span className="home-vehicle-pill-icon">🚗</span>
-                            <span className="home-vehicle-pill-text">{activeVehicle.model} · {activeVehicle.nomor_polisi}</span>
+                            <span className="home-vehicle-pill-text">
+                                {activeVehicle
+                                    ? `${activeVehicle.model} · ${activeVehicle.nomor_polisi}`
+                                    : vehiclesLoading
+                                        ? 'Memuat kendaraan…'
+                                        : '+ Tambah kendaraan'}
+                            </span>
                             {vehicles.length > 1 && <span className="home-vehicle-pill-swap">⇄</span>}
                         </button>
                     </div>
@@ -764,6 +821,19 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                             <h3 className="home-section-title">Kendaraan Saya</h3>
                         </div>
                         <div className="home-vehicle-list">
+                            {vehiclesLoading && <p className="dash-empty">Memuat kendaraan…</p>}
+                            {!vehiclesLoading && vehiclesError && (
+                                <p className="dash-empty">
+                                    {vehiclesError}{' '}
+                                    <button className="dash-link-btn" onClick={() => fetchVehicles()}>Coba lagi</button>
+                                </p>
+                            )}
+                            {!vehiclesLoading && !vehiclesError && vehicles.length === 0 && (
+                                <p className="dash-empty">
+                                    Belum ada kendaraan.{' '}
+                                    <button className="dash-link-btn" onClick={onNavigateToVehicles}>Tambah kendaraan</button>
+                                </p>
+                            )}
                             {vehicles.map((v) => (
                                 <button
                                     key={v.id_vehicle}
@@ -773,7 +843,7 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                                     <span className="home-vehicle-item-avatar">🚗</span>
                                     <span className="home-vehicle-item-info">
                                         <span className="home-vehicle-item-name">{v.merek} {v.model}</span>
-                                        <span className="home-vehicle-item-plate">{v.nomor_polisi} · {v.tipe_konektor}</span>
+                                        <span className="home-vehicle-item-plate">{v.nomor_polisi} · {konektorLabel(v.tipe_konektor)}</span>
                                     </span>
                                     {v.id_vehicle === activeVehicleId && <span className="home-vehicle-item-check">✓</span>}
                                 </button>
@@ -1134,7 +1204,7 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                                     </button>
 
                                 <div className="settings-menu">
-                                    <button className="settings-menu-item">
+                                    <button className="settings-menu-item" onClick={onNavigateToVehicles}>
                                         <span className="settings-menu-icon">🚗</span>
                                         <span className="settings-menu-label">Kendaraan Saya</span>
                                         <span className="settings-menu-arrow">›</span>
