@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import './driverDashboard.css';
 import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
+import { getVehicles } from './api/vehicle';
 
 // Ambil pesan error yang enak dibaca dari response axios (baik yang
 // bentuknya {message} maupun {errors: {field: [..]}} ala Laravel).
@@ -28,10 +29,10 @@ const DUMMY_USER = {
     saldo_dompet: 185000,
 };
 
-const DUMMY_VEHICLES = [
-    { id_vehicle: 1, merek: 'Hyundai', model: 'Ioniq 5', nomor_polisi: 'B 1234 EV', tipe_konektor: 'CCS2' },
-    { id_vehicle: 2, merek: 'Wuling', model: 'Air EV', nomor_polisi: 'B 5678 EV', tipe_konektor: 'Type 2' },
-];
+// Label tampilan tipe konektor dari backend (enum) — sama dengan KelolaKendaraan.
+const KONEKTOR_LABEL = { type_2: 'Type 2', ccs2: 'CCS2', chademo: 'CHAdeMO', gbt: 'GB/T' };
+const konektorLabel = (v) => KONEKTOR_LABEL[v] ?? v;
+const ACTIVE_VEHICLE_KEY = 'ev_active_vehicle';
 
 // Ringkasan aktivitas bulan berjalan — di production diambil dari
 // agregat tabel Charging Session & Payment milik user yang login.
@@ -152,15 +153,40 @@ const DRIVER_ICON = L.divIcon({
     iconAnchor: [11, 11],
 });
 
-export default function DriverDashboard({ user: authUser, onLogout }) {
+const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+// "2000-05-12" -> "12 Mei 2000" (di-parse manual supaya tidak geser hari karena timezone).
+function formatTanggalLahir(value) {
+    if (!value) return '-';
+    const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
+    if (!y || !m || !d) return String(value);
+    return `${d} ${BULAN_ID[m - 1]} ${y}`;
+}
+
+function getInitial(name) {
+    return (name || '?').trim().charAt(0).toUpperCase() || '?';
+}
+
+function capitalize(str) {
+    const s = String(str ?? '');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles }) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
     // saldo selalu ditarik live dari GET /api/wallet (lihat effect di bawah)
     // supaya selalu sinkron dengan database.
     const user = {
         nama: authUser?.profile?.nama_lengkap || authUser?.email || DUMMY_USER.nama,
     };
-    const [vehicles] = useState(DUMMY_VEHICLES);
-    const [activeVehicleId, setActiveVehicleId] = useState(vehicles[0].id_vehicle);
+    // --- Kendaraan (data asli dari backend, GET /api/vehicles) ---------
+    const [vehicles, setVehicles] = useState([]);
+    const [vehiclesLoading, setVehiclesLoading] = useState(true);
+    const [vehiclesError, setVehiclesError] = useState('');
+    const [activeVehicleId, setActiveVehicleId] = useState(() => {
+        const saved = Number(localStorage.getItem(ACTIVE_VEHICLE_KEY));
+        return saved || null;
+    });
     const [stations] = useState(DUMMY_STATIONS);
     const [connectorFilter, setConnectorFilter] = useState('Semua');
     const [activeSession, setActiveSession] = useState(DUMMY_ACTIVE_SESSION);
@@ -283,7 +309,47 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
     // 'map'   -> peta pencarian station (dibuka atas permintaan driver)
     const [view, setView] = useState('home');
 
-    const activeVehicle = vehicles.find((v) => v.id_vehicle === activeVehicleId);
+    // Tarik daftar kendaraan dari backend. `silent` = tanpa spinner (dipakai
+    // saat sinkron ulang di latar belakang).
+    const fetchVehicles = async (silent = false) => {
+        if (!silent) setVehiclesLoading(true);
+        setVehiclesError('');
+        try {
+            const data = await getVehicles();
+            setVehicles(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Gagal memuat kendaraan:', err);
+            setVehiclesError(extractErrorMessage(err, 'Gagal memuat kendaraan.'));
+        } finally {
+            setVehiclesLoading(false);
+        }
+    };
+
+    // Sinkron saat dashboard dibuka (termasuk kembali dari Kelola Kendaraan)
+    // dan setiap tab/aplikasi kembali difokuskan.
+    useEffect(() => {
+        fetchVehicles();
+        const onFocus = () => fetchVehicles(true);
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, []);
+
+    // Jaga kendaraan aktif tetap valid: kalau yang tersimpan sudah dihapus
+    // (atau belum ada pilihan), pakai kendaraan pertama; kosong -> null.
+    useEffect(() => {
+        if (vehiclesLoading) return;
+        const stillExists = vehicles.some((v) => v.id_vehicle === activeVehicleId);
+        if (!stillExists) {
+            setActiveVehicleId(vehicles[0]?.id_vehicle ?? null);
+        }
+    }, [vehicles, vehiclesLoading, activeVehicleId]);
+
+    // Ingat pilihan kendaraan aktif antar sesi.
+    useEffect(() => {
+        if (activeVehicleId) localStorage.setItem(ACTIVE_VEHICLE_KEY, String(activeVehicleId));
+    }, [activeVehicleId]);
+
+    const activeVehicle = vehicles.find((v) => v.id_vehicle === activeVehicleId) ?? null;
 
     const mapNodeRef = useRef(null);
     const mapRef = useRef(null);
@@ -572,6 +638,10 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
     };
 
     const cycleVehicle = () => {
+        if (vehicles.length === 0) {
+            onNavigateToVehicles();
+            return;
+        }
         const idx = vehicles.findIndex((v) => v.id_vehicle === activeVehicleId);
         const next = vehicles[(idx + 1) % vehicles.length];
         setActiveVehicleId(next.id_vehicle);
@@ -631,7 +701,13 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                             title={vehicles.length > 1 ? 'Ketuk untuk ganti kendaraan' : undefined}
                         >
                             <span className="home-vehicle-pill-icon">🚗</span>
-                            <span className="home-vehicle-pill-text">{activeVehicle.model} · {activeVehicle.nomor_polisi}</span>
+                            <span className="home-vehicle-pill-text">
+                                {activeVehicle
+                                    ? `${activeVehicle.model} · ${activeVehicle.nomor_polisi}`
+                                    : vehiclesLoading
+                                        ? 'Memuat kendaraan…'
+                                        : '+ Tambah kendaraan'}
+                            </span>
                             {vehicles.length > 1 && <span className="home-vehicle-pill-swap">⇄</span>}
                         </button>
                     </div>
@@ -764,6 +840,19 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                             <h3 className="home-section-title">Kendaraan Saya</h3>
                         </div>
                         <div className="home-vehicle-list">
+                            {vehiclesLoading && <p className="dash-empty">Memuat kendaraan…</p>}
+                            {!vehiclesLoading && vehiclesError && (
+                                <p className="dash-empty">
+                                    {vehiclesError}{' '}
+                                    <button className="dash-link-btn" onClick={() => fetchVehicles()}>Coba lagi</button>
+                                </p>
+                            )}
+                            {!vehiclesLoading && !vehiclesError && vehicles.length === 0 && (
+                                <p className="dash-empty">
+                                    Belum ada kendaraan.{' '}
+                                    <button className="dash-link-btn" onClick={onNavigateToVehicles}>Tambah kendaraan</button>
+                                </p>
+                            )}
                             {vehicles.map((v) => (
                                 <button
                                     key={v.id_vehicle}
@@ -773,7 +862,7 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                                     <span className="home-vehicle-item-avatar">🚗</span>
                                     <span className="home-vehicle-item-info">
                                         <span className="home-vehicle-item-name">{v.merek} {v.model}</span>
-                                        <span className="home-vehicle-item-plate">{v.nomor_polisi} · {v.tipe_konektor}</span>
+                                        <span className="home-vehicle-item-plate">{v.nomor_polisi} · {konektorLabel(v.tipe_konektor)}</span>
                                     </span>
                                     {v.id_vehicle === activeVehicleId && <span className="home-vehicle-item-check">✓</span>}
                                 </button>
@@ -964,125 +1053,171 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                ============================================================ */}
             <div className={`profile-screen ${view === 'profile' ? 'is-active' : 'is-hidden'}`}>
                 <header className="profile-header">
-                    <button className="mapdash-round-btn" onClick={() => { setView('home'); setIsEditingProfile(false); }} aria-label="Kembali">
-                        ←
-                    </button>
-                    <span className="profile-header-title">Profil Saya</span>
-                    <span style={{ width: 40 }} />
+                    <div className="profile-header-top">
+                        <button
+                            className="profile-back-btn"
+                            onClick={() => { setView('home'); setIsEditingProfile(false); }}
+                            aria-label="Kembali"
+                        >
+                            ←
+                        </button>
+                        <h1 className="profile-header-title">
+                            {isEditingProfile ? 'Edit Profil' : 'Profil Saya'}
+                        </h1>
+                        <span className="profile-header-spacer" />
+                    </div>
                 </header>
 
                 <main className="profile-content">
-                    {profileLoading && <p className="dash-empty">Memuat profil...</p>}
+                    {profileLoading && (
+                        <>
+                            <div className="profile-hero profile-skeleton-hero">
+                                <span className="profile-skeleton profile-skeleton-avatar" />
+                                <span className="profile-skeleton profile-skeleton-line" style={{ width: '55%' }} />
+                                <span className="profile-skeleton profile-skeleton-line" style={{ width: '35%' }} />
+                            </div>
+                            <div className="profile-card">
+                                <span className="profile-skeleton profile-skeleton-row" />
+                                <span className="profile-skeleton profile-skeleton-row" />
+                                <span className="profile-skeleton profile-skeleton-row" />
+                            </div>
+                        </>
+                    )}
 
                     {!profileLoading && profileError && (
-                        <p className="settings-pin-error">{profileError}</p>
+                        <div className="profile-state">
+                            <span className="profile-state-icon">⚠️</span>
+                            <p>{profileError}</p>
+                            <button className="profile-retry-btn" onClick={fetchProfile}>Coba lagi</button>
+                        </div>
                     )}
 
                     {!profileLoading && !profileError && profile && !isEditingProfile && (
                         <>
-                            <div className="profile-avatar-block">
-                                <span className="settings-profile-avatar settings-profile-avatar-lg">👤</span>
-                                <p className="settings-profile-detail-name">{profile.nama_lengkap}</p>
-                                <span className={`dash-status-badge ${profile.status_akun === 'aktif' ? 'ok' : 'danger'}`}>
-                                    {profile.status_akun}
-                                </span>
-                            </div>
-
-                            <div className="settings-profile-detail-list">
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Peran</span>
-                                    <span className="settings-profile-detail-value">{profile.peran}</span>
+                            <section className="profile-hero">
+                                <span className="profile-avatar">{getInitial(profile.nama_lengkap)}</span>
+                                <h2 className="profile-name">{profile.nama_lengkap}</h2>
+                                <p className="profile-email-sub">{profile.email}</p>
+                                <div className="profile-hero-chips">
+                                    <span className={`dash-status-badge ${profile.status_akun === 'aktif' ? 'ok' : 'danger'}`}>
+                                        {capitalize(profile.status_akun)}
+                                    </span>
+                                    {profile.peran && (
+                                        <span className="profile-chip">{capitalize(profile.peran)}</span>
+                                    )}
+                                    {profile.umur != null && (
+                                        <span className="profile-chip">{profile.umur} tahun</span>
+                                    )}
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Email</span>
-                                    <span className="settings-profile-detail-value">
-                                        {profile.email}{' '}
-                                        {profile.email_verified ? '✓' : '(belum diverifikasi)'}
+                            </section>
+
+                            <h3 className="profile-section-title">Informasi Akun</h3>
+                            <div className="profile-card">
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">✉️</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Email</span>
+                                        <span className="profile-row-value">{profile.email}</span>
+                                    </div>
+                                    <span className={`dash-status-badge ${profile.email_verified ? 'ok' : 'warn'}`}>
+                                        {profile.email_verified ? 'Terverifikasi' : 'Belum verifikasi'}
                                     </span>
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Nomor Telepon</span>
-                                    <span className="settings-profile-detail-value">{profile.nomor_telepon ?? '-'}</span>
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">📞</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Nomor Telepon</span>
+                                        <span className="profile-row-value">{profile.nomor_telepon || '-'}</span>
+                                    </div>
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Tanggal Lahir</span>
-                                    <span className="settings-profile-detail-value">{profile.tanggal_lahir ?? '-'}</span>
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">🎂</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Tanggal Lahir</span>
+                                        <span className="profile-row-value">{formatTanggalLahir(profile.tanggal_lahir)}</span>
+                                    </div>
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Umur</span>
-                                    <span className="settings-profile-detail-value">
-                                        {profile.umur != null ? `${profile.umur} tahun` : '-'}
-                                    </span>
-                                </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Alamat</span>
-                                    <span className="settings-profile-detail-value">{profile.alamat ?? '-'}</span>
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">📍</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Alamat</span>
+                                        <span className="profile-row-value">{profile.alamat || '-'}</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <button className="settings-pin-submit" onClick={startEditProfile}>
-                                Edit Profil
+                            <button className="profile-primary-btn" onClick={startEditProfile}>
+                                ✏️ Edit Profil
                             </button>
                         </>
                     )}
 
                     {!profileLoading && !profileError && profile && isEditingProfile && (
-                        <form className="settings-pin-form" onSubmit={handleSubmitEditProfile}>
-                            <label className="settings-pin-label" htmlFor="edit-nama">Nama Lengkap</label>
-                            <input
-                                id="edit-nama"
-                                className="settings-pin-input profile-text-input"
-                                type="text"
-                                value={editForm.nama_lengkap}
-                                onChange={handleEditFieldChange('nama_lengkap')}
-                            />
-                            <p className="settings-pin-desc" style={{ fontSize: 12, color: '#a5730c' }}>
-                                ⚠️ Mengubah email akan membuat status verifikasi email direset.
-                            </p>
-                            <label className="settings-pin-label" htmlFor="edit-email">Email</label>
-                            <input
-                                id="edit-email"
-                                className="settings-pin-input profile-text-input"
-                                type="email"
-                                value={editForm.email}
-                                onChange={handleEditFieldChange('email')}
-                            />
+                        <form className="profile-card profile-form" onSubmit={handleSubmitEditProfile}>
+                            <div className="profile-field">
+                                <label htmlFor="edit-nama">Nama Lengkap</label>
+                                <input
+                                    id="edit-nama"
+                                    type="text"
+                                    value={editForm.nama_lengkap}
+                                    onChange={handleEditFieldChange('nama_lengkap')}
+                                    autoComplete="name"
+                                />
+                            </div>
 
-                            <label className="settings-pin-label" htmlFor="edit-telepon">Nomor Telepon</label>
-                            <input
-                                id="edit-telepon"
-                                className="settings-pin-input profile-text-input"
-                                type="text"
-                                inputMode="numeric"
-                                value={editForm.nomor_telepon}
-                                onChange={handleEditFieldChange('nomor_telepon')}
-                            />
+                            <div className="profile-field">
+                                <label htmlFor="edit-email">Email</label>
+                                <input
+                                    id="edit-email"
+                                    type="email"
+                                    value={editForm.email}
+                                    onChange={handleEditFieldChange('email')}
+                                    autoComplete="email"
+                                />
+                                <p className="profile-notice">
+                                    Mengubah email akan mereset status verifikasi email.
+                                </p>
+                            </div>
 
-                            <label className="settings-pin-label" htmlFor="edit-lahir">Tanggal Lahir</label>
-                            <input
-                                id="edit-lahir"
-                                className="settings-pin-input profile-text-input"
-                                type="date"
-                                value={editForm.tanggal_lahir}
-                                onChange={handleEditFieldChange('tanggal_lahir')}
-                            />
+                            <div className="profile-field">
+                                <label htmlFor="edit-telepon">Nomor Telepon</label>
+                                <input
+                                    id="edit-telepon"
+                                    type="tel"
+                                    inputMode="numeric"
+                                    value={editForm.nomor_telepon}
+                                    onChange={handleEditFieldChange('nomor_telepon')}
+                                    autoComplete="tel"
+                                />
+                            </div>
 
-                            <label className="settings-pin-label" htmlFor="edit-alamat">Alamat</label>
-                            <textarea
-                                id="edit-alamat"
-                                className="settings-pin-input profile-textarea"
-                                rows={3}
-                                value={editForm.alamat}
-                                onChange={handleEditFieldChange('alamat')}
-                            />
+                            <div className="profile-field">
+                                <label htmlFor="edit-lahir">Tanggal Lahir</label>
+                                <input
+                                    id="edit-lahir"
+                                    type="date"
+                                    value={editForm.tanggal_lahir}
+                                    onChange={handleEditFieldChange('tanggal_lahir')}
+                                />
+                            </div>
 
-                            {editError && <p className="settings-pin-error">{editError}</p>}
+                            <div className="profile-field">
+                                <label htmlFor="edit-alamat">Alamat</label>
+                                <textarea
+                                    id="edit-alamat"
+                                    rows={3}
+                                    value={editForm.alamat}
+                                    onChange={handleEditFieldChange('alamat')}
+                                />
+                            </div>
 
-                            <div className="settings-pin-form-actions">
-                                <button type="button" className="settings-pin-cancel" onClick={cancelEditProfile}>
+                            {editError && <p className="settings-pin-error profile-form-error">{editError}</p>}
+
+                            <div className="profile-form-actions">
+                                <button type="button" className="profile-secondary-btn" onClick={cancelEditProfile} disabled={editSubmitting}>
                                     Batal
                                 </button>
-                                <button type="submit" className="settings-pin-submit" disabled={editSubmitting}>
+                                <button type="submit" className="profile-primary-btn" disabled={editSubmitting}>
                                     {editSubmitting ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
@@ -1134,7 +1269,7 @@ export default function DriverDashboard({ user: authUser, onLogout }) {
                                     </button>
 
                                 <div className="settings-menu">
-                                    <button className="settings-menu-item">
+                                    <button className="settings-menu-item" onClick={onNavigateToVehicles}>
                                         <span className="settings-menu-icon">🚗</span>
                                         <span className="settings-menu-label">Kendaraan Saya</span>
                                         <span className="settings-menu-arrow">›</span>
