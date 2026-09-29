@@ -4,6 +4,7 @@ import Registrasi from './Registrasi';
 import Login from './Login';
 import DriverDashboard from './DriverDashboard';
 import KelolaKendaraan from './KelolaKendaraan';
+import Bantuan from './Bantuan';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
 
 export default function App() {
@@ -49,10 +50,14 @@ export default function App() {
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToVehicles={() => setCurrentPage('vehicles')}
+                    onNavigateToHelp={() => setCurrentPage('help')}
                 />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />
+            )}
+            {currentPage === 'help' && (
+                <Bantuan onBack={() => setCurrentPage('dashboard')} />
             )}
         </div>
     );
