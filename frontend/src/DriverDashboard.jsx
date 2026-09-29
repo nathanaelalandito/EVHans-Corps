@@ -153,6 +153,25 @@ const DRIVER_ICON = L.divIcon({
     iconAnchor: [11, 11],
 });
 
+const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+// "2000-05-12" -> "12 Mei 2000" (di-parse manual supaya tidak geser hari karena timezone).
+function formatTanggalLahir(value) {
+    if (!value) return '-';
+    const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
+    if (!y || !m || !d) return String(value);
+    return `${d} ${BULAN_ID[m - 1]} ${y}`;
+}
+
+function getInitial(name) {
+    return (name || '?').trim().charAt(0).toUpperCase() || '?';
+}
+
+function capitalize(str) {
+    const s = String(str ?? '');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles }) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
     // saldo selalu ditarik live dari GET /api/wallet (lihat effect di bawah)
@@ -1034,125 +1053,171 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                ============================================================ */}
             <div className={`profile-screen ${view === 'profile' ? 'is-active' : 'is-hidden'}`}>
                 <header className="profile-header">
-                    <button className="mapdash-round-btn" onClick={() => { setView('home'); setIsEditingProfile(false); }} aria-label="Kembali">
-                        ←
-                    </button>
-                    <span className="profile-header-title">Profil Saya</span>
-                    <span style={{ width: 40 }} />
+                    <div className="profile-header-top">
+                        <button
+                            className="profile-back-btn"
+                            onClick={() => { setView('home'); setIsEditingProfile(false); }}
+                            aria-label="Kembali"
+                        >
+                            ←
+                        </button>
+                        <h1 className="profile-header-title">
+                            {isEditingProfile ? 'Edit Profil' : 'Profil Saya'}
+                        </h1>
+                        <span className="profile-header-spacer" />
+                    </div>
                 </header>
 
                 <main className="profile-content">
-                    {profileLoading && <p className="dash-empty">Memuat profil...</p>}
+                    {profileLoading && (
+                        <>
+                            <div className="profile-hero profile-skeleton-hero">
+                                <span className="profile-skeleton profile-skeleton-avatar" />
+                                <span className="profile-skeleton profile-skeleton-line" style={{ width: '55%' }} />
+                                <span className="profile-skeleton profile-skeleton-line" style={{ width: '35%' }} />
+                            </div>
+                            <div className="profile-card">
+                                <span className="profile-skeleton profile-skeleton-row" />
+                                <span className="profile-skeleton profile-skeleton-row" />
+                                <span className="profile-skeleton profile-skeleton-row" />
+                            </div>
+                        </>
+                    )}
 
                     {!profileLoading && profileError && (
-                        <p className="settings-pin-error">{profileError}</p>
+                        <div className="profile-state">
+                            <span className="profile-state-icon">⚠️</span>
+                            <p>{profileError}</p>
+                            <button className="profile-retry-btn" onClick={fetchProfile}>Coba lagi</button>
+                        </div>
                     )}
 
                     {!profileLoading && !profileError && profile && !isEditingProfile && (
                         <>
-                            <div className="profile-avatar-block">
-                                <span className="settings-profile-avatar settings-profile-avatar-lg">👤</span>
-                                <p className="settings-profile-detail-name">{profile.nama_lengkap}</p>
-                                <span className={`dash-status-badge ${profile.status_akun === 'aktif' ? 'ok' : 'danger'}`}>
-                                    {profile.status_akun}
-                                </span>
-                            </div>
-
-                            <div className="settings-profile-detail-list">
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Peran</span>
-                                    <span className="settings-profile-detail-value">{profile.peran}</span>
+                            <section className="profile-hero">
+                                <span className="profile-avatar">{getInitial(profile.nama_lengkap)}</span>
+                                <h2 className="profile-name">{profile.nama_lengkap}</h2>
+                                <p className="profile-email-sub">{profile.email}</p>
+                                <div className="profile-hero-chips">
+                                    <span className={`dash-status-badge ${profile.status_akun === 'aktif' ? 'ok' : 'danger'}`}>
+                                        {capitalize(profile.status_akun)}
+                                    </span>
+                                    {profile.peran && (
+                                        <span className="profile-chip">{capitalize(profile.peran)}</span>
+                                    )}
+                                    {profile.umur != null && (
+                                        <span className="profile-chip">{profile.umur} tahun</span>
+                                    )}
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Email</span>
-                                    <span className="settings-profile-detail-value">
-                                        {profile.email}{' '}
-                                        {profile.email_verified ? '✓' : '(belum diverifikasi)'}
+                            </section>
+
+                            <h3 className="profile-section-title">Informasi Akun</h3>
+                            <div className="profile-card">
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">✉️</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Email</span>
+                                        <span className="profile-row-value">{profile.email}</span>
+                                    </div>
+                                    <span className={`dash-status-badge ${profile.email_verified ? 'ok' : 'warn'}`}>
+                                        {profile.email_verified ? 'Terverifikasi' : 'Belum verifikasi'}
                                     </span>
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Nomor Telepon</span>
-                                    <span className="settings-profile-detail-value">{profile.nomor_telepon ?? '-'}</span>
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">📞</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Nomor Telepon</span>
+                                        <span className="profile-row-value">{profile.nomor_telepon || '-'}</span>
+                                    </div>
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Tanggal Lahir</span>
-                                    <span className="settings-profile-detail-value">{profile.tanggal_lahir ?? '-'}</span>
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">🎂</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Tanggal Lahir</span>
+                                        <span className="profile-row-value">{formatTanggalLahir(profile.tanggal_lahir)}</span>
+                                    </div>
                                 </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Umur</span>
-                                    <span className="settings-profile-detail-value">
-                                        {profile.umur != null ? `${profile.umur} tahun` : '-'}
-                                    </span>
-                                </div>
-                                <div className="settings-profile-detail-item">
-                                    <span className="settings-menu-label">Alamat</span>
-                                    <span className="settings-profile-detail-value">{profile.alamat ?? '-'}</span>
+                                <div className="profile-row">
+                                    <span className="profile-row-icon">📍</span>
+                                    <div className="profile-row-body">
+                                        <span className="profile-row-label">Alamat</span>
+                                        <span className="profile-row-value">{profile.alamat || '-'}</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <button className="settings-pin-submit" onClick={startEditProfile}>
-                                Edit Profil
+                            <button className="profile-primary-btn" onClick={startEditProfile}>
+                                ✏️ Edit Profil
                             </button>
                         </>
                     )}
 
                     {!profileLoading && !profileError && profile && isEditingProfile && (
-                        <form className="settings-pin-form" onSubmit={handleSubmitEditProfile}>
-                            <label className="settings-pin-label" htmlFor="edit-nama">Nama Lengkap</label>
-                            <input
-                                id="edit-nama"
-                                className="settings-pin-input profile-text-input"
-                                type="text"
-                                value={editForm.nama_lengkap}
-                                onChange={handleEditFieldChange('nama_lengkap')}
-                            />
-                            <p className="settings-pin-desc" style={{ fontSize: 12, color: '#a5730c' }}>
-                                ⚠️ Mengubah email akan membuat status verifikasi email direset.
-                            </p>
-                            <label className="settings-pin-label" htmlFor="edit-email">Email</label>
-                            <input
-                                id="edit-email"
-                                className="settings-pin-input profile-text-input"
-                                type="email"
-                                value={editForm.email}
-                                onChange={handleEditFieldChange('email')}
-                            />
+                        <form className="profile-card profile-form" onSubmit={handleSubmitEditProfile}>
+                            <div className="profile-field">
+                                <label htmlFor="edit-nama">Nama Lengkap</label>
+                                <input
+                                    id="edit-nama"
+                                    type="text"
+                                    value={editForm.nama_lengkap}
+                                    onChange={handleEditFieldChange('nama_lengkap')}
+                                    autoComplete="name"
+                                />
+                            </div>
 
-                            <label className="settings-pin-label" htmlFor="edit-telepon">Nomor Telepon</label>
-                            <input
-                                id="edit-telepon"
-                                className="settings-pin-input profile-text-input"
-                                type="text"
-                                inputMode="numeric"
-                                value={editForm.nomor_telepon}
-                                onChange={handleEditFieldChange('nomor_telepon')}
-                            />
+                            <div className="profile-field">
+                                <label htmlFor="edit-email">Email</label>
+                                <input
+                                    id="edit-email"
+                                    type="email"
+                                    value={editForm.email}
+                                    onChange={handleEditFieldChange('email')}
+                                    autoComplete="email"
+                                />
+                                <p className="profile-notice">
+                                    Mengubah email akan mereset status verifikasi email.
+                                </p>
+                            </div>
 
-                            <label className="settings-pin-label" htmlFor="edit-lahir">Tanggal Lahir</label>
-                            <input
-                                id="edit-lahir"
-                                className="settings-pin-input profile-text-input"
-                                type="date"
-                                value={editForm.tanggal_lahir}
-                                onChange={handleEditFieldChange('tanggal_lahir')}
-                            />
+                            <div className="profile-field">
+                                <label htmlFor="edit-telepon">Nomor Telepon</label>
+                                <input
+                                    id="edit-telepon"
+                                    type="tel"
+                                    inputMode="numeric"
+                                    value={editForm.nomor_telepon}
+                                    onChange={handleEditFieldChange('nomor_telepon')}
+                                    autoComplete="tel"
+                                />
+                            </div>
 
-                            <label className="settings-pin-label" htmlFor="edit-alamat">Alamat</label>
-                            <textarea
-                                id="edit-alamat"
-                                className="settings-pin-input profile-textarea"
-                                rows={3}
-                                value={editForm.alamat}
-                                onChange={handleEditFieldChange('alamat')}
-                            />
+                            <div className="profile-field">
+                                <label htmlFor="edit-lahir">Tanggal Lahir</label>
+                                <input
+                                    id="edit-lahir"
+                                    type="date"
+                                    value={editForm.tanggal_lahir}
+                                    onChange={handleEditFieldChange('tanggal_lahir')}
+                                />
+                            </div>
 
-                            {editError && <p className="settings-pin-error">{editError}</p>}
+                            <div className="profile-field">
+                                <label htmlFor="edit-alamat">Alamat</label>
+                                <textarea
+                                    id="edit-alamat"
+                                    rows={3}
+                                    value={editForm.alamat}
+                                    onChange={handleEditFieldChange('alamat')}
+                                />
+                            </div>
 
-                            <div className="settings-pin-form-actions">
-                                <button type="button" className="settings-pin-cancel" onClick={cancelEditProfile}>
+                            {editError && <p className="settings-pin-error profile-form-error">{editError}</p>}
+
+                            <div className="profile-form-actions">
+                                <button type="button" className="profile-secondary-btn" onClick={cancelEditProfile} disabled={editSubmitting}>
                                     Batal
                                 </button>
-                                <button type="submit" className="settings-pin-submit" disabled={editSubmitting}>
+                                <button type="submit" className="profile-primary-btn" disabled={editSubmitting}>
                                     {editSubmitting ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
