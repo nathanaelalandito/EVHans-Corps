@@ -2783,3 +2783,207 @@
     text-decoration: underline;
     cursor: pointer;
 }
+
+/* ==================================================================
+   Kartu rute ke station terpilih (melayang di atas peta, di bawah
+   baris filter konektor)
+   ================================================================== */
+.route-card {
+    position: absolute;
+    top: 116px;
+    left: 16px;
+    right: 16px;
+    z-index: 9;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.2);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: routeCardIn 0.25s ease both;
+}
+
+@keyframes routeCardIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.route-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.route-card-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.route-card-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7259;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.route-card-name {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 14.5px;
+    color: #1b4d2e;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.route-card-close {
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: #eef0df;
+    color: #55603f;
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.route-card-summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.route-card-dist,
+.route-card-eta {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: #1b4d2e;
+    line-height: 1.1;
+}
+
+.route-card-dot {
+    color: #9aa287;
+    font-weight: 700;
+}
+
+.route-card-note {
+    flex-basis: 100%;
+    font-size: 11.5px;
+    color: #6b7259;
+}
+
+.route-card-status,
+.route-card-error {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.4;
+}
+
+.route-card-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #3b4a2c;
+}
+
+.route-card-error {
+    color: #a12c2c;
+    background: #fdecec;
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+.route-card-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #cfe6c8;
+    border-top-color: #2e7d32;
+    border-radius: 50%;
+    animation: routeSpin 0.8s linear infinite;
+}
+
+@keyframes routeSpin {
+    to { transform: rotate(360deg); }
+}
+
+.route-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.route-card-primary {
+    background: #2e7d32;
+    color: #ffffff;
+    border: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.route-card-primary:disabled {
+    background: #cfd4c2;
+    cursor: progress;
+}
+
+.route-card-secondary {
+    background: #eaf7e5;
+    color: #1b4d2e;
+    border: none;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 9px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.route-card-primary:focus-visible,
+.route-card-secondary:focus-visible,
+.route-card-close:focus-visible {
+    outline: 2px solid #2e7d32;
+    outline-offset: 2px;
+}
+
+/* Tablet: sejajar dengan lebar bottom sheet */
+@media (min-width: 700px) {
+    .route-card {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: 92%;
+        max-width: 560px;
+        animation: none;
+    }
+}
+
+/* Desktop: sheet jadi panel kiri 380px, kartu rute di sisi kanannya */
+@media (min-width: 1024px) {
+    .route-card {
+        top: 96px;
+        left: 428px;
+        right: auto;
+        transform: none;
+        width: 380px;
+        max-width: calc(100% - 452px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .route-card,
+    .route-card-spinner {
+        animation: none;
+    }
+}
