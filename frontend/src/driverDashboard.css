@@ -823,6 +823,9 @@
     position: relative;
     z-index: 2;
     animation: mapdashFadeUp 0.4s ease 0.05s both;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .home-wallet-label {
@@ -853,6 +856,61 @@
     border-radius: 12px;
     cursor: pointer;
     flex-shrink: 0;
+}
+
+.home-wallet-arrow {
+    color: #2e7d32;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.8;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.home-wallet-eye {
+    background: #eaf7e5;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.home-wallet-eye:hover {
+    background: #d7f0cd;
+}
+
+.home-wallet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(27, 77, 46, 0.26);
+}
+
+.home-wallet-card:hover .home-wallet-arrow {
+    transform: translateX(3px);
+    opacity: 1;
+}
+
+.home-wallet-card:hover .home-wallet-value {
+    color: #2e7d32;
+}
+
+.home-wallet-card:active {
+    transform: translateY(1px) scale(0.985);
+    box-shadow: 0 6px 16px rgba(27, 77, 46, 0.18);
+    background: #f6fbef;
+}
+
+.home-wallet-card:focus-visible {
+    outline: 3px solid #2e7d32;
+    outline-offset: 2px;
 }
 
 /* --- Konten utama --- */
@@ -2129,6 +2187,9 @@
     position: relative;
     z-index: 2;
     animation: mapdashFadeUp 0.4s ease 0.05s both;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .home-wallet-label {
@@ -2159,6 +2220,61 @@
     border-radius: 12px;
     cursor: pointer;
     flex-shrink: 0;
+}
+
+.home-wallet-arrow {
+    color: #2e7d32;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.8;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.home-wallet-eye {
+    background: #eaf7e5;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.home-wallet-eye:hover {
+    background: #d7f0cd;
+}
+
+.home-wallet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(27, 77, 46, 0.26);
+}
+
+.home-wallet-card:hover .home-wallet-arrow {
+    transform: translateX(3px);
+    opacity: 1;
+}
+
+.home-wallet-card:hover .home-wallet-value {
+    color: #2e7d32;
+}
+
+.home-wallet-card:active {
+    transform: translateY(1px) scale(0.985);
+    box-shadow: 0 6px 16px rgba(27, 77, 46, 0.18);
+    background: #f6fbef;
+}
+
+.home-wallet-card:focus-visible {
+    outline: 3px solid #2e7d32;
+    outline-offset: 2px;
 }
 
 /* --- Konten utama --- */

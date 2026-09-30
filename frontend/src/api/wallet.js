@@ -1,10 +1,34 @@
 import api from './client';
 
-// Semua fungsi di sini melempar error axios apa adanya kalau gagal —
-// biar komponen yang menampilkan pesan dari error.response.data.
+// Selama satu sesi SPA, data dompet disimpan di cache modul supaya layar
+// dompet bisa langsung tampil tanpa menunggu request API (yang di dev
+// server butuh ~500ms). Data selalu di-refresh di latar belakang.
+
+let cachedWallet = null;
+let cachedTransactions = [];
+
+export function clearWalletCache() {
+    cachedWallet = null;
+    cachedTransactions = [];
+}
+
+export function getCachedWallet() {
+    return cachedWallet;
+}
+
+export function getCachedTransactions() {
+    return cachedTransactions;
+}
 
 export async function getWallet() {
     const { data } = await api.get('/wallet');
+    cachedWallet = data;
+    return data;
+}
+
+export async function getTransactions() {
+    const { data } = await api.get('/wallet/transactions');
+    cachedTransactions = data.transactions || [];
     return data;
 }
 

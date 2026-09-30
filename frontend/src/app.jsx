@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Welcome from './Welcome';
 import Registrasi from './Registrasi';
 import Login from './Login';
 import DriverDashboard from './DriverDashboard';
 import KelolaKendaraan from './KelolaKendaraan';
 import Bantuan from './Bantuan';
+import DompetDigital from './DompetDigital';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
+import { clearWalletCache } from './api/wallet';
 
 export default function App() {
     // Kalau sudah ada token tersimpan (login sebelumnya), langsung ke dashboard.
@@ -20,6 +22,7 @@ export default function App() {
     };
 
     const handleLogout = async () => {
+        clearWalletCache();
         await logout().catch(() => {}); // tetap keluar meski request logout gagal
         setUser(null);
         setCurrentPage('welcome');
@@ -51,7 +54,11 @@ export default function App() {
                     onLogout={handleLogout}
                     onNavigateToVehicles={() => setCurrentPage('vehicles')}
                     onNavigateToHelp={() => setCurrentPage('help')}
+                    onNavigateToWallet={() => setCurrentPage('wallet')}
                 />
+            )}
+            {currentPage === 'wallet' && (
+                <DompetDigital onBack={() => setCurrentPage('dashboard')} />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />

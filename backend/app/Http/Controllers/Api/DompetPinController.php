@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Dompet;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -45,6 +46,57 @@ class DompetPinController extends Controller
             'pin_sudah_diset' => $wallet->hasPin(),
             'terkunci' => $wallet->isLocked(),
             'terkunci_sampai' => $wallet->isLocked() ? $wallet->locked_until : null,
+        ]);
+    }
+
+    /**
+     * GET /api/wallet/transactions
+     * Riwayat/mutasi dompet: gabungan Top Up dan Pembayaran Charging,
+     * diurutkan terbaru dahulu. Hanya baca — update saldo tetap lewat
+     * modul Top Up / Payment masing-masing.
+     */
+    public function transactions(Request $request)
+    {
+        $wallet = $this->getOrCreateWallet($request);
+        $userId = $request->user()->id_user;
+
+        $topups = DB::table('topup')
+            ->join('dompet', 'dompet.id_wallet', '=', 'topup.id_wallet')
+            ->where('dompet.id_user', $userId)
+            ->select('topup.id_topup', 'topup.nominal', 'topup.status_topup', 'topup.waktu_topup')
+            ->get()
+            ->map(fn ($t) => [
+                'id' => 'TOP-' . $t->id_topup,
+                'jenis' => 'Top Up',
+                'tipe' => 'masuk',
+                'nominal' => $t->nominal,
+                'status' => $t->status_topup,
+                'waktu' => $t->waktu_topup,
+            ]);
+
+        $payments = DB::table('payment')
+            ->join('charging_session', 'charging_session.id_session', '=', 'payment.id_session')
+            ->where('charging_session.id_user', $userId)
+            ->select('payment.id_payment', 'payment.total_bayar', 'payment.status_pembayaran', 'payment.waktu_pembayaran')
+            ->get()
+            ->map(fn ($p) => [
+                'id' => 'PAY-' . $p->id_payment,
+                'jenis' => 'Pembayaran Charging',
+                'tipe' => 'keluar',
+                'nominal' => $p->total_bayar,
+                'status' => $p->status_pembayaran,
+                'waktu' => $p->waktu_pembayaran,
+            ]);
+
+        $transactions = collect($topups)
+            ->concat($payments)
+            ->sortByDesc('waktu')
+            ->values()
+            ->take(50);
+
+        return response()->json([
+            'saldo' => $wallet->saldo,
+            'transactions' => $transactions,
         ]);
     }
 

@@ -173,7 +173,7 @@ function capitalize(str) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp }) {
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp, onNavigateToWallet }) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
     // saldo selalu ditarik live dari GET /api/wallet (lihat effect di bawah)
     // supaya selalu sinkron dengan database.
@@ -201,6 +201,17 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     // wallet = { saldo, status_dompet, pin_sudah_diset, terkunci, terkunci_sampai }
     const [wallet, setWallet] = useState(null);
     const [walletLoading, setWalletLoading] = useState(true);
+
+    // Sembunyikan/lihat saldo — sinkron dengan pengaturan di halaman dompet.
+    const [hideWalletSaldo, setHideWalletSaldo] = useState(
+        () => localStorage.getItem('ev_hide_saldo') === '1'
+    );
+    const toggleHideWalletSaldo = () =>
+        setHideWalletSaldo((v) => {
+            const next = !v;
+            localStorage.setItem('ev_hide_saldo', next ? '1' : '0');
+            return next;
+        });
 
     const fetchWallet = async () => {
         try {
@@ -798,14 +809,48 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     </div>
                 </header>
 
-                <div className="home-wallet-card">
+                <div
+                    className="home-wallet-card"
+                    role="button"
+                    tabIndex={0}
+                    onClick={onNavigateToWallet}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onNavigateToWallet();
+                        }
+                    }}
+                    aria-label="Buka dompet digital"
+                >
                     <div className="home-wallet-info">
                         <p className="home-wallet-label">Saldo Dompet</p>
                         <p className="home-wallet-value">
-                            {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
+                            {walletLoading
+                                ? '...'
+                                : hideWalletSaldo
+                                    ? 'Rp ••••••'
+                                    : formatRupiah(wallet?.saldo ?? 0)}
                         </p>
                     </div>
-                    <button className="home-wallet-topup">+ Top Up</button>
+                    <button
+                        className="home-wallet-eye"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleHideWalletSaldo();
+                        }}
+                        aria-label={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                        title={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                    >
+                        {hideWalletSaldo ? '🙈' : '👁️'}
+                    </button>
+                    <span className="home-wallet-arrow" aria-hidden="true">›</span>
+                    <button
+                        className="home-wallet-topup"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Fitur Top Up segera hadir"
+                    >
+                        + Top Up
+                    </button>
                 </div>
 
                 <main className="home-content">

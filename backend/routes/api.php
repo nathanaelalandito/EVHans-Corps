@@ -18,6 +18,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanc
 // Kelola PIN dompet (semua butuh login via Sanctum)
 Route::middleware('auth:sanctum')->prefix('wallet')->group(function () {
     Route::get('/', [DompetPinController::class, 'show']);
+    Route::get('/transactions', [DompetPinController::class, 'transactions']);
     Route::post('/pin', [DompetPinController::class, 'setPin']);
     Route::put('/pin', [DompetPinController::class, 'changePin']);
     Route::post('/pin/verify', [DompetPinController::class, 'verifyPin']);
