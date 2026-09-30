@@ -11,7 +11,6 @@ class ProfileDriverResource extends JsonResource
     public function toArray(Request $request): array
     {
         $profile = $this->profile;
-
         return [
             'id_user' => $this->id_user,
             'nama_lengkap' => $profile?->nama_lengkap,
