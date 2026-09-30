@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\UserProfile;
+ use App\Models\Vehicle;
 
 class User extends Authenticatable
 {
@@ -28,7 +29,7 @@ class User extends Authenticatable
         return $this->hasOne(UserProfile::class, 'id_user', 'id_user');
     }
 
-      public function vehicles()
+    public function vehicles()
     {
         return $this->hasMany(Vehicle::class, 'id_user', 'id_user'); // sesuaikan nama model/tabel kendaraan kamu
     }
