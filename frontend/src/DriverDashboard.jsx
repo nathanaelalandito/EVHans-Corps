@@ -172,7 +172,7 @@ function capitalize(str) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles }) {
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp }) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
     // saldo selalu ditarik live dari GET /api/wallet (lihat effect di bawah)
     // supaya selalu sinkron dengan database.
@@ -1299,7 +1299,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         <span className="settings-menu-label">Notifikasi</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
-                                    <button className="settings-menu-item">
+                                    <button className="settings-menu-item" onClick={onNavigateToHelp}>
                                         <span className="settings-menu-icon">❓</span>
                                         <span className="settings-menu-label">Bantuan</span>
                                         <span className="settings-menu-arrow">›</span>
