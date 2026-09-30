@@ -8,6 +8,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\UserProfile;
  use App\Models\Vehicle;
+use App\Models\ChargingSession;
 
 class User extends Authenticatable
 {
