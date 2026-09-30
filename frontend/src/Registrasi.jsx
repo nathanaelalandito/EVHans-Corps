@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './registrasi.css';
 
-export default function Registrasi({ onBackToWelcome }) { // <--- Tambahkan { onBackToWelcome } di sini
+export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -151,6 +151,15 @@ export default function Registrasi({ onBackToWelcome }) { // <--- Tambahkan { on
                         {loading ? 'Memproses...' : 'Daftar Sekarang'}
                     </button>
                 </form>
+
+                {onNavigateToLogin && (
+                    <p className="subtitle" style={{ marginTop: '1rem' }}>
+                        Sudah punya akun?{' '}
+                        <button type="button" onClick={onNavigateToLogin} className="btn-back" style={{ display: 'inline' }}>
+                            Masuk di sini
+                        </button>
+                    </p>
+                )}
             </div>
         </div>
     );
