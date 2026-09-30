@@ -2,7 +2,7 @@ import React from 'react';
 import './welcome.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg'; // Sesuaikan lokasi logo kamu
 
-export default function Welcome({ onNavigateToRegister }) {
+export default function Welcome({ onNavigateToRegister, onNavigateToLogin }) {
     return (
         <div className="welcome-container">
             <div className="welcome-card">
@@ -18,7 +18,7 @@ export default function Welcome({ onNavigateToRegister }) {
                 </p>
 
                 <div className="welcome-actions">
-                    <button className="btn-primary">
+                    <button onClick={onNavigateToLogin} className="btn-primary">
                         Login Akun
                     </button>
                     
