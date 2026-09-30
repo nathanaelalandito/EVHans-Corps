@@ -5,6 +5,7 @@ import './driverDashboard.css';
 import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
+import { getDrivingRoute, googleMapsDirectionsUrl, formatJarak, formatDurasi } from './api/routing';
 
 // Ambil pesan error yang enak dibaca dari response axios (baik yang
 // bentuknya {message} maupun {errors: {field: [..]}} ala Laravel).
@@ -350,6 +351,14 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     }, [activeVehicleId]);
 
     const activeVehicle = vehicles.find((v) => v.id_vehicle === activeVehicleId) ?? null;
+    const selectedStation = stations.find((s) => s.id_location === selectedStationId) ?? null;
+
+    // Rute ke station terpilih. route = { stationId, coords, distanceM, durationS }.
+    const [route, setRoute] = useState(null);
+    const [routeStatus, setRouteStatus] = useState('idle'); // 'idle' | 'loading' | 'error'
+    const [routeError, setRouteError] = useState('');
+    const routeLayerRef = useRef(null);
+    const routeAbortRef = useRef(null);
 
     const mapNodeRef = useRef(null);
     const mapRef = useRef(null);
@@ -461,6 +470,17 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [connectorFilter, stations]);
+
+    // Ganti station terpilih -> rute lama tidak relevan lagi, hapus.
+    useEffect(() => {
+        if (routeLayerRef.current || routeAbortRef.current || routeStatus !== 'idle') {
+            clearRoute();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStationId]);
+
+    // Batalkan request rute yang masih berjalan saat komponen dilepas.
+    useEffect(() => () => routeAbortRef.current?.abort(), []);
 
     // Timer sesi charging berjalan — di production, energi_kwh & waktu
     // sebaiknya di-refresh dari data yang dikirim Perangkat Charger (FR19).
@@ -635,6 +655,71 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         if (map) map.flyTo([s.lat, s.lng], 16);
         setSelectedStationId(s.id_location);
         markersRef.current[s.id_location]?.openPopup();
+    };
+
+    const clearRoute = () => {
+        routeAbortRef.current?.abort();
+        routeAbortRef.current = null;
+        if (routeLayerRef.current && mapRef.current) {
+            mapRef.current.removeLayer(routeLayerRef.current);
+        }
+        routeLayerRef.current = null;
+        setRoute(null);
+        setRouteStatus('idle');
+        setRouteError('');
+    };
+
+    // Hitung & gambar rute dari posisi driver saat ini ke station.
+    // Dipakai juga untuk "Perbarui rute" (posisi driver terus bergerak).
+    const handleShowRoute = async (station) => {
+        const map = mapRef.current;
+        if (!map || !station) return;
+
+        // Tanpa GPS asli, posisi driver hanyalah lokasi default — rute dari
+        // titik palsu justru menyesatkan, jadi jangan dihitung.
+        if (locationStatus !== 'live') {
+            setRouteStatus('error');
+            setRouteError('Lokasi Anda belum terdeteksi. Aktifkan izin lokasi, lalu coba lagi.');
+            return;
+        }
+
+        routeAbortRef.current?.abort();
+        const controller = new AbortController();
+        routeAbortRef.current = controller;
+        setRouteStatus('loading');
+        setRouteError('');
+
+        try {
+            const result = await getDrivingRoute(driverPosition, station, controller.signal);
+            if (controller.signal.aborted) return;
+
+            if (routeLayerRef.current) map.removeLayer(routeLayerRef.current);
+            const lineStyle = { lineCap: 'round', lineJoin: 'round' };
+            routeLayerRef.current = L.layerGroup([
+                L.polyline(result.coords, { ...lineStyle, color: '#ffffff', weight: 10, opacity: 0.9 }), // garis tepi
+                L.polyline(result.coords, { ...lineStyle, color: '#2e7d32', weight: 6, opacity: 1 }),
+            ]).addTo(map);
+
+            // Sisakan ruang untuk elemen yang menutupi peta: panel kiri di
+            // desktop; filter (atas) & bottom sheet (bawah) di ponsel/tablet.
+            const isDesktop = window.innerWidth >= 1024;
+            map.fitBounds(L.latLngBounds(result.coords), {
+                paddingTopLeft: isDesktop ? [440, 150] : [32, 190],
+                paddingBottomRight: isDesktop ? [40, 40] : [32, 200],
+                maxZoom: 17,
+            });
+
+            setRoute({ stationId: station.id_location, ...result });
+            setRouteStatus('idle');
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            setRouteStatus('error');
+            setRouteError(
+                err.code === 'NO_ROUTE'
+                    ? 'Rute mobil ke station ini tidak ditemukan.'
+                    : 'Gagal memuat rute. Periksa koneksi internet, lalu coba lagi.'
+            );
+        }
     };
 
     const cycleVehicle = () => {
@@ -914,6 +999,73 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 {f}
                             </button>
                         ))}
+                    </div>
+                )}
+
+                {/* Kartu rute ke station terpilih */}
+                {!activeSession && selectedStation && (
+                    <div className="route-card" role="region" aria-label="Rute ke station">
+                        <div className="route-card-head">
+                            <div className="route-card-titles">
+                                <span className="route-card-eyebrow">Tujuan</span>
+                                <span className="route-card-name">{selectedStation.nama_lokasi}</span>
+                            </div>
+                            <button
+                                className="route-card-close"
+                                onClick={() => {
+                                    clearRoute();
+                                    setSelectedStationId(null);
+                                }}
+                                aria-label="Tutup kartu rute"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {route && route.stationId === selectedStation.id_location && (
+                            <div className="route-card-summary">
+                                <span className="route-card-dist">{formatJarak(route.distanceM)}</span>
+                                <span className="route-card-dot">·</span>
+                                <span className="route-card-eta">{formatDurasi(route.durationS)}</span>
+                                <span className="route-card-note">estimasi tanpa lalu lintas</span>
+                            </div>
+                        )}
+
+                        {routeStatus === 'loading' && (
+                            <p className="route-card-status" aria-live="polite">
+                                <span className="route-card-spinner" aria-hidden="true" /> Menghitung rute…
+                            </p>
+                        )}
+                        {routeStatus === 'error' && (
+                            <p className="route-card-error" role="alert">{routeError}</p>
+                        )}
+
+                        <div className="route-card-actions">
+                            <button
+                                className="route-card-primary"
+                                onClick={() => handleShowRoute(selectedStation)}
+                                disabled={routeStatus === 'loading'}
+                            >
+                                {route
+                                    ? '↻ Perbarui rute'
+                                    : routeStatus === 'error'
+                                    ? '↻ Coba lagi'
+                                    : '🧭 Tampilkan Rute'}
+                            </button>
+                            <a
+                                className="route-card-secondary"
+                                href={googleMapsDirectionsUrl(selectedStation)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Google Maps ↗
+                            </a>
+                            {route && (
+                                <button className="route-card-secondary" onClick={clearRoute}>
+                                    Hapus rute
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 
