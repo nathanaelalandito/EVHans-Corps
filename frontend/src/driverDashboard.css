@@ -2784,37 +2784,6 @@
     cursor: pointer;
 }
 
-<<<<<<< HEAD
-/* FIX: Posisi kartu saldo agar selalu berada di tengah */
-.home-wallet-card {
-    width: calc(100% - 32px);
-    max-width: 608px;
-    box-sizing: border-box;
-
-    margin: -40px auto 0;
-
-    position: relative;
-    z-index: 2;
-}
-
-/* Tampilan laptop dan desktop */
-@media (min-width: 1024px) {
-    .home-wallet-card {
-        width: calc(100% - 32px);
-        max-width: 608px;
-
-        margin: -36px auto 0;
-    }
-}
-
-/* Tampilan HP */
-@media (max-width: 699px) {
-    .home-wallet-card {
-        width: calc(100% - 32px);
-        margin: -40px auto 0;
-    }
-}
-=======
 /* ==================================================================
    Kartu rute ke station terpilih (melayang di atas peta, di bawah
    baris filter konektor)
@@ -3018,4 +2987,3 @@
         animation: none;
     }
 }
->>>>>>> 6dd1181e2e6ae34c48f10ec04b3e2d01394f43cd
