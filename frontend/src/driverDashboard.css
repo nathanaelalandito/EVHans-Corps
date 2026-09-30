@@ -816,8 +816,10 @@
     background: #ffffff;
     border-radius: 18px;
     box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
+    width: calc(100% - 32px);
+    max-width: 640px;
     padding: 14px 16px;
-    margin: -40px 16px 0;
+    margin: -40px auto 0;
     position: relative;
     z-index: 2;
     animation: mapdashFadeUp 0.4s ease 0.05s both;
@@ -834,6 +836,11 @@
     font-weight: 700;
     font-size: 18px;
     color: #1b4d2e;
+}
+
+.home-wallet-info {
+    flex: 1;
+    text-align: center;
 }
 
 .home-wallet-topup {
@@ -2115,8 +2122,10 @@
     background: #ffffff;
     border-radius: 18px;
     box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
+    width: calc(100% - 32px);
+    max-width: 640px;
     padding: 14px 16px;
-    margin: -40px 16px 0;
+    margin: -40px auto 0;
     position: relative;
     z-index: 2;
     animation: mapdashFadeUp 0.4s ease 0.05s both;
@@ -2133,6 +2142,11 @@
     font-weight: 700;
     font-size: 18px;
     color: #1b4d2e;
+}
+
+.home-wallet-info {
+    flex: 1;
+    text-align: center;
 }
 
 .home-wallet-topup {

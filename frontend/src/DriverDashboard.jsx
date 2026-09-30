@@ -799,7 +799,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 </header>
 
                 <div className="home-wallet-card">
-                    <div>
+                    <div className="home-wallet-info">
                         <p className="home-wallet-label">Saldo Dompet</p>
                         <p className="home-wallet-value">
                             {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
