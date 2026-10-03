@@ -44,13 +44,15 @@ export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
             });
 
         } catch (error) {
+            console.error("DETAIL ERROR ASLI:", error); // Cek ini di F12 -> Console
+        
             if (error.response && error.response.status === 422) {
                 setErrors(error.response.data.errors);
             } else {
-                setServerMessage('Terjadi kesalahan pada server. Silakan coba lagi.');
+                // Tampilkan pesan error asli dari Laravel jika ada
+                const pesanAsli = error.response?.data?.message || error.message;
+                setServerMessage(`Error: ${pesanAsli}`);
             }
-        } finally {
-            setLoading(false);
         }
     };
 

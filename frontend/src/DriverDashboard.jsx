@@ -1770,3 +1770,4 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         </div>
     );
 }
+

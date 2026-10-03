@@ -8,6 +8,8 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\UserProfile;
  use App\Models\Vehicle;
+ use App\Models\ChargingSession;
+ use App\Models\ErrorLog;
 
 class User extends Authenticatable
 {
@@ -37,6 +39,11 @@ class User extends Authenticatable
     public function chargingSessions()
     {
         return $this->hasMany(ChargingSession::class, 'id_user', 'id_user'); // sesuaikan
+    }
+
+    public function errorLog()
+    {
+        return $this->hasMany(ErrorLog::class, 'id_user', 'id_user');
     }
 
 }

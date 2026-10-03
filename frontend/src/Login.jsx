@@ -22,12 +22,14 @@ export default function Login({ onBackToWelcome, onLoginSuccess }) {
             const user = await login(formData.email, formData.password);
             onLoginSuccess(user);
         } catch (error) {
+            console.error("DETAIL ERROR ASLI:", error); // Cek ini di F12 -> Console
+        
             if (error.response && error.response.status === 422) {
-                setErrors(error.response.data.errors || {});
-            } else if (error.response && error.response.data?.message) {
-                setServerMessage(error.response.data.message);
+                setErrors(error.response.data.errors);
             } else {
-                setServerMessage('Terjadi kesalahan pada server. Silakan coba lagi.');
+                // Tampilkan pesan error asli dari Laravel jika ada
+                const pesanAsli = error.response?.data?.message || error.message;
+                setServerMessage(`Error: ${pesanAsli}`);
             }
         } finally {
             setLoading(false);

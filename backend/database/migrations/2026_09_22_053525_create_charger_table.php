@@ -17,11 +17,11 @@ return new class extends Migration
                 ->constrained('location', 'id_location')
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
-            $table->char('kode_perangkat', 6);
+            $table->char('kode_perangkat', 12);
             $table->enum('tipe_konektor', ['type_2', 'ccs2', 'chademo', 'gbt']);
             $table->integer('daya_kwh');
             $table->enum('tipe_charging', ['AC', 'DC']);
-            $table->enum('status', ['tersedia', 'sedang digunakan', 'maintenance', 'rusak', 'offline'])->default('tersedia');
+            $table->enum('status', ['tersedia', 'digunakan', 'maintenance', 'rusak', 'offline'])->default('tersedia');
             $table->timestamps();
         });
     }

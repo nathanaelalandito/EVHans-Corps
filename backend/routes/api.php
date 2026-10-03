@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\DompetPinController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\OperatorController;
+use Symfony\Component\Routing\Annotation\Route as AnnotationRoute;
 
 Route::get('/user', function (Request $request) {
     return $request->user()->load('profile');
@@ -35,4 +37,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/vehicles', [VehicleController::class, 'store']);
     Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
     Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
+});
+
+Route::middleware('auth:sanctum')->group(function(){
+    Route::get('/operator/station-status', [OperatorController::class, 'getStationStatus']);
+    Route::get('/operator/reports', [OperatorController::class, 'getOperationalReports']);
+    Route::post('/operator/report-error', [OperatorController::class, 'storeErrorLog']);
+    Route::post('/operator/chargers', [OperatorController::class, 'storeCharger']);
 });
