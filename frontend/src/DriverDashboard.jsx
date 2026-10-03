@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './driverDashboard.css';
+import './topUp.css';
 import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
@@ -173,7 +174,14 @@ function capitalize(str) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp, onNavigateToWallet }) {
+export default function DriverDashboard({
+    user: authUser,
+    onLogout,
+    onNavigateToVehicles,
+    onNavigateToHelp,
+    onNavigateToWallet,
+    onNavigateToTopUp
+}) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
     // saldo selalu ditarik live dari GET /api/wallet (lihat effect di bawah)
     // supaya selalu sinkron dengan database.
@@ -201,6 +209,10 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     // wallet = { saldo, status_dompet, pin_sudah_diset, terkunci, terkunci_sampai }
     const [wallet, setWallet] = useState(null);
     const [walletLoading, setWalletLoading] = useState(true);
+    const [showTopUp, setShowTopUp] = useState(false);
+    const [topUpStep, setTopUpStep] = useState(1);
+    const [topUpAmount, setTopUpAmount] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('');
 
     // Sembunyikan/lihat saldo — sinkron dengan pengaturan di halaman dompet.
     const [hideWalletSaldo, setHideWalletSaldo] = useState(
@@ -832,26 +844,28 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     : formatRupiah(wallet?.saldo ?? 0)}
                         </p>
                     </div>
-                    <button
+                        <button
                         className="home-wallet-eye"
                         onClick={(e) => {
                             e.stopPropagation();
                             toggleHideWalletSaldo();
                         }}
                         aria-label={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
-                        title={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
-                    >
+                        title={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}>
                         {hideWalletSaldo ? '🙈' : '👁️'}
                     </button>
-                    <span className="home-wallet-arrow" aria-hidden="true">›</span>
                     <button
                         className="home-wallet-topup"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Fitur Top Up segera hadir"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToTopUp();
+                        }}
                     >
                         + Top Up
                     </button>
+                    <span className="home-wallet-arrow" aria-hidden="true">›</span>
                 </div>
+
 
                 <main className="home-content">
                     {showNotif && activeSession && (
@@ -999,13 +1013,15 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             ))}
                         </div>
                     </section>
-                </main>
-            </div>
+                </main> 
+                 </div>  {/* <-- tambahkan: penutup home-screen */}
+            
 
             {/* ============================================================
                 LAYAR 2 — PETA (dibuka saat driver menekan "Cari Charging
                 Station" atau salah satu kartu station dari dashboard)
                ============================================================ */}
+               
             <div className={`mapdash-container ${view === 'map' ? 'is-active' : 'is-hidden'}`}>
                 <div ref={mapNodeRef} className="mapdash-map" />
 

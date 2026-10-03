@@ -8,6 +8,7 @@ import Bantuan from './Bantuan';
 import DompetDigital from './DompetDigital';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
 import { clearWalletCache } from './api/wallet';
+import TopUp from './Topup';
 
 export default function App() {
     // Kalau sudah ada token tersimpan (login sebelumnya), langsung ke dashboard.
@@ -49,16 +50,23 @@ export default function App() {
                 />
             )}
             {currentPage === 'dashboard' && (
-                <DriverDashboard
-                    user={user}
-                    onLogout={handleLogout}
-                    onNavigateToVehicles={() => setCurrentPage('vehicles')}
-                    onNavigateToHelp={() => setCurrentPage('help')}
-                    onNavigateToWallet={() => setCurrentPage('wallet')}
+               <DriverDashboard
+                        user={user}
+                        onLogout={handleLogout}
+                        onNavigateToVehicles={() => setCurrentPage('vehicles')}
+                        onNavigateToHelp={() => setCurrentPage('help')}
+                        onNavigateToWallet={() => setCurrentPage('wallet')}
+                        onNavigateToTopUp={() => setCurrentPage('topup')}
                 />
             )}
             {currentPage === 'wallet' && (
                 <DompetDigital onBack={() => setCurrentPage('dashboard')} />
+            )}
+            {currentPage === 'topup' && (
+            <TopUp
+                onBack={() => setCurrentPage('dashboard')}
+                onDone={() => setCurrentPage('dashboard')}
+            />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />

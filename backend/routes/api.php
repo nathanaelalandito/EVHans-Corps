@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\DompetPinController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\TopupController;
 
 Route::get('/user', function (Request $request) {
     return $request->user()->load('profile');
@@ -36,4 +37,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/vehicles', [VehicleController::class, 'store']);
     Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
     Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
+});
+
+Route::middleware('auth:sanctum')->prefix('topup')->group(function () {
+    Route::get('/methods', [TopupController::class, 'methods']);
+    Route::post('/', [TopupController::class, 'store']);
+    Route::get('/{reference}', [TopupController::class, 'show']);
+    Route::post('/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
 });

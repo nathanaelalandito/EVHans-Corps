@@ -67,3 +67,26 @@ export async function resetPin(password, pinBaru, pinBaruConfirmation) {
     });
     return data;
 }
+export async function getTopUpMethods() {
+    const { data } = await api.get('/topup/methods');
+    return data;
+}
+
+export async function createTopUp(method, amount) {
+    const { data } = await api.post('/topup', {
+        method,
+        amount,
+    });
+    return data;
+}
+
+export async function getTopUp(reference) {
+    const { data } = await api.get(`/topup/${reference}`);
+    return data;
+}
+
+export async function simulateTopUpPayment(reference) {
+    const { data } = await api.post(`/topup/${reference}/simulate-pay`);
+    return data;
+}
+
