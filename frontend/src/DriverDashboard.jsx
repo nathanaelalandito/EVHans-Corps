@@ -6,8 +6,10 @@ import { getWallet, createPin, changePin as changePinApi, disablePin as disableP
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
 import { getDrivingRoute, googleMapsDirectionsUrl, formatJarak, formatDurasi } from './api/routing';
-import { getStations, distanceKm, konektorLabel } from './api/station';
+import { getStations, distanceKm, distanceMeters, ARRIVAL_RADIUS_M, konektorLabel } from './api/station';
+import { getActiveSession, stopCharging } from './api/charging';
 import StationDetail from './StationDetail';
+import StartCharging from './StartCharging';
 
 // Ambil pesan error yang enak dibaca dari response axios (baik yang
 // bentuknya {message} maupun {errors: {field: [..]}} ala Laravel).
@@ -146,6 +148,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [rawStations, setRawStations] = useState([]);
     const [stationsError, setStationsError] = useState('');
     const [detailStationId, setDetailStationId] = useState(null);
+    const [showStartCharging, setShowStartCharging] = useState(false);
+    const [sessionError, setSessionError] = useState('');
+    const [stoppingSession, setStoppingSession] = useState(false);
     const [connectorFilter, setConnectorFilter] = useState('Semua');
     const [activeSession, setActiveSession] = useState(DUMMY_ACTIVE_SESSION);
     const [elapsed, setElapsed] = useState(0);
@@ -331,8 +336,34 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         };
     }, []);
 
+    // Muat ulang ketersediaan port (dipanggil setelah sesi dimulai/dihentikan).
+    const reloadStations = () => {
+        getStations().then(setRawStations).catch(() => {});
+    };
+
+    // Pulihkan sesi charging yang masih berjalan (mis. setelah refresh halaman).
+    useEffect(() => {
+        let cancelled = false;
+        getActiveSession()
+            .then((session) => {
+                if (cancelled || !session) return;
+                setActiveSession(session);
+                setShowNotif(true);
+            })
+            .catch((err) => console.warn('Gagal memuat sesi aktif:', err));
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const selectedStation = stations.find((s) => s.id_location === selectedStationId) ?? null;
     const detailStation = stations.find((s) => s.id_location === detailStationId) ?? null;
+
+    // "Sudah sampai" = GPS asli aktif dan jarak ke station terpilih <= radius.
+    // (Server memeriksa ulang saat sesi dimulai.)
+    const distToSelectedM =
+        selectedStation && locationStatus === 'live' ? distanceMeters(driverPosition, selectedStation) : null;
+    const hasArrived = distToSelectedM != null && distToSelectedM <= ARRIVAL_RADIUS_M;
 
     // Rute ke station terpilih. route = { stationId, coords, distanceM, durationS }.
     const [route, setRoute] = useState(null);
@@ -492,18 +523,68 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [view]);
 
-    const sessionProgressPct = activeSession
-        ? Math.min(100, Math.round((activeSession.energi_kwh / activeSession.target_kwh) * 100))
-        : 0;
+    // Simulasi pengisian: server menghitung energi & persen baterai dari lama
+    // sesi, jadi cukup ambil ulang data sesi aktif secara berkala sampai penuh.
+    const activeSessionId = activeSession?.id_session;
+    const activeSessionFull = activeSession?.sudah_penuh;
+    useEffect(() => {
+        if (!activeSessionId || activeSessionFull) return;
+        let cancelled = false;
+        const poll = () => {
+            getActiveSession()
+                .then((session) => {
+                    if (cancelled || !session || session.id_session !== activeSessionId) return;
+                    setActiveSession(session);
+                })
+                .catch(() => {});
+        };
+        const interval = setInterval(poll, 3000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [activeSessionId, activeSessionFull]);
+
+    const sessionProgressPct =
+        activeSession && activeSession.target_kwh > 0
+            ? Math.min(100, Math.round((activeSession.energi_kwh / activeSession.target_kwh) * 100))
+            : 0;
+
+    const sessionDurationMs =
+        activeSession?.durasi_detik != null ? activeSession.durasi_detik * 1000 : elapsed;
 
     const sessionEstimatedCost = activeSession
-        ? Math.round(activeSession.energi_kwh * activeSession.tarif_per_kwh + activeSession.biaya_parkir)
+        ? activeSession.estimasi_biaya ??
+          Math.round(activeSession.energi_kwh * activeSession.tarif_per_kwh + activeSession.biaya_parkir)
         : 0;
 
-    const handleStopSession = () => {
-        // TODO: panggil endpoint "Menghentikan Sesi Charging" (FR23),
-        // lalu tampilkan hasil penyelesaian transaksi (FR34 / FR37).
-        setActiveSession(null);
+    const handleStopSession = async () => {
+        if (!activeSession || stoppingSession) return;
+        setStoppingSession(true);
+        setSessionError('');
+        try {
+            await stopCharging(activeSession.id_session);
+            // TODO: tampilkan hasil penyelesaian transaksi (FR34 / FR37).
+            setActiveSession(null);
+            setShowNotif(false);
+            reloadStations();
+            fetchWallet(); // dana yang di-hold sudah dilepas
+        } catch (err) {
+            setSessionError(extractErrorMessage(err, 'Gagal menghentikan sesi charging. Coba lagi.'));
+        } finally {
+            setStoppingSession(false);
+        }
+    };
+
+    // Sesi berhasil dimulai dari lembar "Mulai Charging".
+    const handleSessionStarted = (session) => {
+        setShowStartCharging(false);
+        clearRoute();
+        setSelectedStationId(null);
+        setActiveSession(session);
+        setShowNotif(true);
+        reloadStations();
+        fetchWallet(); // saldo tersedia berkurang karena hold
     };
 
     // ---------------------------------------------------------------
@@ -791,7 +872,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     <div>
                         <p className="home-wallet-label">Saldo Dompet</p>
                         <p className="home-wallet-value">
-                            {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
+                            {walletLoading ? '...' : formatRupiah(wallet?.saldo_tersedia ?? wallet?.saldo ?? 0)}
                         </p>
                     </div>
                     <button className="home-wallet-topup">+ Top Up</button>
@@ -809,7 +890,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         <section className="home-session-card">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title home-session-title">Sesi Charging Berlangsung</span>
-                                <span className="dash-status-badge ok">● {activeSession.status}</span>
+                                <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}</p>
 
@@ -818,11 +899,15 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             </div>
                             <div className="dash-session-stats">
                                 <div>
+                                    <p className="stat-value">{activeSession.soc_sekarang ?? '-'}%</p>
+                                    <p className="stat-label">Baterai</p>
+                                </div>
+                                <div>
                                     <p className="stat-value">{activeSession.energi_kwh} kWh</p>
                                     <p className="stat-label">Energi Terisi</p>
                                 </div>
                                 <div>
-                                    <p className="stat-value">{formatDuration(elapsed)}</p>
+                                    <p className="stat-value">{formatDuration(sessionDurationMs)}</p>
                                     <p className="stat-label">Durasi</p>
                                 </div>
                                 <div>
@@ -830,12 +915,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     <p className="stat-label">Estimasi Biaya</p>
                                 </div>
                             </div>
+                            {sessionError && <p className="route-card-error" role="alert">{sessionError}</p>}
                             <div className="home-session-actions">
                                 <button className="dash-btn-navigate home-session-map-btn" onClick={goToActiveSessionOnMap}>
                                     🗺️ Lihat di Peta
                                 </button>
-                                <button className="dash-btn-stop" onClick={handleStopSession}>
-                                    Hentikan Sesi
+                                <button className="dash-btn-stop" onClick={handleStopSession} disabled={stoppingSession}>
+                                    {stoppingSession ? 'Menghentikan…' : activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
                                 </button>
                             </div>
                         </section>
@@ -1029,6 +1115,25 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <p className="route-card-error" role="alert">{routeError}</p>
                         )}
 
+                        <div className="route-card-start-block">
+                            {hasArrived ? (
+                                <p className="route-card-arrived">✅ Anda sudah sampai di station.</p>
+                            ) : (
+                                <p className="route-card-hint">
+                                    {distToSelectedM != null
+                                        ? `Mulai charging aktif setelah Anda sampai (± ${formatJarak(distToSelectedM)} lagi).`
+                                        : 'Aktifkan izin lokasi agar kami tahu kapan Anda sampai di station.'}
+                                </p>
+                            )}
+                            <button
+                                className="route-card-start"
+                                onClick={() => setShowStartCharging(true)}
+                                disabled={!hasArrived}
+                            >
+                                ⚡ Mulai Charging
+                            </button>
+                        </div>
+
                         <div className="route-card-actions">
                             <button
                                 className="route-card-primary"
@@ -1095,7 +1200,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         <div className="mapdash-session">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title">Sesi Charging Berlangsung</span>
-                                <span className="dash-status-badge ok">● {activeSession.status}</span>
+                                <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}</p>
 
@@ -1104,11 +1209,15 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             </div>
                             <div className="dash-session-stats">
                                 <div>
+                                    <p className="stat-value">{activeSession.soc_sekarang ?? '-'}%</p>
+                                    <p className="stat-label">Baterai</p>
+                                </div>
+                                <div>
                                     <p className="stat-value">{activeSession.energi_kwh} kWh</p>
                                     <p className="stat-label">Energi Terisi</p>
                                 </div>
                                 <div>
-                                    <p className="stat-value">{formatDuration(elapsed)}</p>
+                                    <p className="stat-value">{formatDuration(sessionDurationMs)}</p>
                                     <p className="stat-label">Durasi</p>
                                 </div>
                                 <div>
@@ -1116,8 +1225,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     <p className="stat-label">Estimasi Biaya</p>
                                 </div>
                             </div>
-                            <button className="dash-btn-stop" onClick={handleStopSession}>
-                                Hentikan Sesi Charging
+                            {sessionError && <p className="route-card-error" role="alert">{sessionError}</p>}
+                            <button className="dash-btn-stop" onClick={handleStopSession} disabled={stoppingSession}>
+                                {stoppingSession ? 'Menghentikan…' : activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi Charging'}
                             </button>
                         </div>
                     ) : (
@@ -1764,6 +1874,17 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
                     </div>
                 </div>
+            )}
+
+            {showStartCharging && selectedStation && (
+                <StartCharging
+                    key={selectedStation.id_location}
+                    station={selectedStation}
+                    vehicle={activeVehicle}
+                    position={driverPosition}
+                    onClose={() => setShowStartCharging(false)}
+                    onStarted={handleSessionStarted}
+                />
             )}
 
             {detailStation && (

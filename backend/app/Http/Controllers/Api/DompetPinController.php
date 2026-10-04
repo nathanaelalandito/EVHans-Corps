@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ChecksWalletPin;
 use App\Http\Controllers\Controller;
 use App\Models\Dompet;
 use Illuminate\Http\Request;
@@ -10,15 +11,7 @@ use Illuminate\Support\Facades\Validator;
 
 class DompetPinController extends Controller
 {
-    /**
-     * Batas percobaan PIN salah sebelum dompet dikunci sementara.
-     */
-    protected int $maxAttempt = 5;
-
-    /**
-     * Lama waktu kunci (menit) setelah percobaan salah melebihi batas.
-     */
-    protected int $lockMinutes = 15;
+    use ChecksWalletPin;
 
     /**
      * Ambil (atau buat otomatis jika belum ada) dompet milik user yang login.
@@ -41,6 +34,8 @@ class DompetPinController extends Controller
 
         return response()->json([
             'saldo' => $wallet->saldo,
+            'saldo_hold' => (int) $wallet->saldo_hold,
+            'saldo_tersedia' => $wallet->saldoTersedia(),
             'status_dompet' => $wallet->status_dompet,
             'pin_sudah_diset' => $wallet->hasPin(),
             'terkunci' => $wallet->isLocked(),
@@ -218,47 +213,5 @@ class DompetPinController extends Controller
         $wallet->save();
 
         return response()->json(['message' => 'PIN dompet berhasil dinonaktifkan.']);
-    }
-
-    /**
-     * Cek apakah dompet sedang terkunci akibat terlalu banyak percobaan salah.
-     */
-    protected function blockIfLocked(Dompet $wallet)
-    {
-        if ($wallet->isLocked()) {
-            return response()->json([
-                'message' => 'Dompet terkunci sementara karena terlalu banyak percobaan PIN salah. Coba lagi nanti.',
-                'terkunci_sampai' => $wallet->locked_until,
-            ], 423); // 423 Locked
-        }
-
-        return null;
-    }
-
-    /**
-     * Tambah hitungan percobaan gagal, kunci dompet jika sudah melebihi batas.
-     */
-    protected function handleFailedAttempt(Dompet $wallet, string $message)
-    {
-        $wallet->percobaan_pin_gagal += 1;
-
-        if ($wallet->percobaan_pin_gagal >= $this->maxAttempt) {
-            $wallet->locked_until = now()->addMinutes($this->lockMinutes);
-            $wallet->percobaan_pin_gagal = 0;
-            $wallet->save();
-
-            return response()->json([
-                'message' => "Terlalu banyak percobaan salah. Dompet dikunci selama {$this->lockMinutes} menit.",
-                'terkunci_sampai' => $wallet->locked_until,
-            ], 423);
-        }
-
-        $wallet->save();
-
-        $sisa = $this->maxAttempt - $wallet->percobaan_pin_gagal;
-
-        return response()->json([
-            'message' => "{$message} Sisa percobaan: {$sisa}.",
-        ], 422);
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\DompetPinController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\StationController;
+use App\Http\Controllers\Api\ChargingSessionController;
 
 Route::get('/user', function (Request $request) {
     return $request->user()->load('profile');
@@ -41,4 +42,12 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/stations', [StationController::class, 'index']);
     Route::get('/stations/{id}', [StationController::class, 'show']);
+});
+
+Route::middleware('auth:sanctum')->prefix('charging')->group(function () {
+    Route::get('/active', [ChargingSessionController::class, 'active']);
+    Route::post('/prepare', [ChargingSessionController::class, 'prepare']);
+    Route::post('/estimate', [ChargingSessionController::class, 'estimate']);
+    Route::post('/start', [ChargingSessionController::class, 'start']);
+    Route::post('/{id}/stop', [ChargingSessionController::class, 'stop']);
 });
