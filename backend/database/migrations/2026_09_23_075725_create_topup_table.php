@@ -16,6 +16,7 @@ return new class extends Migration
             // Metode pembayaran (GoPay, DANA, VA BRI, SeaBank)
             $table->unsignedBigInteger('id_metode');
             $table->string('referensi', 50)->unique();   // EVT20261003-ABC123 (kode transaksi)
+            $table->string('kode_pembayaran', 100); // nomor telepon (GoPay/DANA) atau nomor VA (kode bank + telepon)
             $table->integer('nominal');                  // saldo yang masuk ke dompet
             $table->integer('biaya_layanan')->default(0); // biaya metode saat transaksi dibuat
             $table->enum('status_topup', ['pending', 'sukses', 'gagal'])->default('pending');
