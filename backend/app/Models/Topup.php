@@ -20,4 +20,15 @@ class Topup extends Model
         'waktu_topup'      => 'datetime',
         'kedaluwarsa_pada' => 'datetime',
     ];
+    // app/Models/Topup.php
+        public function dompet()
+        {
+            return $this->belongsTo(\App\Models\Dompet::class, 'id_wallet', 'id_wallet');
+        }
+
+        // app/Models/Dompet.php
+        public function profile()
+        {
+            return $this->hasOne(\App\Models\UserProfile::class, 'id_user', 'id_user');
+        }
 }

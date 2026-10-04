@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import { createTopup, getTopup, getTopupMethods, simulatePayTopup } from './api/topup';
 import './topup.css';
 
@@ -27,7 +26,6 @@ const errMessage = (err) =>
   'Terjadi kesalahan. Coba lagi.';
 
 // Kunci = nama metode di tabel metode_pembayaran (huruf kecil).
-// Nama di database berbeda? Ubah kuncinya di sini.
 const LOGOS = {
   'gopay': gopayLogo,
   'dana': danaLogo,
@@ -35,10 +33,42 @@ const LOGOS = {
   'seabank': seabankLogo,
 };
 
+// 'phone' = bayar ke nomor telepon (e-wallet), 'va' = Virtual Account
+const PAYMENT_KIND = {
+  'gopay': 'phone',
+  'dana': 'phone',
+  'va bri': 'va',
+  'seabank': 'va',
+};
+
+// Kode bank (prefix VA). SESUAIKAN dengan kode resmi dari bank/payment gateway Anda.
+const BANK_CODES = {
+  'va bri': '77777',
+  'seabank': '90100',
+};
+
+const onlyDigits = (v) => String(v || '').replace(/\D/g, '');
+
+// 081234567890 -> 0812-3456-7890
+const formatPhone = (v) => onlyDigits(v).replace(/(\d{4})(?=\d)/g, '$1-');
+
+// Tentukan jenis pembayaran & kode yang ditampilkan
+function getPayInfo(topup, phoneNumber) {
+  const key = String(topup.method_name || '').toLowerCase().trim();
+  const kind = PAYMENT_KIND[key] || (topup.type === 'va' ? 'va' : 'phone');
+  const phone = onlyDigits(topup.phone_number || phoneNumber);
+
+  if (kind === 'va') {
+    const bankCode = BANK_CODES[key] || '';
+    // Nomor telepon tanpa angka 0 di depan: 0812xxx -> 812xxx
+    return { kind, phone, code: phone ? bankCode + phone.replace(/^0/, '') : '' };
+  }
+  return { kind, phone, code: phone };
+}
+
 function MethodLogo({ name }) {
   const src = LOGOS[name.toLowerCase().trim()];
 
-  // Logo tidak ditemukan: tampilkan inisial supaya tampilan tidak rusak.
   if (!src) {
     return (
       <span className="tu-logo tu-logo-fallback" aria-hidden="true">
@@ -52,10 +82,11 @@ function MethodLogo({ name }) {
 
 /**
  * Props:
- *  - onBack(): kembali ke halaman sebelumnya (tombol panah di langkah pilih metode)
+ *  - phoneNumber: nomor telepon driver (user_profile.nomor_telepon)
+ *  - onBack(): kembali ke halaman sebelumnya
  *  - onDone(saldoBaru): dipanggil saat user menekan "Kembali ke Beranda"
  */
-export default function TopUp({ onBack, onDone }) {
+export default function TopUp({ phoneNumber, onBack, onDone }) {
   const [step, setStep] = useState('select'); // select | pay | success
   const [methods, setMethods] = useState([]);
   const [limits, setLimits] = useState({ min: 10000, max: 5000000 });
@@ -68,7 +99,6 @@ export default function TopUp({ onBack, onDone }) {
   const [copied, setCopied] = useState(false);
   const pollRef = useRef(null);
 
-  // Ambil daftar metode pembayaran
   useEffect(() => {
     getTopupMethods()
       .then((d) => {
@@ -78,7 +108,6 @@ export default function TopUp({ onBack, onDone }) {
       .catch((e) => setError(errMessage(e)));
   }, []);
 
-  // Hitung mundur + polling status selama di halaman pembayaran
   useEffect(() => {
     if (step !== 'pay' || !topup) return undefined;
 
@@ -89,7 +118,7 @@ export default function TopUp({ onBack, onDone }) {
         setTopup(latest);
         if (latest.status === 'paid') setStep('success');
       } catch {
-        /* abaikan error jaringan sesaat, coba lagi di siklus berikutnya */
+        /* abaikan error jaringan sesaat */
       }
     }, 3000);
 
@@ -133,9 +162,9 @@ export default function TopUp({ onBack, onDone }) {
     }
   };
 
-  const handleCopy = async () => {
+  const handleCopy = async (text) => {
     try {
-      await navigator.clipboard.writeText(topup.payment_code);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -184,9 +213,11 @@ export default function TopUp({ onBack, onDone }) {
     );
   }
 
-  /* ---------- Langkah 2: tampilkan kode pembayaran ---------- */
+  /* ---------- Langkah 2: tampilkan nomor / kode VA ---------- */
   if (step === 'pay' && topup) {
-    const isVA = topup.type === 'va';
+    const { kind, code } = getPayInfo(topup, phoneNumber);
+    const isVA = kind === 'va';
+
     return (
       <div className="tu-page">
         <header className="tu-header">
@@ -196,19 +227,22 @@ export default function TopUp({ onBack, onDone }) {
 
         <section className="tu-card tu-pay">
           <p className="tu-muted">
-            {isVA ? 'Transfer ke Virtual Account berikut' : `Scan QR dengan aplikasi ${topup.method_name}`}
+            {isVA
+              ? `Transfer ke Virtual Account ${topup.method_name} berikut`
+              : `Bayar melalui aplikasi ${topup.method_name} ke nomor berikut`}
           </p>
 
-          {isVA ? (
+          {code ? (
             <div className="tu-va">
-              <span className="tu-va-number">{topup.payment_code}</span>
-              <button className="tu-copy" onClick={handleCopy}>{copied ? 'Tersalin' : 'Salin'}</button>
+              <span className="tu-va-number">{isVA ? code : formatPhone(code)}</span>
+              <button className="tu-copy" onClick={() => handleCopy(code)}>
+                {copied ? 'Tersalin' : 'Salin'}
+              </button>
             </div>
           ) : (
-            <div className="tu-qr">
-              <QRCodeSVG value={topup.payment_code} size={200} level="M" />
-              <code>{topup.payment_code}</code>
-            </div>
+            <p className="tu-error" role="alert">
+              Nomor telepon driver belum tersedia. Lengkapi nomor telepon di profil Anda.
+            </p>
           )}
 
           <div className="tu-timer" aria-live="polite">
@@ -244,8 +278,8 @@ export default function TopUp({ onBack, onDone }) {
         )}
 
         {import.meta.env.DEV && !expired && (
-          <button className="tu-btn tu-btn" onClick={handleSimulate}>
-            Simulasi bayar 
+          <button className="tu-btn" onClick={handleSimulate}>
+            Simulasi bayar
           </button>
         )}
       </div>

@@ -10,7 +10,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
- * Top up berdiri sendiri: hanya memakai tabel topup, dompet, dan metode_pembayaran.
+ * Top up berdiri sendiri: memakai tabel topup, dompet, metode_pembayaran,
+ * dan user_profile (hanya untuk membaca nomor telepon driver).
  * Tabel payment (khusus pembayaran charging) tidak disentuh.
  */
 class TopupController extends Controller
@@ -36,7 +37,7 @@ class TopupController extends Controller
                     'fee'         => (int) $m->biaya_layanan,
                     'description' => $type === 'va'
                         ? 'Transfer ke Virtual Account'
-                        : 'Scan QR dengan aplikasi ' . $m->nama_metode,
+                        : 'Bayar ke nomor ' . $m->nama_metode . ' Anda',
                 ];
             })
             ->values();
@@ -67,17 +68,29 @@ class TopupController extends Controller
             return response()->json(['success' => false, 'message' => 'Dompet Anda sedang nonaktif.'], 422);
         }
 
+        // Nomor telepon driver: dompet -> user_profile
+        $phone = $this->phoneOfWallet($dompet->id_wallet);
+
+        if ($phone === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nomor telepon belum diisi di profil Anda.',
+            ], 422);
+        }
+
         $isVa = $this->typeOf($metode->nama_metode) === 'va';
+
+        // VA = kode bank + nomor telepon (tanpa 0 di depan); GoPay/DANA = nomor telepon
+        $kodePembayaran = $isVa
+            ? $this->bankCodeOf($metode->nama_metode) . ltrim($phone, '0')
+            : $phone;
 
         $topup = Topup::create([
             'id_wallet'        => $dompet->id_wallet,
             'id_payment'       => null, // top up tidak memakai tabel payment
             'id_metode'        => $metode->id_metode,
             'referensi'        => 'EVT' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
-            // Kode pembayaran: nomor VA, atau isi QR berformat EVCHG-XXXX-XXXX-XXXX
-            'kode_pembayaran'  => $isVa
-                ? '88810' . str_pad((string) random_int(0, 99999999999), 11, '0', STR_PAD_LEFT)
-                : 'EVCHG-' . implode('-', str_split(strtoupper(Str::random(12)), 4)),
+            'kode_pembayaran'  => $kodePembayaran,
             'nominal'          => $validated['amount'],
             'biaya_layanan'    => (int) $metode->biaya_layanan,
             'status_topup'     => 'pending',
@@ -141,6 +154,28 @@ class TopupController extends Controller
         return preg_match('/\bva\b/i', $namaMetode) ? 'va' : 'qr';
     }
 
+    /** Nomor telepon driver lewat: dompet (id_wallet) -> user_profile (id_user). */
+    private function phoneOfWallet($idWallet): string
+    {
+        $phone = DB::table('dompet')
+            ->join('user_profile', 'user_profile.id_user', '=', 'dompet.id_user')
+            ->where('dompet.id_wallet', $idWallet)
+            ->value('user_profile.nomor_telepon');
+
+        return preg_replace('/\D/', '', (string) $phone);
+    }
+
+    /** Kode bank (prefix VA). Sesuaikan dengan kode resmi bank/gateway Anda. */
+    private function bankCodeOf(string $namaMetode): string
+    {
+        $map = [
+            'va bri'  => '77777',
+            'seabank' => '90100',
+        ];
+
+        return $map[strtolower(trim($namaMetode))] ?? '';
+    }
+
     private function dompetOf(Request $request): object
     {
         $idUser = $request->user()->getKey();
@@ -191,6 +226,7 @@ class TopupController extends Controller
             'amount'       => $topup->nominal,
             'total'        => $topup->nominal + $topup->biaya_layanan,
             'payment_code' => $topup->kode_pembayaran,
+            'phone_number' => $this->phoneOfWallet($topup->id_wallet),
             'status'       => ['pending' => 'pending', 'sukses' => 'paid', 'gagal' => 'expired'][$topup->status_topup],
             'expires_at'   => $topup->kedaluwarsa_pada->toIso8601String(),
             'paid_at'      => $topup->status_topup === 'sukses' ? $topup->waktu_topup->toIso8601String() : null,

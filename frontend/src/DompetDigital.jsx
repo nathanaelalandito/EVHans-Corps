@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import TopUp from './Topup'; // sesuaikan nama file: Topup.jsx / TopUp.jsx
 import './dompetDigital.css';
 import {
     getWallet,
@@ -112,6 +113,21 @@ export default function DompetDigital({ onBack }) {
 
     const handleDigits = (setter) => (e) => {
         setter(e.target.value.replace(/\D/g, '').slice(0, 6));
+    };
+    // Dipanggil TopUp saat user menekan "Kembali ke Beranda"
+    const handleTopupDone = async (saldoBaru) => {
+        if (typeof saldoBaru === 'number') {
+            setWallet((prev) => ({ ...(prev || {}), saldo: saldoBaru }));
+        }
+        try {
+            // Ambil ulang saldo + riwayat supaya top up baru langsung muncul
+            const data = await getTransactions();
+            setTransactions(data.transactions || []);
+            setWallet((prev) => ({ ...(prev || {}), saldo: data.saldo }));
+        } catch {
+            /* abaikan, data lama tetap tampil */
+        }
+        setStatus('wallet');
     };
 
     const handleVerifyPin = async (e) => {
@@ -658,6 +674,15 @@ export default function DompetDigital({ onBack }) {
             </div>
         );
     }
+    
+    if (status === 'topup') {
+    return (
+        <TopUp
+            onBack={() => setStatus('wallet')}
+            onDone={handleTopupDone}
+        />
+    );
+    }
 
     // status === 'wallet'
     const locked = wallet?.terkunci;
@@ -719,11 +744,10 @@ export default function DompetDigital({ onBack }) {
             </div>
 
             <div className="dmp-actions">
-                <button className="dmp-action" onClick={() => {}} disabled title="Fitur Top Up">
-                    <span className="dmp-action-icon">➕</span>
-                    <span className="dmp-action-label">Top Up</span>
-                    <span className="dmp-action-tag">Segera hadir</span>
-                </button>
+                   <button className="dmp-action"   onClick={() => setStatus('topup')}disabled={locked || wallet?.status_dompet !== 'aktif'}title="Top Up saldo">
+                         <span className="dmp-action-icon">➕</span>
+                        <span className="dmp-action-label">Top Up</span>
+                    </button>
                 <button className="dmp-action" onClick={() => setStatus('managePin')}>
                     <span className="dmp-action-icon">🔒</span>
                     <span className="dmp-action-label">Kelola PIN</span>
