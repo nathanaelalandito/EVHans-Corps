@@ -8,6 +8,8 @@ import Bantuan from './Bantuan';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
 import OperatorDashboard from './OpsDashboard'; // Perhatikan ejaannya
 import ChargerMonitor from './ChargerMonitor';
+import OpsReport from './OpsReport';
+import PortMonitor from './PortMonitor';
 
 export default function App() {
     // Kalau sudah ada token tersimpan (login sebelumnya), langsung ke dashboard.
@@ -88,25 +90,44 @@ export default function App() {
                 <OperatorDashboard 
                     user={user}
                     onLogout={handleLogout}
+                    onNavigateToCharger={() => setCurrentPage('charger')}
                     onNavigateToPort={() => setCurrentPage('port')}
-                    onNavigateToOpsReport={() => setCurrentPage('ops-Report')}
+                    onNavigateToOpsReport={() => setCurrentPage('ops-report')}
+                    onNavigateToOpsProfil={() => setCurrentPage('profil')}
+                />
+            )}
+            {currentPage == 'charger' &&(
+                <ChargerMonitor
+                    user={user}
+                    onLogout={handleLogout}
+                    onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
+                    onNavigateToPort={() => setCurrentPage('port')}
+                    onNavigateToOpsReport={() => setCurrentPage('ops-report')}
+                    onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
             )}
             {currentPage == 'port' &&(
-                <ChargerMonitor
+                <PortMonitor
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
-                    onNavigateToOpsReport={() => setCurrentPage('ops-Report')}
+                    onNavigateToCharger={() => setCurrentPage('charger')}
+                    onNavigateToOpsReport={() => setCurrentPage('ops-report')}
+                    onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
             )}
             {currentPage == 'ops-report' &&(
-                <ChargerMonitor
+                <OpsReport
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
-                    onNavigateToOpsReport={() => setCurrentPage('ops-Report')}
+                    onNavigateToCharge={() => setCurrentPage('charger')}
+                    onNavigateToPort={() => setCurrentPage('port')}
+                    onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
+            )}
+            {currentPage == 'profil' && (
+                <ProfilOps/>
             )}
             {currentPage == 'admin-dashboard' && (
                 <AdminDaashboard onLoginSuccess={handleLoginSuccess} />

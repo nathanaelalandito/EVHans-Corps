@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    FaBell, FaCog, FaTachometerAlt, FaChargingStation, 
+    FaBell, FaCog, FaTachometerAlt, FaChargingStation, FaPlug, 
     FaFileAlt, FaUser, FaSignOutAlt, FaBolt, FaCheckCircle, 
     FaExclamationTriangle, FaDollarSign, FaSyncAlt, FaPowerOff, FaStop, FaChartLine, FaExclamationCircle
 } from 'react-icons/fa';
@@ -15,7 +15,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function OperatorDashboard({ user, onLogout, setActiveMenu}) {
+export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNavigateToCharger, onNavigateToPort, onNavigateToOpsReport}) {
     const [stats, setStats] = useState({
         activeCharging: 0,
         availablePorts: 0,
@@ -29,7 +29,8 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu}) {
 
     const nameString = typeof user === 'string' 
         ? user 
-        : (user?.name || user?.email || '');
+        : (user?.profile?.nama_lengkap || user?.name || user?.email || '');
+
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
     const fetchDashboardData = async () => {
@@ -113,13 +114,23 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu}) {
                             <FaTachometerAlt className="op-menu-icon" />
                             <span>Dashboard</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => setActiveMenu && setActiveMenu('ports')}>
+                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('charger'); 
+                            if (onNavigateToCharger) onNavigateToCharger(); 
+                        }}>
                             <FaChargingStation className="op-menu-icon" />
-                            <span>Port Monitoring</span>
+                            <span>Manage Charger</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => setActiveMenu && setActiveMenu('reports')}>
+                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('ports');
+                            if(onNavigateToPort) onNavigateToPort();
+                        }}>
+                            <FaPlug className="op-menu-icon" />
+                            <span>Manage port</span>
+                        </li>
+                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('reports');
+                            if(onNavigateToOpsReport) onNavigateToOpsReport();
+                        }}>
                             <FaFileAlt className="op-menu-icon" />
-                            <span>Transaction Report</span>
+                            <span>Manage Report</span>
                         </li>
                         <li className="op-menu-item" onClick={() => setActiveMenu && setActiveMenu('profils')}>
                             <FaUser className="op-menu-icon" />
@@ -203,7 +214,6 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu}) {
                             </div>
                         </div>
 
-                        {/* 2 & 3. BAGIAN ANALITIK: GRAFIK UTILITAS & TREN KEBERHASILAN SESI */}
                         {/* 2 & 3. BAGIAN ANALITIK: GRAFIK UTILITAS & TREN KEBERHASILAN SESI */}
                         <div className="op-analytics-grid">
                             
@@ -294,7 +304,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu}) {
                                                                 <FaStop size={12} />
                                                             </button>
                                                             <button 
-                                                                className="op-btn-remote reboot"
+                                                                className="op-btn_remote reboot"
                                                                 title="Remote Reboot Mesin" 
                                                                 onClick={() => handleRemoteAction('REBOOT', session.port)}
                                                             >

@@ -40,8 +40,23 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function(){
-    Route::get('/operator/station-status', [OperatorController::class, 'getStationStatus']);
-    Route::get('/operator/reports', [OperatorController::class, 'getOperationalReports']);
-    Route::post('/operator/report-error', [OperatorController::class, 'storeErrorLog']);
-    Route::post('/operator/chargers', [OperatorController::class, 'storeCharger']);
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::get('/operator/dashboard', [OperatorController::class, 'getDashboard']);
+        Route::get('/operator/chargers', [OperatorController::class, 'getChargers']);
+        Route::post('/operator/storechargers', [OperatorController::class, 'storeCharger']);
+        Route::put('/operator/chargers/{id}', [OperatorController::class, 'updateCharger']);
+        Route::post('/operator/charger/{id}/start', [OperatorController::class, 'startCharger']);
+        Route::post('/operator/charger/{id}/stop', [OperatorController::class, 'stopCharger']);
+        Route::post('/operator/charger/{id}/reboot', [OperatorController::class, 'rebootCharger']);
+        Route::delete('/operator/delchargers/{id}', [OperatorController::class, 'destroyCharger']);
+        Route::get('/operator/ports', [OperatorController::class, 'getPorts']);
+        Route::post('/operator/storeports', [OperatorController::class, 'storePort']);
+        Route::put('/operator/ports/{id}', [OperatorController::class, 'updatePort']);
+        Route::post('/operator/port/{id}/start', [OperatorController::class, 'startport']);
+        Route::post('/operator/port/{id}/stop', [OperatorController::class, 'stoport']);
+        Route::post('/operator/port/{id}/reboot', [OperatorController::class, 'rebootport']);
+        Route::delete('/operator/delports/{id}', [OperatorController::class, 'destroyPort']);
+        Route::get('/operator/reports', [OperatorController::class, 'getOperationalReports']);
+        Route::get('/operator/profile', [OperatorController::class, 'getProfile']);
+    });
 });

@@ -18,10 +18,9 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
             $table->char('kode_perangkat', 12);
-            $table->enum('tipe_konektor', ['type_2', 'ccs2', 'chademo', 'gbt']);
-            $table->integer('daya_kwh');
-            $table->enum('tipe_charging', ['AC', 'DC']);
-            $table->enum('status', ['tersedia', 'digunakan', 'maintenance', 'rusak', 'offline'])->default('tersedia');
+            $table->string('merek_model');
+            $table->integer('kap_tot_kw');
+            $table->enum('status_mesin', ['Active', 'Maintenance', 'Offline'])->default('Active');
             $table->timestamps();
         });
     }

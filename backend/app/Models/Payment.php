@@ -14,12 +14,7 @@ class Payment extends Model {
     protected $primaryKey = 'id_payment';
     
     protected $fillable = [
-        'id_session', 
-        'id_metode', 
-        'total_bayar', 
-        'status_pembayaran', 
-        'waktu_pembayaran', 
-        'referensi_gateway'
+        'id_session', 'id_metode', 'total_bayar', 'status_pembayaran', 'waktu_pembayaran', 'referensi_gateway'
     ];
 
     // Relasi ke ChargingSession

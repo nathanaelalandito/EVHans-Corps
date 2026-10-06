@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Charger;
+use app\Models\StationOperator;
 
 class Location extends Model {
     protected $table = 'location';
@@ -13,5 +14,8 @@ class Location extends Model {
 
     public function chargers(): HasMany {
         return $this->hasMany(Charger::class, 'id_location', 'id_location');
+    }
+    public function stationoperator(): HasMany {
+        return $this->hasMany(StationOperator::class, 'id_location', 'id_location');
     }
 }

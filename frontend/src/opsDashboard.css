@@ -33,10 +33,10 @@
 .op-logo-box {
     width: 60px;
     height: 60px;
-    display: flex;
+    display: flex ;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    flex-shrink: 0 ;
 }
 
 .op-logo-box img {
@@ -50,12 +50,12 @@
     font-size: 1.1rem;
     font-weight: 600;
     color: #1b5e20;
-    margin: 0;
+    margin: 0 ;
 }
 
 .op-welcome-text p {
     font-size: 0.85rem;
-    color: #4e8550;
+    color: #4e8550; 
     margin: 2px 0 0 0;
 }
 
@@ -66,7 +66,7 @@
 }
 
 .op-icon-btn {
-    background: #f1f8f2;
+    background: #f1f8f4;
     border: 1px solid #c8e6c9;
     width: 40px;
     height: 40px;
@@ -138,19 +138,19 @@
 }
 
 .op-menu-item:hover {
-    background-color: #2e7d32;
-    color: #ffffff;
+    background-color: #2e7d32!important;
+    color: #ffffff!important;
 }
 
 .op-menu-item.active {
-    background-color: #76c457;
-    color: #1b5e20;
-    font-weight: 600;
-    border-left-color: #ffffff;
+    background-color: #76c457!important;
+    color: #1b5e20!important;
+    font-weight: 600!important;
+    border-left-color: #ffffff!important;
 }
 
 .op-menu-icon {
-    font-size: 1.1rem;
+    font-size: 1.1rem!important;
 }
 
 .op-sidebar-footer {
@@ -441,4 +441,43 @@
 .op-alert-link:hover {
     color: #991b1b;
     text-decoration: underline;
+}
+
+/* Styling Tombol Aksi Remote pada Tabel Sesi Aktif */
+.op-action-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.op-btn-remote {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    color: #ffffff;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.op-btn-remote:active {
+    transform: scale(0.95);
+}
+
+/* Tombol Stop (Merah) */
+.op-btn-remote.stop {
+    background-color: #ef4444;
+}
+.op-btn-remote.stop:hover {
+    background-color: #dc2626;
+}
+
+/* Tombol Reboot / Power Off (Biru) */
+.op-btn-remote.reboot {
+    background-color: #3b82f6;
+}
+.op-btn-remote.reboot:hover {
+    background-color: #2563eb;
 }

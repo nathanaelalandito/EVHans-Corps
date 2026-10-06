@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    FaBell, FaCog, FaTachometerAlt, FaChargingStation, 
+    FaBell, FaCog, FaTachometerAlt, FaChargingStation, FaPlug,
     FaFileAlt, FaUser, FaSignOutAlt, FaSyncAlt, FaBolt, 
-    FaThermometerHalf, FaNetworkWired, FaPowerOff, FaStop, FaPlay, FaExclamationTriangle 
+    FaThermometerHalf, FaNetworkWired, FaPowerOff, FaStop, FaPlay, FaExclamationTriangle, FaPlus, FaEdit, FaTrash, FaTimes 
 } from 'react-icons/fa';
+import axios from 'axios';
+import { getStoredToken } from './api/auth';
 import './chargerMonitor.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
@@ -15,35 +17,43 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function ChargerMonitor({ user, onLogout, setActiveMenu }) {
+export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToPort, onNavigateToOpsReport }) {
     const [chargers, setChargers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('ALL');
 
+    // State untuk Modal Form (Tambah / Edit Charger) disesuaikan dengan migrasi baru
+    const [showModal, setShowModal] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [currentChargerId, setCurrentChargerId] = useState(null);
+    const [formData, setFormData] = useState({
+        kode_perangkat: '',
+        merek_model: '',
+        kap_tot_kw: 60,
+        status_mesin: 'Active'
+    });
+
     const nameString = typeof user === 'string' 
         ? user 
-        : (user?.name || user?.email || '');
+        : (user?.profile?.nama_lengkap || user?.name || user?.email || '');
+
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
-    // Fungsi ambil data port dari API Laravel
+    // Mengambil data dari endpoint operator
     const fetchChargersData = async () => {
         setLoading(true);
         try {
-            // TODO: Hubungkan ke endpoint Laravel Controller (contoh: /api/chargers)
-            // const res = await axios.get('/api/chargers');
-            // setChargers(res.data);
+            const token = getStoredToken(); 
+            const response = await axios.get('http://127.0.0.1:8000/api/operator/chargers', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            console.log("ISI DATA API:", response.data); // Cek lewat F12 Console browser
 
-            // Simulasi data dari database relasional Laravel
-            setChargers([
-                { id: 1, name: 'Port SPKLU 01', type: 'CCS2 (DC 60kW)', status: 'CHARGING', voltage: '400V', current: '112A', temp: '42°C', ocpp: 'Connected', user: 'B 1234 XYZ' },
-                { id: 2, name: 'Port SPKLU 02', type: 'CCS2 (DC 60kW)', status: 'AVAILABLE', voltage: '0V', current: '0A', temp: '28°C', ocpp: 'Connected', user: '-' },
-                { id: 3, name: 'Port SPKLU 03', type: 'CHAdeMO (DC 50kW)', status: 'FAULT', voltage: '0V', current: '0A', temp: '75°C', ocpp: 'Connected', user: '-' },
-                { id: 4, name: 'Port SPKLU 04', type: 'AC Type 2 (22kW)', status: 'CHARGING', voltage: '380V', current: '32A', temp: '39°C', ocpp: 'Connected', user: 'H 5678 AB' },
-                { id: 5, name: 'Port SPKLU 05', type: 'AC Type 2 (22kW)', status: 'OFFLINE', voltage: '0V', current: '0A', temp: '25°C', ocpp: 'Disconnected', user: '-' },
-                { id: 6, name: 'Port SPKLU 06', type: 'CCS2 (DC 120kW)', status: 'AVAILABLE', voltage: '0V', current: '0A', temp: '30°C', ocpp: 'Connected', user: '-' },
-            ]);
+            setChargers(response.data.data || []); 
         } catch (error) {
-            console.error("Gagal memuat data port:", error);
+            console.error("Gagal memuat data charger:", error);
+            setChargers([]);
         } finally {
             setLoading(false);
         }
@@ -53,23 +63,102 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu }) {
         fetchChargersData();
     }, []);
 
-    // Handler perintah remote (Start, Stop, Reboot) ke backend Laravel
-    const handleRemoteControl = async (action, portName) => {
-        if (window.confirm(`Konfirmasi: Kirim perintah [${action}] untuk ${portName}?`)) {
+    // Buka Modal Tambah Charger
+    const handleOpenAddModal = () => {
+        setIsEditing(false);
+        setFormData({
+            kode_perangkat: '',
+            merek_model: '',
+            kap_tot_kw: 60,
+            status_mesin: 'Active'
+        });
+        setShowModal(true);
+    };
+
+    // Buka Modal Edit Charger
+    const handleOpenEditModal = (charger) => {
+        setIsEditing(true);
+        const chargerId = charger.id_charger || charger.id;
+        setCurrentChargerId(chargerId);
+        setFormData({
+            kode_perangkat: charger.kode_perangkat || '',
+            merek_model: charger.merek_model || '',
+            kap_tot_kw: charger.kap_tot_kw || 60,
+            status_mesin: charger.status_mesin || 'Active'
+        });
+        setShowModal(true);
+    };
+
+    // Simpan Data (Create / Update ke Operator API)
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const token = getStoredToken();
+            const headers = { Authorization: `Bearer ${token}` };
+
+            if (isEditing) {
+                await axios.put(`http://127.0.0.1:8000/api/operator/chargers/${currentChargerId}`, formData, { headers });
+                alert(`Mesin Charger ${formData.kode_perangkat} berhasil diperbarui!`);
+            } else {
+                // Sesuaikan endpoint POST store charger agar sinkron dengan routing Laravel
+                await axios.post('http://127.0.0.1:8000/api/operator/chargers', formData, { headers });
+                alert(`Mesin Charger baru berhasil ditambahkan!`);
+            }
+            setShowModal(false);
+            fetchChargersData();
+        } catch (err) {
+            alert(`Gagal menyimpan data: ${err.response?.data?.message || err.message}`);
+        }
+    };
+
+    // Kontrol Jarak Jauh (Start / Stop / Reboot)
+    const handleRemoteControl = async (action, id, kode) => {
+        if (window.confirm(`Konfirmasi: Kirim perintah [${action}] untuk perangkat ${kode}?`)) {
             try {
-                // TODO: axios.post(`/api/chargers/${portId}/control`, { action })
-                alert(`Perintah ${action} berhasil dikirim ke ${portName}`);
+                const token = getStoredToken();
+                const headers = { Authorization: `Bearer ${token}` };
+
+                // Petakan aksi ke endpoint backend Laravel yang sesuai
+                if (action === 'START') {
+                    await axios.post(`http://127.0.0.1:8000/api/operator/charger/${id}/start`, {}, { headers });
+                } else if (action === 'STOP') {
+                    await axios.post(`http://127.0.0.1:8000/api/operator/charger/${id}/stop`, {}, { headers });
+                } else if (action === 'REBOOT') {
+                    // Memanggil endpoint backend untuk mengubah status ke maintenance/offline
+                    await axios.post(`http://127.0.0.1:8000/api/operator/charger/${id}/reboot`, {}, { headers });
+                } else {
+                    // Jika ada perintah lain seperti REBOOT, arahkan atau sesuaikan endpoint-nya
+                    alert(`Perintah ${action} belum didukung oleh server.`);
+                    return;
+                }
+
+                alert(`Perintah ${action} berhasil dikirim ke ${kode}`);
                 fetchChargersData();
             } catch (err) {
-                alert(`Gagal mengeksekusi perintah: ${err.message}`);
+                alert(`Gagal mengirim perintah ${action}: ${err.response?.data?.message || err.message}`);
+            }
+        }
+    };
+    // Hapus Charger
+    const handleDeleteCharger = async (id, kode) => {
+        if (window.confirm(`Peringatan: Apakah Anda yakin ingin menghapus mesin perangkat ${kode}?`)) {
+            try {
+                const token = getStoredToken();
+                await axios.delete(`http://127.0.0.1:8000/api/operator/delchargers/${id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                fetchChargersData();
+                alert(`Perangkat ${kode} berhasil dihapus.`);
+            } catch (err) {
+                alert(`Gagal menghapus charger: ${err.response?.data?.message || err.message}`);
             }
         }
     };
 
-    // Filter data port berdasarkan status
+    // Filter status berdasarkan status_mesin (Active, Maintenance, Offline)
     const filteredChargers = filterStatus === 'ALL' 
         ? chargers 
-        : chargers.filter(c => c.status === filterStatus);
+        : chargers.filter(c => c.status_mesin && c.status_mesin.toLowerCase() === filterStatus.toLowerCase());
 
     return (
         <div className="cm-layout-container">
@@ -81,18 +170,13 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu }) {
                     </div>
                     <div className="cm-welcome-text">
                         <h2>{getGreeting()}, Petugas {firstName}</h2>
-                        <p>Panel Monitoring Port SPKLU</p>
+                        <p>Panel Monitoring & Manajemen Unit Charger SPKLU</p>
                     </div>
                 </div>
 
                 <div className="cm-header-right">
-                    <button className="cm-icon-btn" title="Notifikasi">
-                        <FaBell />
-                        <span className="cm-badge">2</span>
-                    </button>
-                    <button className="cm-icon-btn" title="Pengaturan Akun" onClick={() => setActiveMenu && setActiveMenu('profils')}>
-                        <FaCog />
-                    </button>
+                    <button className="cm-icon-btn" title="Notifikasi"><FaBell /><span className="cm-badge">2</span></button>
+                    <button className="cm-icon-btn" title="Pengaturan" onClick={() => setActiveMenu && setActiveMenu('profils')}><FaCog /></button>
                 </div>
             </header>
 
@@ -102,28 +186,24 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu }) {
                 {/* --- SIDEBAR --- */}
                 <aside className="cm-sidebar">
                     <ul className="cm-menu-list">
-                        <li className="cm-menu-item" onClick={() => setActiveMenu && setActiveMenu('dashboard')}>
-                            <FaTachometerAlt className="cm-menu-icon" />
-                            <span>Dashboard</span>
+                        <li className="cm-menu-item" onClick={() => {setActiveMenu && setActiveMenu('dashboard')
+                            if (onNavigateToOpsDash) onNavigateToOpsDash();
+                        }}><FaTachometerAlt className="cm-menu-icon" /><span>Dashboard</span></li>
+                        <li className="cm-menu-item active" onClick={() => setActiveMenu && setActiveMenu('charger')}>
+                            <FaChargingStation className="cm-menu-icon" /><span>Manage Charger</span></li>
+                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('ports');
+                            if(onNavigateToPort) onNavigateToPort();
+                        }}>
+                            <FaPlug className="op-menu-icon" /><span>Manage port</span>
                         </li>
-                        <li className="cm-menu-item active" onClick={() => setActiveMenu && setActiveMenu('ports')}>
-                            <FaChargingStation className="cm-menu-icon" />
-                            <span>Port Monitoring</span>
-                        </li>
-                        <li className="cm-menu-item" onClick={() => setActiveMenu && setActiveMenu('reports')}>
-                            <FaFileAlt className="cm-menu-icon" />
-                            <span>Transaction Report</span>
-                        </li>
-                        <li className="cm-menu-item" onClick={() => setActiveMenu && setActiveMenu('profils')}>
-                            <FaUser className="cm-menu-icon" />
-                            <span>Profil</span>
-                        </li>
+                        <li className="cm-menu-item" onClick={() => {setActiveMenu && setActiveMenu('report')
+                            if (onNavigateToOpsReport) onNavigateToOpsReport();
+                        }}><FaFileAlt className="cm-menu-icon" /><span>Manage Report</span></li>
+                        <li className="cm-menu-item" onClick={() => setActiveMenu && setActiveMenu('profil')}>
+                            <FaUser className="cm-menu-icon" /><span>Profil</span></li>
                     </ul>
-
                     <div className="cm-sidebar-footer">
-                        <button className="cm-logout-btn" onClick={onLogout}>
-                            <FaSignOutAlt /> <span>Keluar</span>
-                        </button>
+                        <button className="cm-logout-btn" onClick={onLogout}><FaSignOutAlt /> <span>Keluar</span></button>
                     </div>
                 </aside>
 
@@ -131,94 +211,78 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu }) {
                 <main className="cm-main-content">
                     <div className="cm-container">
                         
-                        {/* Top Bar: Title & Filter */}
+                        {/* Top Bar */}
                         <div className="cm-top-bar">
                             <div className="cm-title-area">
-                                <h1>Monitoring Telemetri Port</h1>
-                                <p>Pantau tegangan, arus, suhu, dan kendalikan status unit *charger* secara *real-time*.</p>
+                                <h1>Manajemen & Telemetri Unit Charger</h1>
+                                <p>Kontrol penuh atas status mesin, spesifikasi kapasitas, dan penambahan unit baru.</p>
                             </div>
                             <div className="cm-top-actions">
-                                <select 
-                                    className="cm-filter-select" 
-                                    value={filterStatus} 
-                                    onChange={(e) => setFilterStatus(e.target.value)}
-                                >
+                                <button className="cm-add-btn" onClick={handleOpenAddModal}>
+                                    <FaPlus /> Tambah Unit Baru
+                                </button>
+                                <select className="cm-filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
                                     <option value="ALL">Semua Status</option>
-                                    <option value="CHARGING">Sedang Charging</option>
-                                    <option value="AVAILABLE">Tersedia</option>
-                                    <option value="FAULT">Bermasalah (Fault)</option>
-                                    <option value="OFFLINE">Offline</option>
+                                    <option value="Active">Active</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                    <option value="Offline">Offline</option>
                                 </select>
                                 <button className="cm-refresh-btn" onClick={fetchChargersData} disabled={loading}>
-                                    <FaSyncAlt className={loading ? "fa-spin" : ""} /> {loading ? "Memuat..." : "Refresh"}
+                                    <FaSyncAlt className={loading ? "fa-spin" : ""} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Grid Kartu Port */}
+                        {/* Grid Kartu Charger */}
                         <div className="cm-grid">
                             {filteredChargers.length > 0 ? (
-                                filteredChargers.map((port) => (
-                                    <div key={port.id} className={`cm-port-card status-${port.status.toLowerCase()}`}>
-                                        
-                                        {/* Card Header */}
-                                        <div className="cm-port-header">
-                                            <div>
-                                                <h3>{port.name}</h3>
-                                                <span className="cm-port-type">{port.type}</span>
+                                filteredChargers.map((charger) => {
+                                    const chargerId = charger.id_charger || charger.id;
+                                    const statusClass = (charger.status_mesin || 'Active').toLowerCase();
+                                    return (
+                                        <div key={chargerId} className={`cm-port-card status-${statusClass}`}>
+                                            
+                                            <div className="cm-port-header">
+                                                <div>
+                                                    <h3>{charger.kode_perangkat}</h3>
+                                                    <span className="cm-port-type">{charger.merek_model}</span>
+                                                </div>
+                                                <div className="cm-header-badges">
+                                                    <span className={`cm-status-badge ${statusClass}`}>{charger.status_mesin}</span>
+                                                    <div className="cm-crud-icons">
+                                                        <FaEdit title="Ubah Charger" onClick={() => handleOpenEditModal(charger)} />
+                                                        <FaTrash title="Hapus Charger" onClick={() => handleDeleteCharger(chargerId, charger.kode_perangkat)} />
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span className={`cm-status-badge ${port.status.toLowerCase()}`}>
-                                                {port.status}
-                                            </span>
-                                        </div>
 
-                                        {/* Telemetry Metrics */}
-                                        <div className="cm-metrics-grid">
-                                            <div className="cm-metric-item">
-                                                <span className="cm-metric-label"><FaBolt /> Tegangan</span>
-                                                <span className="cm-metric-val">{port.voltage}</span>
+                                            <div className="cm-metrics-grid">
+                                                <div className="cm-metric-item">
+                                                    <span className="cm-metric-label"><FaBolt /> Kapasitas Total</span>
+                                                    <span className="cm-metric-val">{charger.kap_tot_kw} kW</span>
+                                                </div>
+                                                <div className="cm-metric-item">
+                                                    <span className="cm-metric-label"><FaChargingStation /> Lokasi ID</span>
+                                                    <span className="cm-metric-val">#LOC-{charger.id_location || '1'}</span>
+                                                </div>
                                             </div>
-                                            <div className="cm-metric-item">
-                                                <span className="cm-metric-label"><FaChargingStation /> Arus</span>
-                                                <span className="cm-metric-val">{port.current}</span>
-                                            </div>
-                                            <div className="cm-metric-item">
-                                                <span className="cm-metric-label"><FaThermometerHalf /> Suhu Modul</span>
-                                                <span className={`cm-metric-val ${parseInt(port.temp) > 70 ? 'text-danger' : ''}`}>{port.temp}</span>
-                                            </div>
-                                            <div className="cm-metric-item">
-                                                <span className="cm-metric-label"><FaNetworkWired /> OCPP</span>
-                                                <span className={`cm-metric-val ${port.ocpp === 'Connected' ? 'text-success' : 'text-danger'}`}>{port.ocpp}</span>
-                                            </div>
-                                        </div>
 
-                                        {/* Additional Info */}
-                                        <div className="cm-port-info-footer">
-                                            <span>Kendaraan / Pengguna: <strong>{port.user}</strong></span>
-                                        </div>
+                                            <div className="cm-port-actions">
+                                                {charger.status_mesin === 'Active' ? (
+                                                    <button className="cm-btn stop" onClick={() => handleRemoteControl('STOP', chargerId, charger.kode_perangkat)}><FaStop /> Stop</button>
+                                                ) : (
+                                                    <button className="cm-btn start" onClick={() => handleRemoteControl('START', chargerId, charger.kode_perangkat)}><FaPlay /> Start</button>
+                                                )}
+                                                <button className="cm-btn reboot" onClick={() => handleRemoteControl('REBOOT', chargerId, charger.kode_perangkat)}><FaPowerOff /> Reboot</button>
+                                            </div>
 
-                                        {/* Remote Actions */}
-                                        <div className="cm-port-actions">
-                                            {port.status === 'CHARGING' ? (
-                                                <button className="cm-btn stop" onClick={() => handleRemoteControl('STOP', port.name)}>
-                                                    <FaStop /> Remote Stop
-                                                </button>
-                                            ) : (
-                                                <button className="cm-btn start" onClick={() => handleRemoteControl('START', port.name)}>
-                                                    <FaPlay /> Remote Start
-                                                </button>
-                                            )}
-                                            <button className="cm-btn reboot" onClick={() => handleRemoteControl('REBOOT', port.name)}>
-                                                <FaPowerOff /> Reboot
-                                            </button>
                                         </div>
-
-                                    </div>
-                                ))
+                                    );
+                                })
                             ) : (
                                 <div className="cm-empty-state">
                                     <FaExclamationTriangle size={32} />
-                                    <p>Tidak ada port yang cocok dengan filter status tersebut.</p>
+                                    <p>Tidak ada unit charger ditemukan di database operasional.</p>
                                 </div>
                             )}
                         </div>
@@ -226,6 +290,66 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu }) {
                     </div>
                 </main>
             </div>
+
+            {/* --- MODAL FORM OVERLAY (CREATE / UPDATE) --- */}
+            {showModal && (
+                <div className="cm-modal-overlay">
+                    <div className="cm-modal-card">
+                        <div className="cm-modal-header">
+                            <h3>{isEditing ? 'Ubah Konfigurasi Mesin Charger' : 'Tambah Unit Charger Baru'}</h3>
+                            <button className="cm-close-modal" onClick={() => setShowModal(false)}><FaTimes /></button>
+                        </div>
+                        <form onSubmit={handleFormSubmit} className="cm-form">
+                            <div className="cm-form-group">
+                                <label>Kode Perangkat (Maks 12 Karakter)</label>
+                                <input 
+                                    type="text" 
+                                    maxLength="12"
+                                    value={formData.kode_perangkat} 
+                                    onChange={(e) => setFormData({...formData, kode_perangkat: e.target.value})} 
+                                    required 
+                                />
+                            </div>
+                            <div className="cm-form-group">
+                                <label>Merek & Model Mesin</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="Contoh: ABB Terra 184 kW"
+                                    value={formData.merek_model} 
+                                    onChange={(e) => setFormData({...formData, merek_model: e.target.value})} 
+                                    required 
+                                />
+                            </div>
+                            <div className="cm-form-row">
+                                <div className="cm-form-group">
+                                    <label>Kapasitas Total (kW)</label>
+                                    <input 
+                                        type="number" 
+                                        value={formData.kap_tot_kw} 
+                                        onChange={(e) => setFormData({...formData, kap_tot_kw: parseInt(e.target.value) || 0})} 
+                                        required 
+                                    />
+                                </div>
+                                <div className="cm-form-group">
+                                    <label>Status Mesin</label>
+                                    <select 
+                                        value={formData.status_mesin} 
+                                        onChange={(e) => setFormData({...formData, status_mesin: e.target.value})}
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="Offline">Offline</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="cm-modal-actions">
+                                <button type="button" className="cm-btn-secondary" onClick={() => setShowModal(false)}>Batal</button>
+                                <button type="submit" className="cm-btn-primary">Simpan ke Database</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

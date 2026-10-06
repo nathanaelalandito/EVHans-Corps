@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id('id_metode');
             $table->string('nama_metode');
             $table->integer('biaya_layanan')->default(0);
-            $table->enum('status_metode', ['aktif', 'nonaktif'])->default('aktif');
+            $table->enum('status_metode', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->timestamps();
         });
     }
