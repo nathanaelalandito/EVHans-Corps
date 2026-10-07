@@ -6,22 +6,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Models\UserProfile;
- use App\Models\Vehicle;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $table = 'users'; // Sesuaikan dengan nama tabel di DB
+
     protected $primaryKey = 'id_user'; // Beritahu Laravel kalau primary key-nya id_user
-    
+
     public $incrementing = false; // Karena pakai string (ADM001), matikan auto-increment integer
+
     protected $keyType = 'string'; // Tipe data primary key adalah string
 
-    protected $fillable = ['id_user','email','password','peran','status_akun',];
+    protected $fillable = ['id_user', 'email', 'password', 'peran', 'status_akun'];
 
-    protected $hidden = ['password', 'remember_token',];
+    protected $hidden = ['password', 'remember_token'];
 
     // Relasi ke UserProfile (One to One)
     public function profile()
@@ -38,5 +38,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(ChargingSession::class, 'id_user', 'id_user'); // sesuaikan
     }
-
 }

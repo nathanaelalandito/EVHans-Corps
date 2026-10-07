@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './driverDashboard.css';
-import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi } from './api/wallet';
+import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi, topUpWallet } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
+import { getStations } from './api/stations';
+import { finishChargingSession, getActiveChargingSession, interruptChargingSession, startChargingSession, validateCharger } from './api/chargingSessions';
+import { getPaymentDetail, getPaymentHistory } from './api/payments';
 import { getDrivingRoute, googleMapsDirectionsUrl, formatJarak, formatDurasi } from './api/routing';
 
 // Ambil pesan error yang enak dibaca dari response axios (baik yang
@@ -74,6 +77,13 @@ const DUMMY_STATIONS = [
         tipe_konektor: ['CCS2', 'Type 2'],
         daya_kw_max: 50,
         tarif_per_kwh: 2500,
+        biaya_parkir: 5000,
+        chargers: [
+            { id_charger: 101, kode_perangkat: 'CHG-01', tipe_konektor: 'CCS2', daya_kw: 50, status: 'tersedia' },
+            { id_charger: 102, kode_perangkat: 'CHG-02', tipe_konektor: 'Type 2', daya_kw: 22, status: 'sedang digunakan' },
+            { id_charger: 103, kode_perangkat: 'CHG-03', tipe_konektor: 'CCS2', daya_kw: 50, status: 'tersedia' },
+            { id_charger: 104, kode_perangkat: 'CHG-04', tipe_konektor: 'Type 2', daya_kw: 22, status: 'maintenance' },
+        ],
     },
     {
         id_location: 2,
@@ -89,6 +99,11 @@ const DUMMY_STATIONS = [
         tipe_konektor: ['CCS2'],
         daya_kw_max: 22,
         tarif_per_kwh: 2200,
+        biaya_parkir: 4000,
+        chargers: [
+            { id_charger: 201, kode_perangkat: 'CHG-01', tipe_konektor: 'CCS2', daya_kw: 22, status: 'sedang digunakan' },
+            { id_charger: 202, kode_perangkat: 'CHG-02', tipe_konektor: 'CCS2', daya_kw: 22, status: 'sedang digunakan' },
+        ],
     },
     {
         id_location: 3,
@@ -104,10 +119,16 @@ const DUMMY_STATIONS = [
         tipe_konektor: ['Type 2', 'CHAdeMO'],
         daya_kw_max: 60,
         tarif_per_kwh: 2700,
+        biaya_parkir: 6000,
+        chargers: [
+            { id_charger: 301, kode_perangkat: 'CHG-01', tipe_konektor: 'Type 2', daya_kw: 22, status: 'maintenance' },
+            { id_charger: 302, kode_perangkat: 'CHG-02', tipe_konektor: 'CHAdeMO', daya_kw: 60, status: 'rusak' },
+        ],
     },
 ];
 
 const CONNECTOR_FILTERS = ['Semua', 'CCS2', 'Type 2', 'CHAdeMO'];
+const TOP_UP_METHODS = ['Mandiri', 'OVO', 'BCA', 'BRI', 'BNI'];
 
 function formatRupiah(value) {
     return 'Rp' + value.toLocaleString('id-ID');
@@ -132,6 +153,18 @@ function stationStatusLabel(status, tersedia) {
     if (status === 'Dalam Perawatan') return { text: 'Perawatan', tone: 'warn' };
     if (tersedia === 0) return { text: 'Penuh', tone: 'danger' };
     return { text: 'Tersedia', tone: 'ok' };
+}
+
+function chargerStatusLabel(status) {
+    if (status === 'tersedia') return { text: 'Tersedia', tone: 'ok' };
+    if (status === 'sedang digunakan') return { text: 'Charging', tone: 'warn' };
+    if (status === 'maintenance') return { text: 'Maintenance', tone: 'warn' };
+    return { text: capitalize(status), tone: 'danger' };
+}
+
+function estimateChargingCost(kwh, station) {
+    const energiKwh = Number(kwh) || 0;
+    return Math.round(energiKwh * station.tarif_per_kwh + station.biaya_parkir);
 }
 
 // Marker custom (divIcon) — menghindari masalah klasik path ikon default
@@ -188,9 +221,12 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         const saved = Number(localStorage.getItem(ACTIVE_VEHICLE_KEY));
         return saved || null;
     });
-    const [stations] = useState(DUMMY_STATIONS);
+    const [stations, setStations] = useState(DUMMY_STATIONS);
+    const [stationsLoading, setStationsLoading] = useState(false);
+    const [stationsError, setStationsError] = useState('');
     const [connectorFilter, setConnectorFilter] = useState('Semua');
     const [activeSession, setActiveSession] = useState(DUMMY_ACTIVE_SESSION);
+    const [activeSessionLoading, setActiveSessionLoading] = useState(false);
     const [elapsed, setElapsed] = useState(0);
     const [sheetExpanded, setSheetExpanded] = useState(false);
     const [selectedStationId, setSelectedStationId] = useState(null);
@@ -216,6 +252,23 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     // Tarik data dompet sekali saat dashboard dibuka.
     useEffect(() => {
         fetchWallet();
+    }, []);
+
+    const fetchActiveSession = async () => {
+        setActiveSessionLoading(true);
+        try {
+            const session = await getActiveChargingSession();
+            setActiveSession(session);
+            setShowNotif(!!session);
+        } catch (err) {
+            console.error('Gagal memuat sesi charging aktif:', err);
+        } finally {
+            setActiveSessionLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchActiveSession();
     }, []);
 
       // --- Profil Driver (data asli dari backend, mengikuti ProfileDriverResource) ---
@@ -335,6 +388,29 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         return () => window.removeEventListener('focus', onFocus);
     }, []);
 
+    const fetchStations = async (silent = false) => {
+        if (!silent) setStationsLoading(true);
+        setStationsError('');
+        try {
+            const data = await getStations({
+                lat: driverPosition.lat,
+                lng: driverPosition.lng,
+            });
+            setStations(Array.isArray(data) && data.length > 0 ? data : DUMMY_STATIONS);
+        } catch (err) {
+            console.error('Gagal memuat station:', err);
+            setStations(DUMMY_STATIONS);
+            setStationsError(extractErrorMessage(err, 'Gagal memuat charging station dari server.'));
+        } finally {
+            setStationsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchStations();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Jaga kendaraan aktif tetap valid: kalau yang tersimpan sudah dihapus
     // (atau belum ada pilihan), pakai kendaraan pertama; kosong -> null.
     useEffect(() => {
@@ -352,6 +428,45 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     const activeVehicle = vehicles.find((v) => v.id_vehicle === activeVehicleId) ?? null;
     const selectedStation = stations.find((s) => s.id_location === selectedStationId) ?? null;
+    const activeVehicleConnector = activeVehicle ? konektorLabel(activeVehicle.tipe_konektor) : null;
+    const suggestedStations = activeVehicleConnector
+        ? stations.filter((s) => s.tipe_konektor.includes(activeVehicleConnector))
+        : stations;
+    const [chargingDraft, setChargingDraft] = useState(null);
+    const [targetKwh, setTargetKwh] = useState(20);
+    const [holdPinInput, setHoldPinInput] = useState('');
+    const [holdError, setHoldError] = useState('');
+    const [holdSubmitting, setHoldSubmitting] = useState(false);
+    const [invoice, setInvoice] = useState(null);
+    const [showTopUp, setShowTopUp] = useState(false);
+    const [topUpAmount, setTopUpAmount] = useState(100000);
+    const [topUpMethod, setTopUpMethod] = useState('Mandiri');
+    const [topUpPin, setTopUpPin] = useState('');
+    const [topUpError, setTopUpError] = useState('');
+    const [topUpSubmitting, setTopUpSubmitting] = useState(false);
+    const [transactionHistory, setTransactionHistory] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState('');
+    const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [invoiceLoading, setInvoiceLoading] = useState(false);
+
+    const fetchTransactionHistory = async () => {
+        setHistoryLoading(true);
+        setHistoryError('');
+        try {
+            const data = await getPaymentHistory();
+            setTransactionHistory(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Gagal memuat riwayat transaksi:', err);
+            setHistoryError(extractErrorMessage(err, 'Gagal memuat riwayat transaksi.'));
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTransactionHistory();
+    }, []);
 
     // Rute ke station terpilih. route = { stationId, coords, distanceM, durationS }.
     const [route, setRoute] = useState(null);
@@ -371,6 +486,89 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         if (connectorFilter === 'Semua') return true;
         return s.tipe_konektor.includes(connectorFilter);
     });
+
+    const openChargingDraft = async (station, charger) => {
+        setHoldError('');
+
+        if (!activeVehicle) {
+            setChargingDraft({ station, charger });
+            setHoldError('Pilih kendaraan aktif terlebih dahulu.');
+            return;
+        }
+
+        const chargerBadge = chargerStatusLabel(charger.status);
+        if (chargerBadge.tone !== 'ok') {
+            setHoldError('Charger sudah digunakan atau belum siap. Pilih charger lain yang tersedia.');
+            return;
+        }
+
+        setChargingDraft({ station, charger });
+        setTargetKwh(20);
+        setHoldPinInput('');
+
+        try {
+            await validateCharger({
+                id_charger: charger.id_charger,
+                id_vehicle: activeVehicle.id_vehicle,
+                target_kwh: 20,
+            });
+        } catch (err) {
+            setHoldError(extractErrorMessage(err, 'Charger tidak valid untuk kendaraan aktif.'));
+            return;
+        }
+    };
+
+    const closeChargingDraft = () => {
+        setChargingDraft(null);
+        setHoldPinInput('');
+        setHoldError('');
+    };
+
+    const handleConfirmHold = async (e) => {
+        e.preventDefault();
+        if (!chargingDraft || !activeVehicle) return;
+
+        const holdAmount = estimateChargingCost(targetKwh, chargingDraft.station);
+        const availableBalance = wallet?.saldo_tersedia ?? wallet?.saldo ?? 0;
+        if (availableBalance < holdAmount) {
+            setHoldError('Saldo Dompet Digital belum mencukupi untuk estimasi transaksi. Silakan top up terlebih dahulu.');
+            return;
+        }
+
+        if (!hasPin) {
+            setHoldError('PIN Dompet belum aktif. Atur PIN Dompet sebelum memulai sesi charging.');
+            return;
+        }
+
+        if (holdPinInput.length !== 6) {
+            setHoldError('Masukkan PIN Dompet 6 digit untuk konfirmasi hold saldo.');
+            return;
+        }
+
+        setHoldSubmitting(true);
+        setHoldError('');
+
+        try {
+            const session = await startChargingSession({
+                id_charger: chargingDraft.charger.id_charger,
+                id_vehicle: activeVehicle.id_vehicle,
+                target_kwh: Number(targetKwh),
+                pin: holdPinInput,
+            });
+
+            setActiveSession(session);
+            await fetchWallet();
+            await fetchStations(true);
+            setShowNotif(true);
+            setInvoice(null);
+            closeChargingDraft();
+            setView('home');
+        } catch (err) {
+            setHoldError(extractErrorMessage(err, 'Gagal memulai sesi charging.'));
+        } finally {
+            setHoldSubmitting(false);
+        }
+    };
 
     // ---------------------------------------------------------------
     // Inisialisasi peta sekali saat komponen mount. Peta tetap di-mount
@@ -519,10 +717,117 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         ? Math.round(activeSession.energi_kwh * activeSession.tarif_per_kwh + activeSession.biaya_parkir)
         : 0;
 
-    const handleStopSession = () => {
-        // TODO: panggil endpoint "Menghentikan Sesi Charging" (FR23),
-        // lalu tampilkan hasil penyelesaian transaksi (FR34 / FR37).
+    const handleStopSession = async () => {
+        if (!activeSession) return;
+
+        if (activeSession.id_session) {
+            try {
+                const finishedInvoice = await finishChargingSession(activeSession.id_session);
+                setInvoice(finishedInvoice);
+                await fetchWallet();
+                await fetchStations(true);
+                await fetchTransactionHistory();
+                setActiveSession(null);
+                return;
+            } catch (err) {
+                setInvoice({
+                    nama_lokasi: activeSession.nama_lokasi,
+                    kode_charger: activeSession.kode_charger,
+                    energi_kwh: 0,
+                    biaya_aktual: 0,
+                    jumlah_hold: activeSession.jumlah_hold,
+                    status: extractErrorMessage(err, 'Gagal menyelesaikan sesi'),
+                });
+                return;
+            }
+        }
+
+        const energiAktual = Math.max(1, Number(activeSession.energi_kwh) || Math.round(activeSession.target_kwh * 0.72));
+        const biayaAktual = Math.round(energiAktual * activeSession.tarif_per_kwh + activeSession.biaya_parkir);
+        setInvoice({
+            nama_lokasi: activeSession.nama_lokasi,
+            kode_charger: activeSession.kode_charger,
+            energi_kwh: energiAktual,
+            biaya_aktual: biayaAktual,
+            jumlah_hold: activeSession.jumlah_hold,
+            status: 'Selesai',
+        });
         setActiveSession(null);
+    };
+
+    const handleInterruptSession = async () => {
+        if (!activeSession?.id_session) return;
+
+        try {
+            const interruptedInvoice = await interruptChargingSession(activeSession.id_session, {
+                status: 'gagal',
+                alasan: 'Gangguan charger dilaporkan oleh driver.',
+            });
+            setInvoice(interruptedInvoice);
+            await fetchWallet();
+            await fetchStations(true);
+            await fetchTransactionHistory();
+            setActiveSession(null);
+        } catch (err) {
+            setInvoice({
+                nama_lokasi: activeSession.nama_lokasi,
+                kode_charger: activeSession.kode_charger,
+                energi_kwh: 0,
+                biaya_aktual: 0,
+                jumlah_hold: activeSession.jumlah_hold,
+                status: extractErrorMessage(err, 'Gagal memproses gangguan sesi charging'),
+            });
+        }
+    };
+
+    const handleOpenInvoice = async (idPayment) => {
+        setSelectedInvoice(null);
+        setInvoiceLoading(true);
+        try {
+            const data = await getPaymentDetail(idPayment);
+            setSelectedInvoice(data);
+        } catch (err) {
+            setSelectedInvoice({
+                status: extractErrorMessage(err, 'Gagal memuat detail invoice.'),
+                nama_lokasi: '-',
+                kode_charger: '-',
+                energi_kwh: 0,
+                biaya_aktual: 0,
+                jumlah_hold: 0,
+                selisih_dikembalikan: 0,
+            });
+        } finally {
+            setInvoiceLoading(false);
+        }
+    };
+
+    const openTopUpModal = () => {
+        setTopUpAmount(100000);
+        setTopUpMethod('Mandiri');
+        setTopUpPin('');
+        setTopUpError('');
+        setShowTopUp(true);
+    };
+
+    const handleTopUpSubmit = async (e) => {
+        e.preventDefault();
+        setTopUpError('');
+
+        if (hasPin && topUpPin.length !== 6) {
+            setTopUpError('Masukkan PIN Dompet 6 digit untuk top up.');
+            return;
+        }
+
+        setTopUpSubmitting(true);
+        try {
+            await topUpWallet(Number(topUpAmount), topUpMethod, topUpPin);
+            await fetchWallet();
+            setShowTopUp(false);
+        } catch (err) {
+            setTopUpError(extractErrorMessage(err, 'Top up gagal. Coba lagi.'));
+        } finally {
+            setTopUpSubmitting(false);
+        }
     };
 
     // ---------------------------------------------------------------
@@ -722,16 +1027,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
-    const cycleVehicle = () => {
-        if (vehicles.length === 0) {
-            onNavigateToVehicles();
-            return;
-        }
-        const idx = vehicles.findIndex((v) => v.id_vehicle === activeVehicleId);
-        const next = vehicles[(idx + 1) % vehicles.length];
-        setActiveVehicleId(next.id_vehicle);
-    };
-
     // Membuka layar peta dari dashboard. Jika sebuah station diberikan,
     // peta akan otomatis fly-to & membuka popup station tersebut begitu
     // ukurannya selesai dihitung ulang (lihat effect di atas).
@@ -742,14 +1037,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         if (station) setSelectedStationId(station.id_location);
     };
 
-    const goToActiveSessionOnMap = () => {
-        if (!activeSession) return;
-        const station = stations.find((s) => s.id_location === activeSession.id_location);
-        goToMap(station);
-    };
-
     const firstName = user.nama.split(' ')[0];
-
     return (
         <div className="app-shell">
             {/* ============================================================
@@ -758,7 +1046,10 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
             <div className={`home-screen ${view === 'home' ? 'is-active' : 'is-hidden'}`}>
                 <header className="home-header">
                     <div className="home-header-top">
-                        <span />
+                        <div className="home-greeting-block">
+                            <p className="home-greeting-text">{getGreeting()}, {firstName} 👋</p>
+                            <p className="home-greeting-sub">Siap cari charger terdekat hari ini.</p>
+                        </div>
                         <div className="home-header-actions">
                             <button
                                 className="home-icon-btn"
@@ -778,35 +1069,43 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         </div>
                     </div>
 
-                    <div className="home-greeting-block">
-                        <p className="home-greeting-text">{getGreeting()}, {firstName} 👋</p>
-                        <button
-                            className="home-vehicle-pill"
-                            onClick={cycleVehicle}
-                            title={vehicles.length > 1 ? 'Ketuk untuk ganti kendaraan' : undefined}
-                        >
-                            <span className="home-vehicle-pill-icon">🚗</span>
-                            <span className="home-vehicle-pill-text">
-                                {activeVehicle
-                                    ? `${activeVehicle.model} · ${activeVehicle.nomor_polisi}`
-                                    : vehiclesLoading
-                                        ? 'Memuat kendaraan…'
-                                        : '+ Tambah kendaraan'}
-                            </span>
-                            {vehicles.length > 1 && <span className="home-vehicle-pill-swap">⇄</span>}
-                        </button>
+                    <div className="home-header-summary">
+                        <div className="home-balance-panel">
+                            <div>
+                                <p className="home-wallet-label">Saldo Dompet</p>
+                                <p className="home-wallet-value">
+                                    {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
+                                </p>
+                            </div>
+                            <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
+                        </div>
+
+                        <div className="home-vehicle-panel">
+                            <div className="home-vehicle-panel-head">
+                                <span className="home-vehicle-pill-icon">🚗</span>
+                                <span>Kendaraan Aktif</span>
+                            </div>
+                            {vehicles.length > 0 ? (
+                                <select
+                                    className="home-vehicle-select"
+                                    value={activeVehicleId ?? ''}
+                                    onChange={(e) => setActiveVehicleId(Number(e.target.value))}
+                                    disabled={vehiclesLoading}
+                                >
+                                    {vehicles.map((v) => (
+                                        <option key={v.id_vehicle} value={v.id_vehicle}>
+                                            {v.model} · {v.nomor_polisi}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <button className="home-vehicle-add-btn" onClick={onNavigateToVehicles}>
+                                    {vehiclesLoading ? 'Memuat kendaraan...' : '+ Tambah kendaraan'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </header>
-
-                <div className="home-wallet-card">
-                    <div>
-                        <p className="home-wallet-label">Saldo Dompet</p>
-                        <p className="home-wallet-value">
-                            {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
-                        </p>
-                    </div>
-                    <button className="home-wallet-topup">+ Top Up</button>
-                </div>
 
                 <main className="home-content">
                     {showNotif && activeSession && (
@@ -814,6 +1113,16 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <span>⚡ Sesi charging Anda di <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.</span>
                             <button className="mapdash-notif-close" onClick={() => setShowNotif(false)}>✕</button>
                         </div>
+                    )}
+
+                    {activeSessionLoading && !activeSession && (
+                        <section className="home-session-card">
+                            <div className="mapdash-sheet-title-row">
+                                <span className="mapdash-sheet-title home-session-title">Mengecek Sesi Charging</span>
+                                <span className="dash-status-badge warn">Memuat</span>
+                            </div>
+                            <p className="mapdash-session-location">Sistem sedang mencari sesi charging yang masih berjalan.</p>
+                        </section>
                     )}
 
                     {activeSession && (
@@ -842,24 +1151,71 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 </div>
                             </div>
                             <div className="home-session-actions">
-                                <button className="dash-btn-navigate home-session-map-btn" onClick={goToActiveSessionOnMap}>
-                                    🗺️ Lihat di Peta
-                                </button>
                                 <button className="dash-btn-stop" onClick={handleStopSession}>
                                     Hentikan Sesi
+                                </button>
+                                <button className="dash-btn-issue" onClick={handleInterruptSession}>
+                                    Laporkan Gangguan
                                 </button>
                             </div>
                         </section>
                     )}
 
-                    <button className="home-cta-map" onClick={() => goToMap()}>
-                        <span className="home-cta-icon">🗺️</span>
-                        <span className="home-cta-text">
-                            <span className="home-cta-title">Cari Charging Station</span>
-                            <span className="home-cta-sub">{filteredStations.length} station di sekitar Anda</span>
-                        </span>
-                        <span className="home-cta-arrow">→</span>
-                    </button>
+                    <section className="home-search-card">
+                        <button className="home-cta-map" onClick={() => goToMap()}>
+                            <span className="home-cta-icon">🗺️</span>
+                            <span className="home-cta-text">
+                                <span className="home-cta-title">Cari Charging Station</span>
+                                <span className="home-cta-sub">
+                                    {activeVehicleConnector
+                                        ? `${suggestedStations.length} station cocok untuk ${activeVehicleConnector}`
+                                        : `${filteredStations.length} station di sekitar Anda`}
+                                </span>
+                            </span>
+                            <span className="home-cta-arrow">→</span>
+                        </button>
+
+                        <div className="home-search-filters" aria-label="Filter konektor charging station">
+                            {CONNECTOR_FILTERS.map((f) => (
+                                <button
+                                    key={f}
+                                    type="button"
+                                    className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
+                                    onClick={() => setConnectorFilter(f)}
+                                >
+                                    {f}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    {invoice && (
+                        <section className="home-invoice-card">
+                            <div className="mapdash-sheet-title-row">
+                                <span className="mapdash-sheet-title">Invoice Digital Terakhir</span>
+                                <span className="dash-status-badge ok">{invoice.status}</span>
+                            </div>
+                            <p className="mapdash-session-location">📍 {invoice.nama_lokasi} · {invoice.kode_charger}</p>
+                            <div className="invoice-grid">
+                                <div>
+                                    <span className="invoice-label">Energi Aktual</span>
+                                    <strong>{invoice.energi_kwh} kWh</strong>
+                                </div>
+                                <div>
+                                    <span className="invoice-label">Biaya Aktual</span>
+                                    <strong>{formatRupiah(invoice.biaya_aktual)}</strong>
+                                </div>
+                                <div>
+                                    <span className="invoice-label">Dana Hold</span>
+                                    <strong>{formatRupiah(invoice.jumlah_hold)}</strong>
+                                </div>
+                                <div>
+                                    <span className="invoice-label">Selisih Dikembalikan</span>
+                                    <strong>{formatRupiah(Math.max(0, invoice.jumlah_hold - invoice.biaya_aktual))}</strong>
+                                </div>
+                            </div>
+                        </section>
+                    )}
 
                     <section className="home-stats-row">
                         <div className="home-stat-card">
@@ -877,22 +1233,15 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     </section>
 
                     <section className="home-section">
-                        <div className="home-section-title-row">
-                            <h3 className="home-section-title">Station Terdekat</h3>
-                            <button className="dash-link-btn" onClick={() => goToMap()}>Lihat di Peta →</button>
-                        </div>
-
-                        <div className="home-filters-inline">
-                            {CONNECTOR_FILTERS.map((f) => (
-                                <button
-                                    key={f}
-                                    className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
-                                    onClick={() => setConnectorFilter(f)}
-                                >
-                                    {f}
+                        <div className="home-station-summary">
+                            <span>{stationsLoading ? 'Memuat station...' : `${filteredStations.length} station terdekat`}</span>
+                            {stationsError && (
+                                <button className="dash-link-btn" onClick={() => fetchStations()}>
+                                    Coba lagi
                                 </button>
-                            ))}
+                            )}
                         </div>
+                        {stationsError && <p className="dash-empty">{stationsError} Menampilkan data contoh.</p>}
 
                         <div className="mapdash-station-scroll home-station-scroll">
                             {filteredStations.map((s) => {
@@ -922,38 +1271,48 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
                     <section className="home-section">
                         <div className="home-section-title-row">
-                            <h3 className="home-section-title">Kendaraan Saya</h3>
+                            <h3 className="home-section-title">Riwayat Transaksi</h3>
+                            <span className="home-section-caption">
+                                {historyLoading ? 'Memuat...' : `${transactionHistory.length} transaksi terakhir`}
+                            </span>
                         </div>
-                        <div className="home-vehicle-list">
-                            {vehiclesLoading && <p className="dash-empty">Memuat kendaraan…</p>}
-                            {!vehiclesLoading && vehiclesError && (
-                                <p className="dash-empty">
-                                    {vehiclesError}{' '}
-                                    <button className="dash-link-btn" onClick={() => fetchVehicles()}>Coba lagi</button>
-                                </p>
+
+                        {historyError && (
+                            <p className="dash-empty">
+                                {historyError}{' '}
+                                <button className="dash-link-btn" onClick={fetchTransactionHistory}>Coba lagi</button>
+                            </p>
+                        )}
+
+                        <div className="transaction-list">
+                            {!historyLoading && !historyError && transactionHistory.length === 0 && (
+                                <p className="dash-empty">Belum ada transaksi.</p>
                             )}
-                            {!vehiclesLoading && !vehiclesError && vehicles.length === 0 && (
-                                <p className="dash-empty">
-                                    Belum ada kendaraan.{' '}
-                                    <button className="dash-link-btn" onClick={onNavigateToVehicles}>Tambah kendaraan</button>
-                                </p>
-                            )}
-                            {vehicles.map((v) => (
+                            {transactionHistory.map((trx) => (
                                 <button
-                                    key={v.id_vehicle}
-                                    className={`home-vehicle-item ${v.id_vehicle === activeVehicleId ? 'active' : ''}`}
-                                    onClick={() => setActiveVehicleId(v.id_vehicle)}
+                                    className="transaction-item"
+                                    key={trx.id_payment}
+                                    onClick={() => handleOpenInvoice(trx.id_payment)}
                                 >
-                                    <span className="home-vehicle-item-avatar">🚗</span>
-                                    <span className="home-vehicle-item-info">
-                                        <span className="home-vehicle-item-name">{v.merek} {v.model}</span>
-                                        <span className="home-vehicle-item-plate">{v.nomor_polisi} · {konektorLabel(v.tipe_konektor)}</span>
-                                    </span>
-                                    {v.id_vehicle === activeVehicleId && <span className="home-vehicle-item-check">✓</span>}
+                                    <div className="transaction-main">
+                                        <span className="transaction-icon">🧾</span>
+                                        <div>
+                                            <p className="transaction-location">{trx.nama_lokasi}</p>
+                                            <p className="transaction-meta">
+                                                {trx.tanggal}
+                                                {trx.energi_kwh !== null ? ` · ${trx.energi_kwh} kWh` : ` · ${trx.metode_pembayaran}`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="transaction-side">
+                                        <strong>{formatRupiah(trx.total)}</strong>
+                                        <span className="dash-status-badge ok">{trx.status}</span>
+                                    </div>
                                 </button>
                             ))}
                         </div>
                     </section>
+
                 </main>
             </div>
 
@@ -1121,9 +1480,14 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     <p className="stat-label">Estimasi Biaya</p>
                                 </div>
                             </div>
-                            <button className="dash-btn-stop" onClick={handleStopSession}>
-                                Hentikan Sesi Charging
-                            </button>
+                            <div className="home-session-actions">
+                                <button className="dash-btn-stop" onClick={handleStopSession}>
+                                    Hentikan Sesi
+                                </button>
+                                <button className="dash-btn-issue" onClick={handleInterruptSession}>
+                                    Gangguan
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <>
@@ -1183,10 +1547,45 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                                     <span className="dash-station-count">
                                                         {s.charger_tersedia}/{s.charger_total} charger
                                                     </span>
-                                                    <button className="dash-btn-navigate" disabled={badge.tone !== 'ok'}>
-                                                        Pilih
+                                                    <button
+                                                        className="dash-btn-navigate"
+                                                        disabled={badge.tone !== 'ok'}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedStationId(s.id_location);
+                                                        }}
+                                                    >
+                                                        Detail
                                                     </button>
                                                 </div>
+                                                {selectedStationId === s.id_location && (
+                                                    <div className="charger-picker">
+                                                        <div className="charger-picker-head">
+                                                            <span>Unit Charger</span>
+                                                            <small>{formatRupiah(s.tarif_per_kwh)}/kWh · parkir {formatRupiah(s.biaya_parkir)}</small>
+                                                        </div>
+                                                        {s.chargers.map((charger) => {
+                                                            const chargerBadge = chargerStatusLabel(charger.status);
+                                                            return (
+                                                                <button
+                                                                    key={charger.id_charger}
+                                                                    className="charger-option"
+                                                                    disabled={chargerBadge.tone !== 'ok'}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openChargingDraft(s, charger);
+                                                                    }}
+                                                                >
+                                                                    <span className="charger-option-main">
+                                                                        <strong>{charger.kode_perangkat}</strong>
+                                                                        <span>{charger.tipe_konektor} · {charger.daya_kw} kW</span>
+                                                                    </span>
+                                                                    <span className={`dash-status-badge ${chargerBadge.tone}`}>{chargerBadge.text}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -1199,6 +1598,275 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     )}
                 </div>
             </div>
+
+            {chargingDraft && (
+                <div className="charge-flow-overlay" onClick={closeChargingDraft}>
+                    <form className="charge-flow-panel" onSubmit={handleConfirmHold} onClick={(e) => e.stopPropagation()}>
+                        <div className="settings-panel-header">
+                            <span className="settings-panel-title">Estimasi & Hold Saldo</span>
+                            <button type="button" className="mapdash-notif-close" onClick={closeChargingDraft} aria-label="Tutup estimasi">
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="charge-flow-station">
+                            <span className="charge-flow-icon">⚡</span>
+                            <div>
+                                <strong>{chargingDraft.station.nama_lokasi}</strong>
+                                <p>{chargingDraft.charger.kode_perangkat} · {chargingDraft.charger.tipe_konektor} · {chargingDraft.charger.daya_kw} kW</p>
+                            </div>
+                        </div>
+
+                        <label className="settings-pin-label" htmlFor="target-kwh">Kebutuhan daya charging</label>
+                        <div className="charge-kwh-control">
+                            <button type="button" onClick={() => setTargetKwh((v) => Math.max(5, Number(v) - 5))}>−</button>
+                            <input
+                                id="target-kwh"
+                                type="number"
+                                min="5"
+                                max="100"
+                                step="5"
+                                value={targetKwh}
+                                onChange={(e) => setTargetKwh(e.target.value)}
+                            />
+                            <button type="button" onClick={() => setTargetKwh((v) => Math.min(100, Number(v) + 5))}>+</button>
+                        </div>
+
+                        <div className="charge-estimate-box">
+                            <div>
+                                <span>Tarif charging</span>
+                                <strong>{formatRupiah(chargingDraft.station.tarif_per_kwh)}/kWh</strong>
+                            </div>
+                            <div>
+                                <span>Biaya parkir flat</span>
+                                <strong>{formatRupiah(chargingDraft.station.biaya_parkir)}</strong>
+                            </div>
+                            <div>
+                                <span>Total estimasi hold</span>
+                                <strong>{formatRupiah(estimateChargingCost(targetKwh, chargingDraft.station))}</strong>
+                            </div>
+                            <div>
+                                <span>Saldo tersedia</span>
+                                <strong>{walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}</strong>
+                            </div>
+                        </div>
+
+                        {hasPin ? (
+                            <>
+                                <label className="settings-pin-label" htmlFor="hold-pin">PIN Dompet</label>
+                                <input
+                                    id="hold-pin"
+                                    className="settings-pin-input"
+                                    type="password"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    maxLength={6}
+                                    placeholder="••••••"
+                                    value={holdPinInput}
+                                    onChange={handlePinDigitsChange(setHoldPinInput)}
+                                />
+                            </>
+                        ) : (
+                            <p className="charge-flow-note">
+                                PIN Dompet belum aktif. Atur PIN Dompet terlebih dahulu melalui Pengaturan sebelum memulai charging.
+                            </p>
+                        )}
+
+                        {holdError && <p className="settings-pin-error">{holdError}</p>}
+
+                        <button type="submit" className="settings-pin-submit" disabled={holdSubmitting}>
+                            {holdSubmitting ? 'Memvalidasi...' : 'Konfirmasi Hold Saldo & Mulai Charging'}
+                        </button>
+                    </form>
+                </div>
+            )}
+
+            {showTopUp && (
+                <div className="charge-flow-overlay" onClick={() => setShowTopUp(false)}>
+                    <form className="charge-flow-panel" onSubmit={handleTopUpSubmit} onClick={(e) => e.stopPropagation()}>
+                        <div className="settings-panel-header">
+                            <span className="settings-panel-title">Top Up Dompet Digital</span>
+                            <button type="button" className="mapdash-notif-close" onClick={() => setShowTopUp(false)} aria-label="Tutup top up">
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="charge-flow-note">
+                            Top up instant untuk prototype. Integrasi payment gateway bisa disambungkan pada tahap berikutnya.
+                        </p>
+
+                        <label className="settings-pin-label" htmlFor="topup-amount">Nominal Top Up</label>
+                        <input
+                            id="topup-amount"
+                            className="topup-amount-input"
+                            type="number"
+                            min="10000"
+                            step="10000"
+                            value={topUpAmount}
+                            onChange={(e) => setTopUpAmount(e.target.value)}
+                        />
+
+                        <div className="topup-quick-row">
+                            {[50000, 100000, 200000].map((amount) => (
+                                <button
+                                    key={amount}
+                                    type="button"
+                                    className={`topup-quick-btn ${Number(topUpAmount) === amount ? 'active' : ''}`}
+                                    onClick={() => setTopUpAmount(amount)}
+                                >
+                                    {formatRupiah(amount)}
+                                </button>
+                            ))}
+                        </div>
+
+                        <label className="settings-pin-label">Metode Pembayaran</label>
+                        <div className="topup-method-grid">
+                            {TOP_UP_METHODS.map((method) => (
+                                <button
+                                    key={method}
+                                    type="button"
+                                    className={`topup-method-btn ${topUpMethod === method ? 'active' : ''}`}
+                                    onClick={() => setTopUpMethod(method)}
+                                >
+                                    {method}
+                                </button>
+                            ))}
+                        </div>
+
+                        {hasPin && (
+                            <>
+                                <label className="settings-pin-label" htmlFor="topup-pin">PIN Dompet</label>
+                                <input
+                                    id="topup-pin"
+                                    className="settings-pin-input"
+                                    type="password"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    maxLength={6}
+                                    placeholder="••••••"
+                                    value={topUpPin}
+                                    onChange={handlePinDigitsChange(setTopUpPin)}
+                                />
+                            </>
+                        )}
+
+                        {topUpError && <p className="settings-pin-error">{topUpError}</p>}
+
+                        <button type="submit" className="settings-pin-submit" disabled={topUpSubmitting}>
+                            {topUpSubmitting ? 'Memproses...' : 'Top Up Sekarang'}
+                        </button>
+                    </form>
+                </div>
+            )}
+
+            {(selectedInvoice || invoiceLoading) && (
+                <div className="charge-flow-overlay" onClick={() => setSelectedInvoice(null)}>
+                    <div className="charge-flow-panel invoice-detail-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="settings-panel-header">
+                            <span className="settings-panel-title">Detail Invoice</span>
+                            <button
+                                type="button"
+                                className="mapdash-notif-close"
+                                onClick={() => setSelectedInvoice(null)}
+                                aria-label="Tutup invoice"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {invoiceLoading && !selectedInvoice ? (
+                            <p className="dash-empty">Memuat detail invoice...</p>
+                        ) : (
+                            <>
+                                <div className="charge-flow-station">
+                                    <span className="charge-flow-icon">🧾</span>
+                                    <div>
+                                        <strong>{selectedInvoice.nama_lokasi}</strong>
+                                        <p>{selectedInvoice.alamat || selectedInvoice.kode_charger}</p>
+                                    </div>
+                                </div>
+
+                                {selectedInvoice.jenis_pembayaran === 'topup' ? (
+                                    <div className="charge-estimate-box invoice-total-box">
+                                        <div>
+                                            <span>Metode pembayaran</span>
+                                            <strong>{selectedInvoice.metode_pembayaran}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Status</span>
+                                            <strong>{selectedInvoice.status}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Referensi</span>
+                                            <strong>{selectedInvoice.referensi_gateway}</strong>
+                                        </div>
+                                        <div className="invoice-total-row">
+                                            <span>Total top up</span>
+                                            <strong>{formatRupiah(selectedInvoice.biaya_aktual ?? 0)}</strong>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="invoice-grid invoice-detail-grid">
+                                            <div>
+                                                <span className="invoice-label">Charger</span>
+                                                <strong>{selectedInvoice.kode_charger}</strong>
+                                            </div>
+                                            <div>
+                                                <span className="invoice-label">Status</span>
+                                                <strong>{selectedInvoice.status}</strong>
+                                            </div>
+                                            <div>
+                                                <span className="invoice-label">Kendaraan</span>
+                                                <strong>{selectedInvoice.kendaraan?.nama ?? '-'}</strong>
+                                            </div>
+                                            <div>
+                                                <span className="invoice-label">Nomor Polisi</span>
+                                                <strong>{selectedInvoice.kendaraan?.nomor_polisi ?? '-'}</strong>
+                                            </div>
+                                            <div>
+                                                <span className="invoice-label">Energi Terisi</span>
+                                                <strong>{selectedInvoice.energi_kwh} kWh</strong>
+                                            </div>
+                                            <div>
+                                                <span className="invoice-label">Tarif</span>
+                                                <strong>{formatRupiah(selectedInvoice.tarif_per_kwh ?? 0)}/kWh</strong>
+                                            </div>
+                                        </div>
+
+                                        <div className="charge-estimate-box invoice-total-box">
+                                            <div>
+                                                <span>Metode pembayaran</span>
+                                                <strong>{selectedInvoice.metode_pembayaran ?? '-'}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Biaya charging</span>
+                                                <strong>{formatRupiah(selectedInvoice.biaya_charging ?? 0)}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Biaya parkir</span>
+                                                <strong>{formatRupiah(selectedInvoice.biaya_parkir ?? 0)}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Dana hold</span>
+                                                <strong>{formatRupiah(selectedInvoice.jumlah_hold ?? 0)}</strong>
+                                            </div>
+                                            <div>
+                                                <span>Dikembalikan</span>
+                                                <strong>{formatRupiah(selectedInvoice.selisih_dikembalikan ?? 0)}</strong>
+                                            </div>
+                                            <div className="invoice-total-row">
+                                                <span>Total dibayar</span>
+                                                <strong>{formatRupiah(selectedInvoice.biaya_aktual ?? 0)}</strong>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
 
                         {/* ============================================================
                 LAYAR 3 — PROFIL DRIVER (halaman penuh)
@@ -1439,11 +2107,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                                 {hasPin ? 'PIN aktif' : 'Belum diatur'}
                                             </span>
                                         </span>
-                                        <span className="settings-menu-arrow">›</span>
-                                    </button>
-                                    <button className="settings-menu-item">
-                                        <span className="settings-menu-icon">🧾</span>
-                                        <span className="settings-menu-label">Riwayat Transaksi</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
                                     <button className="settings-menu-item">

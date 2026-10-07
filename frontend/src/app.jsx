@@ -3,6 +3,7 @@ import Welcome from './Welcome';
 import Registrasi from './Registrasi';
 import Login from './Login';
 import DriverDashboard from './DriverDashboard';
+import OperatorAdminDashboard from './OperatorAdminDashboard';
 import KelolaKendaraan from './KelolaKendaraan';
 import Bantuan from './Bantuan';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
@@ -19,6 +20,8 @@ export default function App() {
         setCurrentPage('dashboard');
     };
 
+    const isStaff = ['operator', 'admin'].includes(user?.peran);
+
     const handleLogout = async () => {
         await logout().catch(() => {}); // tetap keluar meski request logout gagal
         setUser(null);
@@ -30,7 +33,7 @@ export default function App() {
             {currentPage === 'welcome' && (
                 <Welcome
                     onNavigateToRegister={() => setCurrentPage('register')}
-                    onNavigateToLogin={() => setCurrentPage('login')}
+                    onLoginSuccess={handleLoginSuccess}
                 />
             )}
             {currentPage === 'register' && (
@@ -46,12 +49,16 @@ export default function App() {
                 />
             )}
             {currentPage === 'dashboard' && (
-                <DriverDashboard
-                    user={user}
-                    onLogout={handleLogout}
-                    onNavigateToVehicles={() => setCurrentPage('vehicles')}
-                    onNavigateToHelp={() => setCurrentPage('help')}
-                />
+                isStaff ? (
+                    <OperatorAdminDashboard user={user} onLogout={handleLogout} />
+                ) : (
+                    <DriverDashboard
+                        user={user}
+                        onLogout={handleLogout}
+                        onNavigateToVehicles={() => setCurrentPage('vehicles')}
+                        onNavigateToHelp={() => setCurrentPage('help')}
+                    />
+                )
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />

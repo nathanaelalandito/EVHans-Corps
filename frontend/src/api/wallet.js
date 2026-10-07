@@ -8,6 +8,15 @@ export async function getWallet() {
     return data;
 }
 
+export async function topUpWallet(nominal, metodePembayaran, pin = '') {
+    const { data } = await api.post('/wallet/topup', {
+        nominal,
+        metode_pembayaran: metodePembayaran,
+        pin,
+    });
+    return data;
+}
+
 export async function createPin(pin, pinConfirmation) {
     const { data } = await api.post('/wallet/pin', {
         pin,

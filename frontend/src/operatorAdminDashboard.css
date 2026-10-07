@@ -1,0 +1,339 @@
+.ops-shell {
+    min-height: 100vh;
+    background: #f4f7ed;
+    color: #1d2f22;
+    padding: 18px;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+.ops-header {
+    max-width: 1180px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, #10371f, #237534);
+    color: #ffffff;
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    box-shadow: 0 16px 34px rgba(16, 55, 31, 0.22);
+}
+
+.ops-role {
+    display: inline-flex;
+    color: #dff7d6;
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.ops-header h1 {
+    margin: 0;
+    font-size: 25px;
+    line-height: 1.2;
+}
+
+.ops-header p {
+    margin: 6px 0 0;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 13px;
+}
+
+.ops-logout,
+.ops-primary {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    background: #ffffff;
+    color: #14552f;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ops-feedback,
+.ops-state {
+    max-width: 1180px;
+    margin: 0 auto 14px;
+    background: #fffdf5;
+    border: 1px solid #eee6c9;
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: #53624b;
+    font-weight: 700;
+}
+
+.ops-stats,
+.ops-layout,
+.ops-panel {
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.ops-stats {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.ops-stats div,
+.ops-report-grid div,
+.ops-tarif-row div {
+    background: #ffffff;
+    border: 1px solid #e4ecd9;
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 8px 22px rgba(27, 77, 46, 0.06);
+}
+
+.ops-stats span,
+.ops-report-grid span,
+.ops-tarif-row span {
+    display: block;
+    color: #7c8874;
+    font-size: 11px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+
+.ops-stats strong,
+.ops-report-grid strong,
+.ops-tarif-row strong {
+    color: #1b4d2e;
+    font-size: 18px;
+}
+
+.ops-layout {
+    display: grid;
+    grid-template-columns: 330px minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.ops-panel {
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid #e4ecd9;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 10px 26px rgba(27, 77, 46, 0.07);
+    margin-bottom: 14px;
+}
+
+.ops-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ops-panel-head h2 {
+    margin: 0;
+    color: #1b4d2e;
+    font-size: 17px;
+}
+
+.ops-panel-head p,
+.ops-panel-head span {
+    margin: 4px 0 0;
+    color: #7c8874;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ops-panel select,
+.ops-form input {
+    min-height: 40px;
+    border: 1px solid #dfe3d2;
+    border-radius: 12px;
+    background: #f9faf3;
+    color: #223423;
+    font-weight: 700;
+    padding: 0 10px;
+}
+
+.ops-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #53624b;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.ops-station-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ops-station-item {
+    border: 1px solid #e4ecd9;
+    border-radius: 14px;
+    background: #ffffff;
+    padding: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.ops-station-item.active {
+    border-color: #237534;
+    background: #eef8e9;
+}
+
+.ops-station-item strong,
+.ops-charger-card strong,
+.ops-operator-list strong {
+    display: block;
+    color: #1b4d2e;
+    font-size: 14px;
+}
+
+.ops-station-item span,
+.ops-charger-card span,
+.ops-operator-list span {
+    display: block;
+    color: #7c8874;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.ops-tarif-row,
+.ops-report-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.ops-tarif-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ops-form {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.ops-tarif-form {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ops-station-form {
+    grid-template-columns: 1fr;
+    background: #eef8e9;
+    border: 1px solid #dbead1;
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.ops-form-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 2px;
+}
+
+.ops-form-title strong {
+    color: #1b4d2e;
+    font-size: 14px;
+}
+
+.ops-form-title span,
+.ops-map-picker-wrap p {
+    color: #7c8874;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.ops-inline-fields,
+.ops-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.ops-edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ops-map-picker-wrap {
+    border: 1px solid #dbead1;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.ops-map-picker {
+    height: 190px;
+    min-height: 190px;
+    background: #e7ecdf;
+}
+
+.ops-map-picker-wrap p {
+    margin: 0;
+    padding: 9px 10px;
+}
+
+.ops-edit-station-form {
+    background: #f7fbf2;
+    border: 1px solid #dbead1;
+    border-radius: 16px;
+    padding: 12px;
+    margin-bottom: 14px;
+}
+
+.ops-operator-form {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.ops-form button {
+    border: 0;
+    border-radius: 12px;
+    background: #1b4d2e;
+    color: #ffffff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ops-charger-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ops-charger-card,
+.ops-operator-list div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: #fffdf5;
+    border: 1px solid #eee6c9;
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.ops-operator-list {
+    display: grid;
+    gap: 8px;
+}
+
+@media (max-width: 900px) {
+    .ops-stats,
+    .ops-layout,
+    .ops-tarif-row,
+    .ops-report-grid,
+    .ops-charger-grid,
+    .ops-tarif-form,
+    .ops-operator-form {
+        grid-template-columns: 1fr;
+    }
+
+    .ops-header {
+        flex-direction: column;
+    }
+}
