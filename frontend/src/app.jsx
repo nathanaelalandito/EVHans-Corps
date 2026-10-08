@@ -10,6 +10,7 @@ import OperatorDashboard from './OpsDashboard'; // Perhatikan ejaannya
 import ChargerMonitor from './ChargerMonitor';
 import OpsReport from './OpsReport';
 import PortMonitor from './PortMonitor';
+import ProfilOps from './ProfilOps';
 
 export default function App() {
     // Kalau sudah ada token tersimpan (login sebelumnya), langsung ke dashboard.
@@ -121,13 +122,20 @@ export default function App() {
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
-                    onNavigateToCharge={() => setCurrentPage('charger')}
+                    onNavigateToCharger={() => setCurrentPage('charger')}
                     onNavigateToPort={() => setCurrentPage('port')}
                     onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
             )}
             {currentPage == 'profil' && (
-                <ProfilOps/>
+                <ProfilOps
+                    user={user}
+                    onLogout={handleLogout}
+                    onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
+                    onNavigateToCharger={() => setCurrentPage('charger')}
+                    onNavigateToPort={() => setCurrentPage('port')}
+                    onNavigateToOpsReport={() => setCurrentPage('ops-report')}
+                />
             )}
             {currentPage == 'admin-dashboard' && (
                 <AdminDaashboard onLoginSuccess={handleLoginSuccess} />

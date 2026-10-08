@@ -1,0 +1,339 @@
+/* ================================================================= */
+/* PROFIL OPERATOR STASIUN (Disamakan dengan Layout & Tema Dashboard) */
+/* ================================================================= */
+
+/* --- RESET & BASE LAYOUT --- */
+.prf-layout-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #fefae0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+/* --- HEADER --- */
+.prf-header {
+    height: 90px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.prf-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.prf-logo-box {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.prf-logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.prf-welcome-text h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1b5e20;
+    margin: 0;
+}
+
+.prf-welcome-text p {
+    font-size: 0.85rem;
+    color: #4e8550; 
+    margin: 2px 0 0 0;
+}
+
+.prf-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.prf-icon-btn {
+    background: #f1f8f4;
+    border: 1px solid #c8e6c9;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2e7d32;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.prf-icon-btn:hover {
+    background: #e8f5e9;
+    color: #1b5e20;
+}
+
+.prf-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #d32f2f;
+    color: white;
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    border-radius: 10px;
+    font-weight: bold;
+}
+
+/* --- BODY WRAPPER --- */
+.prf-body-wrapper {
+    display: flex;
+    flex: 1;
+    height: calc(100vh - 90px);
+    overflow: hidden;
+}
+
+/* --- SIDEBAR --- */
+.prf-sidebar {
+    width: 260px;
+    min-width: 260px;
+    background-color: #1b5e20;
+    color: #e8f5e9;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 0;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.prf-menu-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.prf-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    border-left: 4px solid transparent;
+}
+
+.prf-menu-item:hover {
+    background-color: #2e7d32 !important;
+    color: #ffffff !important;
+}
+
+.prf-menu-item.active {
+    background-color: #76c457 !important;
+    color: #1b5e20 !important;
+    font-weight: 600 !important;
+    border-left-color: #ffffff !important;
+}
+
+.prf-menu-icon {
+    font-size: 1.1rem !important;
+}
+
+.prf-sidebar-footer {
+    padding: 0 20px;
+}
+
+.prf-logout-btn {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffcdd2;
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+.prf-logout-btn:hover {
+    background: rgba(211, 47, 47, 0.2);
+    color: #ffebee;
+}
+
+/* --- MAIN CONTENT & PROFILE CONTAINER --- */
+.prf-main-content {
+    flex: 1;
+    background-color: #fefae0;
+    padding: 24px;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.prf-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.prf-content-title h1 {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #1b5e20;
+    margin: 0;
+}
+
+.prf-content-title p {
+    color: #4e8550;
+    font-size: 0.85rem;
+    margin: 4px 0 0 0;
+}
+
+/* --- KARTU PROFIL UTAMA (Mengikuti Gaya Kartu Dashboard) --- */
+.prf-profile-card-wrapper {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    border: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+}
+
+.prf-profile-top-section {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    position: relative;
+}
+
+.prf-avatar-box {
+    width: 110px;
+    height: 130px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid #c8e6c9;
+    background: #f1f8f4;
+}
+
+.prf-avatar-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.prf-profile-heading h2 {
+    margin: 0 0 6px 0;
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #1b5e20;
+}
+
+.prf-highlight-name {
+    color: #d32f2f;
+}
+
+.prf-sub-status {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #4e8550;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.prf-refresh-action {
+    margin-left: auto;
+    align-self: flex-start;
+}
+
+.prf-refresh-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #2e7d32;
+    color: #ffffff;
+    border: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.prf-refresh-btn:hover {
+    background: #1b5e20;
+}
+
+.prf-divider {
+    border: none;
+    border-top: 1px solid #e0e0e0;
+    margin: 24px 0;
+}
+
+.prf-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.prf-detail-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #f0f0f0;
+}
+
+.prf-detail-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.prf-detail-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4e8550;
+}
+
+.prf-detail-value {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.prf-empty-state {
+    text-align: center;
+    padding: 50px;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    color: #6b7280;
+}

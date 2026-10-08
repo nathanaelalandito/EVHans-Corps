@@ -551,7 +551,7 @@ class OperatorController extends Controller
         $assignment = DB::table('station_operators')
             ->join('location', 'station_operators.id_location', '=', 'location.id_location')
             ->where('station_operators.id_user', $user->id_user)
-            ->select('station_operators.*', 'location.nama_lokasi', 'location.alamat', 'location.kota')
+            ->select('station_operators.*', 'location.nama_lokasi', 'location.alamat')
             ->first();
 
         return response()->json([

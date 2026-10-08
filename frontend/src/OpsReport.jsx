@@ -16,7 +16,8 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function OpsReport({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToCharger, onNavigateToPort}) {
+export default function OpsReport({ user, onLogout, setActiveMenu, onNavigateToOpsDash, 
+    onNavigateToCharger, onNavigateToPort, onNavigateToProfil}) {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('');
@@ -116,7 +117,9 @@ export default function OpsReport({ user, onLogout, setActiveMenu, onNavigateToO
                             <FaFileAlt className="op-menu-icon" />
                             <span>Transaction Report</span>
                         </li>
-                        <li className="rep-menu-item" onClick={() => setActiveMenu && setActiveMenu('profils')}>
+                        <li className="rep-menu-item" onClick={() => {setActiveMenu && setActiveMenu('profils')
+                            if (onNavigateToOpsProfil) onNavigateToOpsProfil();
+                        }}>
                             <FaUser className="rep-menu-icon" />
                             <span>Profil</span>
                         </li>

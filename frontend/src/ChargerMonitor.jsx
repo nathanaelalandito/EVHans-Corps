@@ -17,7 +17,8 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToPort, onNavigateToOpsReport }) {
+export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNavigateToOpsDash, 
+    onNavigateToPort, onNavigateToOpsReport, onNavigateToOpsProfil}) {
     const [chargers, setChargers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -199,7 +200,9 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNaviga
                         <li className="cm-menu-item" onClick={() => {setActiveMenu && setActiveMenu('report')
                             if (onNavigateToOpsReport) onNavigateToOpsReport();
                         }}><FaFileAlt className="cm-menu-icon" /><span>Manage Report</span></li>
-                        <li className="cm-menu-item" onClick={() => setActiveMenu && setActiveMenu('profil')}>
+                        <li className="cm-menu-item" onClick={() => { setActiveMenu && setActiveMenu('profil');
+                            if (onNavigateToOpsProfil) onNavigateToOpsProfil();
+                        }}>
                             <FaUser className="cm-menu-icon" /><span>Profil</span></li>
                     </ul>
                     <div className="cm-sidebar-footer">

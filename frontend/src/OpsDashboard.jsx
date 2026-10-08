@@ -15,7 +15,8 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNavigateToCharger, onNavigateToPort, onNavigateToOpsReport}) {
+export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNavigateToCharger, 
+    onNavigateToPort, onNavigateToOpsReport, onNavigateToOpsProfil}) {
     const [stats, setStats] = useState({
         activeCharging: 0,
         availablePorts: 0,
@@ -132,7 +133,9 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                             <FaFileAlt className="op-menu-icon" />
                             <span>Manage Report</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => setActiveMenu && setActiveMenu('profils')}>
+                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('profils');
+                            if (onNavigateToOpsProfil) onNavigateToOpsProfil();
+                        }}>
                             <FaUser className="op-menu-icon" />
                             <span>Profil</span>
                         </li>

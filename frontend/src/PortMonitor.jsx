@@ -17,7 +17,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function PortManagement({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToOpsReport }) {
+export default function PortManagement({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToCharger, onNavigateToProfil, onNavigateToOpsReport }) {
     const [ports, setPorts] = useState([]);
     const [chargers, setChargers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -203,7 +203,9 @@ export default function PortManagement({ user, onLogout, setActiveMenu, onNaviga
                         }}>
                             <FaTachometerAlt className="prt-menu-icon" /><span>Dashboard</span>
                         </li>
-                        <li className="prt-menu-item" onClick={() => setActiveMenu && setActiveMenu('charger')}>
+                        <li className="prt-menu-item" onClick={() => { setActiveMenu && setActiveMenu('charger');
+                            if (onNavigateToCharger) onNavigateToCharger();
+                        }}>
                             <FaChargingStation className="prt-menu-icon" /><span>Manage Charger</span>
                         </li>
                         <li className="prt-menu-item active" onClick={() => setActiveMenu && setActiveMenu('port')}>
@@ -215,7 +217,9 @@ export default function PortManagement({ user, onLogout, setActiveMenu, onNaviga
                         }}>
                             <FaFileAlt className="prt-menu-icon" /><span>Manage Report</span>
                         </li>
-                        <li className="prt-menu-item" onClick={() => setActiveMenu && setActiveMenu('profil')}>
+                        <li className="prt-menu-item" onClick={() => {setActiveMenu && setActiveMenu('profil')
+                            if (onNavigateToOpsProfil) onNavigateToOpsProfil();
+                        }}>
                             <FaUser className="prt-menu-icon" /><span>Profil</span>
                         </li>
                     </ul>
