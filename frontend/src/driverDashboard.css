@@ -521,6 +521,18 @@
     cursor: pointer;
 }
 
+.dash-btn-issue {
+    width: 100%;
+    background: #fff8e8;
+    border: 1.5px solid #d69b1f;
+    color: #8a650c;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
 .dash-link-btn {
     background: none;
     border: none;
@@ -545,6 +557,67 @@
     border-radius: 14px;
     padding: 12px;
     background: #ffffff;
+}
+
+.charger-picker {
+    flex: 1 1 100%;
+    border-top: 1px solid #eef0df;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.charger-picker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #1b4d2e;
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.charger-picker-head small {
+    color: #8a927a;
+    font-weight: 600;
+    text-align: right;
+}
+
+.charger-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid #e3e8d8;
+    background: #f9faf3;
+    border-radius: 12px;
+    padding: 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.charger-option:disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
+}
+
+.charger-option-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.charger-option-main strong {
+    font-size: 13px;
+    color: #1b4d2e;
+}
+
+.charger-option-main span {
+    font-size: 11.5px;
+    color: #6b7a6f;
 }
 
 .dash-station-main {
@@ -691,19 +764,14 @@
     }
 
     .home-content {
-        max-width: 640px;
+        max-width: 720px;
         margin: 0 auto;
     }
 
-    .home-header,
-    .home-wallet-card {
-        max-width: 640px;
+    .home-header {
+        max-width: 720px;
         margin-left: auto;
         margin-right: auto;
-    }
-
-    .home-wallet-card {
-        margin-top: -36px;
     }
 }
 
@@ -723,16 +791,17 @@
 /* --- Header hijau melengkung di atas --- */
 .home-header {
     background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
-    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
-    border-radius: 0 0 28px 28px;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 18px;
+    border-radius: 0 0 24px 24px;
     animation: mapdashFadeUp 0.4s ease both;
 }
 
 .home-header-top {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 18px;
+    gap: 12px;
+    margin-bottom: 14px;
 }
 
 .home-header-actions {
@@ -765,24 +834,14 @@
 .home-greeting-text {
     font-family: 'Outfit', sans-serif;
     font-weight: 600;
-    font-size: 16.5px;
+    font-size: 17px;
     color: #ffffff;
-    margin-bottom: 10px;
+    margin-bottom: 3px;
 }
 
-.home-vehicle-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    color: #eafbe4;
-    border-radius: 999px;
-    padding: 7px 14px 7px 8px;
+.home-greeting-sub {
+    color: rgba(255, 255, 255, 0.76);
     font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    max-width: 100%;
 }
 
 .home-vehicle-pill-icon {
@@ -797,43 +856,39 @@
     flex-shrink: 0;
 }
 
-.home-vehicle-pill-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.home-header-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
 }
 
-.home-vehicle-pill-swap {
-    opacity: 0.85;
+.home-balance-panel,
+.home-vehicle-panel {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 12px;
+    backdrop-filter: blur(8px);
 }
 
-/* --- Kartu saldo dompet, "mengintip" di atas lengkungan header --- */
-.home-wallet-card {
+.home-balance-panel {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    background: #ffffff;
-    border-radius: 18px;
-    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
-    padding: 14px 16px;
-    margin: -40px 16px 0;
-    position: relative;
-    z-index: 2;
-    animation: mapdashFadeUp 0.4s ease 0.05s both;
+    gap: 12px;
 }
 
 .home-wallet-label {
     font-size: 11.5px;
-    color: #8a927a;
+    color: rgba(255, 255, 255, 0.72);
     margin-bottom: 2px;
 }
 
 .home-wallet-value {
     font-family: 'Outfit', sans-serif;
     font-weight: 700;
-    font-size: 18px;
-    color: #1b4d2e;
+    font-size: 20px;
+    color: #ffffff;
 }
 
 .home-wallet-topup {
@@ -848,12 +903,55 @@
     flex-shrink: 0;
 }
 
-/* --- Konten utama --- */
-.home-content {
-    padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+.home-vehicle-panel {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 8px;
+}
+
+.home-vehicle-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.home-vehicle-select,
+.home-vehicle-add-btn {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 12px;
+}
+
+.home-vehicle-select {
+    cursor: pointer;
+}
+
+.home-vehicle-select option {
+    color: #1b4d2e;
+    background: #ffffff;
+}
+
+.home-vehicle-add-btn {
+    cursor: pointer;
+    text-align: left;
+}
+
+/* --- Konten utama --- */
+.home-content {
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
 .home-notif {
@@ -870,6 +968,40 @@
     animation: mapdashFadeUp 0.4s ease 0.1s both;
 }
 
+.home-invoice-card {
+    background: #ffffff;
+    border: 1px solid #e4ecd9;
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+    animation: mapdashFadeUp 0.4s ease 0.1s both;
+}
+
+.invoice-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.invoice-grid div {
+    background: #f4f7ed;
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.invoice-label {
+    display: block;
+    color: #7c8874;
+    font-size: 10.5px;
+    margin-bottom: 4px;
+}
+
+.invoice-grid strong {
+    color: #1b4d2e;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+}
+
 .home-session-title {
     font-size: 14.5px;
 }
@@ -880,6 +1012,7 @@
 }
 
 .home-session-actions .dash-btn-stop,
+.home-session-actions .dash-btn-issue,
 .home-session-map-btn {
     flex: 1;
 }
@@ -897,8 +1030,8 @@
     text-align: left;
     background: linear-gradient(120deg, #1b4d2e, #2e7d32 70%);
     border: none;
-    border-radius: 20px;
-    padding: 18px;
+    border-radius: 18px;
+    padding: 14px;
     cursor: pointer;
     box-shadow: 0 10px 26px rgba(27, 77, 46, 0.28);
     animation: mapdashFadeUp 0.4s ease 0.1s both;
@@ -910,14 +1043,14 @@
 }
 
 .home-cta-icon {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.18);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 19px;
     flex-shrink: 0;
 }
 
@@ -951,22 +1084,22 @@
 .home-stats-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 8px;
     animation: mapdashFadeUp 0.4s ease 0.15s both;
 }
 
 .home-stat-card {
     background: #ffffff;
     border: 1px solid #eee6c9;
-    border-radius: 14px;
-    padding: 12px 8px;
+    border-radius: 12px;
+    padding: 10px 8px;
     text-align: center;
 }
 
 .home-stat-value {
     font-family: 'Outfit', sans-serif;
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
     color: #1b4d2e;
 }
 
@@ -975,7 +1108,7 @@
 }
 
 .home-stat-label {
-    font-size: 10.5px;
+    font-size: 10px;
     color: #8a927a;
     margin-top: 3px;
 }
@@ -1089,6 +1222,472 @@
     .home-stats-row,
     .home-section {
         animation: none;
+    }
+}
+
+/* ==================================================================
+   FINAL DASHBOARD COMPACT OVERRIDES
+   CSS file ini masih punya blok lama yang terduplikasi di atas. Blok
+   final ini sengaja ditempatkan paling akhir agar layout dashboard
+   terbaru tidak tertimpa style lama.
+   ================================================================== */
+.home-header {
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 18px;
+    border-radius: 0 0 24px 24px;
+}
+
+.home-header-top {
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.home-greeting-text {
+    font-size: 17px;
+    margin-bottom: 3px;
+}
+
+.home-greeting-sub {
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 12px;
+}
+
+.home-header-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+}
+
+.home-balance-panel,
+.home-vehicle-panel {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 12px;
+    backdrop-filter: blur(8px);
+}
+
+.home-balance-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.home-wallet-card {
+    display: none;
+}
+
+.home-wallet-label {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.home-wallet-value {
+    color: #ffffff;
+    font-size: 20px;
+}
+
+.home-vehicle-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.home-vehicle-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.home-vehicle-select,
+.home-vehicle-add-btn {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 12px;
+}
+
+.home-vehicle-select {
+    cursor: pointer;
+}
+
+.home-vehicle-select option {
+    color: #1b4d2e;
+    background: #ffffff;
+}
+
+.home-vehicle-add-btn {
+    cursor: pointer;
+    text-align: left;
+}
+
+.home-content {
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    gap: 14px;
+}
+
+.home-cta-map {
+    border-radius: 18px;
+    padding: 14px;
+}
+
+.home-cta-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 19px;
+}
+
+.home-stats-row {
+    gap: 8px;
+}
+
+.home-stat-card {
+    border-radius: 12px;
+    padding: 10px 8px;
+}
+
+.home-stat-value {
+    font-size: 14px;
+}
+
+.home-stat-label {
+    font-size: 10px;
+}
+
+@media (min-width: 700px) {
+    .home-header-summary {
+        grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .home-header,
+    .home-content {
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* Center settings modal */
+.settings-overlay {
+    align-items: center;
+    padding: 24px 16px;
+}
+
+.settings-panel {
+    border-radius: 22px;
+    max-height: min(86vh, 760px);
+}
+
+.home-search-card {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(229, 219, 184, 0.9);
+    border-radius: 22px;
+    padding: 10px;
+    box-shadow: 0 12px 28px rgba(27, 77, 46, 0.09);
+}
+
+.home-search-card .home-cta-map {
+    box-shadow: none;
+}
+
+.home-search-filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px 2px 2px;
+    scrollbar-width: none;
+}
+
+.home-search-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.home-search-filters .mapdash-filter-chip {
+    box-shadow: none;
+    border: 1px solid rgba(27, 77, 46, 0.08);
+}
+
+.home-station-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #51624c;
+    font-size: 12.5px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.home-section-caption {
+    color: #7c8874;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.transaction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.transaction-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(229, 219, 184, 0.9);
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow: 0 8px 22px rgba(27, 77, 46, 0.06);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.transaction-item:hover,
+.transaction-item:focus-visible {
+    border-color: rgba(47, 125, 50, 0.34);
+    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.1);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.transaction-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.transaction-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: #eaf7e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.transaction-location {
+    color: #1b4d2e;
+    font-size: 13.5px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.transaction-meta {
+    color: #7c8874;
+    font-size: 11.5px;
+    margin-top: 2px;
+}
+
+.transaction-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.transaction-side strong {
+    color: #1b4d2e;
+    font-size: 13px;
+    font-family: 'Outfit', sans-serif;
+}
+
+/* ==================================================================
+   POLISHED SIMPLE DASHBOARD
+   Lapisan visual akhir: tetap memakai markup yang sudah ada, tanpa
+   menambah komponen/logic baru.
+   ================================================================== */
+.home-screen {
+    background:
+        radial-gradient(circle at 15% 0%, rgba(161, 203, 53, 0.26), transparent 28%),
+        linear-gradient(180deg, #f4f7ed 0%, #eef0df 52%, #f7f8ef 100%);
+}
+
+.home-header {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(145deg, #0f371f 0%, #1b5a31 55%, #2f8a39 100%);
+    box-shadow: 0 14px 32px rgba(15, 55, 31, 0.22);
+}
+
+.home-header::after {
+    content: '';
+    position: absolute;
+    right: -58px;
+    top: -72px;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+}
+
+.home-header > * {
+    position: relative;
+    z-index: 1;
+}
+
+.home-greeting-text {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.home-icon-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+}
+
+.home-balance-panel,
+.home-vehicle-panel {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.home-wallet-topup {
+    background: #dff7d6;
+    color: #1b5a31;
+    box-shadow: 0 8px 18px rgba(10, 45, 24, 0.16);
+}
+
+.home-vehicle-select,
+.home-vehicle-add-btn {
+    appearance: none;
+    background:
+        linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.9) 50%) calc(100% - 18px) 16px / 7px 7px no-repeat,
+        linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
+}
+
+.home-content {
+    gap: 12px;
+}
+
+.home-cta-map {
+    background: linear-gradient(135deg, #174826 0%, #237534 72%, #36a145 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 14px 30px rgba(27, 77, 46, 0.22);
+}
+
+.home-cta-icon {
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.home-cta-title {
+    font-size: 16px;
+}
+
+.home-stats-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.home-stat-card,
+.mapdash-station-mini,
+.home-vehicle-item,
+.home-invoice-card,
+.home-session-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(229, 219, 184, 0.9);
+    box-shadow: 0 8px 22px rgba(27, 77, 46, 0.07);
+}
+
+.home-stat-card {
+    min-height: 68px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.home-section-title-row {
+    margin-top: 2px;
+}
+
+.home-section-title {
+    font-size: 16px;
+}
+
+.dash-link-btn {
+    color: #169447;
+    font-size: 13px;
+}
+
+.home-filters-inline {
+    padding-bottom: 8px;
+}
+
+.mapdash-filter-chip {
+    border-radius: 999px;
+    box-shadow: 0 6px 14px rgba(27, 77, 46, 0.08);
+}
+
+.mapdash-filter-chip.active {
+    background: #14552f;
+}
+
+.home-station-scroll {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    overflow: visible;
+}
+
+.home-station-scroll .mapdash-station-mini {
+    width: 100%;
+    flex: none;
+    border-radius: 16px;
+    padding: 13px 14px;
+}
+
+.mapdash-station-mini-name {
+    font-size: 14px;
+}
+
+.mapdash-station-mini-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.dash-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+}
+
+@media (min-width: 700px) {
+    .home-content {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .home-station-scroll {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -1424,6 +2023,220 @@
     font-weight: 700;
     font-size: 14px;
     cursor: pointer;
+}
+
+/* ==================================================================
+   FLOW CHARGING — estimasi biaya, hold saldo, lalu mulai sesi.
+   ================================================================== */
+.charge-flow-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 30, 20, 0.48);
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 16px 16px 0;
+}
+
+.charge-flow-panel {
+    width: 100%;
+    max-width: 480px;
+    background: #ffffff;
+    border-radius: 22px 22px 0 0;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.2);
+    animation: settingsSlideUp 0.25s ease both;
+}
+
+.invoice-detail-panel {
+    max-height: 88vh;
+    overflow-y: auto;
+}
+
+.charge-flow-station {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: #eef4e9;
+    border-radius: 16px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.charge-flow-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #d9ead1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.charge-flow-station strong {
+    color: #1b4d2e;
+    font-size: 14px;
+}
+
+.charge-flow-station p {
+    color: #6b7a6f;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.charge-kwh-control {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.charge-kwh-control button,
+.charge-kwh-control input {
+    height: 44px;
+    border-radius: 12px;
+    border: 1.5px solid #dfe3d2;
+    background: #f9faf3;
+    font-weight: 700;
+    color: #1b4d2e;
+}
+
+.charge-kwh-control button {
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.charge-kwh-control input {
+    text-align: center;
+    font-size: 15px;
+    font-family: 'Outfit', sans-serif;
+}
+
+.charge-estimate-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #fffdf5;
+    border: 1px solid #eee6c9;
+    border-radius: 16px;
+    padding: 12px;
+    margin-bottom: 14px;
+}
+
+.charge-estimate-box div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #6b7a6f;
+}
+
+.charge-estimate-box strong {
+    color: #1b4d2e;
+    text-align: right;
+}
+
+.invoice-detail-grid {
+    margin-bottom: 14px;
+}
+
+.invoice-total-box {
+    margin-bottom: 0;
+}
+
+.invoice-total-row {
+    border-top: 1px solid #e4ecd9;
+    padding-top: 10px;
+    margin-top: 2px;
+}
+
+.invoice-total-row strong {
+    font-size: 16px;
+}
+
+.charge-flow-note {
+    background: #fdf1d9;
+    color: #8a650c;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+}
+
+.topup-amount-input {
+    width: 100%;
+    height: 46px;
+    border: 1.5px solid #dfe3d2;
+    border-radius: 12px;
+    background: #f9faf3;
+    color: #1b4d2e;
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 0 14px;
+    margin-bottom: 10px;
+}
+
+.topup-quick-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.topup-quick-btn {
+    border: 1px solid #dfe3d2;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #1b4d2e;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 10px 6px;
+    cursor: pointer;
+}
+
+.topup-quick-btn.active {
+    background: #eaf7e5;
+    border-color: #2e7d32;
+}
+
+.topup-method-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.topup-method-btn {
+    min-height: 42px;
+    border: 1px solid #dfe3d2;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #1b4d2e;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.topup-method-btn.active {
+    background: #1b4d2e;
+    border-color: #1b4d2e;
+    color: #ffffff;
+}
+
+@media (min-width: 700px) {
+    .charge-flow-overlay {
+        align-items: center;
+        padding: 16px;
+    }
+
+    .charge-flow-panel {
+        border-radius: 22px;
+    }
 }
 
 /* ==================================================================
@@ -2985,5 +3798,157 @@
     .route-card,
     .route-card-spinner {
         animation: none;
+    }
+}
+
+/* ==================================================================
+   FINAL DASHBOARD COMPACT OVERRIDES
+   Diletakkan paling akhir agar tidak tertimpa blok lama/duplikat.
+   ================================================================== */
+.home-header {
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 18px;
+    border-radius: 0 0 24px 24px;
+}
+
+.home-header-top {
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.home-greeting-text {
+    font-size: 17px;
+    margin-bottom: 3px;
+}
+
+.home-greeting-sub {
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 12px;
+}
+
+.home-header-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+}
+
+.home-balance-panel,
+.home-vehicle-panel {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 16px;
+    padding: 12px;
+    backdrop-filter: blur(8px);
+}
+
+.home-balance-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.home-wallet-card {
+    display: none;
+}
+
+.home-wallet-label {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.home-wallet-value {
+    color: #ffffff;
+    font-size: 20px;
+}
+
+.home-vehicle-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.home-vehicle-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.home-vehicle-select,
+.home-vehicle-add-btn {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 12px;
+}
+
+.home-vehicle-select {
+    cursor: pointer;
+}
+
+.home-vehicle-select option {
+    color: #1b4d2e;
+    background: #ffffff;
+}
+
+.home-vehicle-add-btn {
+    cursor: pointer;
+    text-align: left;
+}
+
+.home-content {
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    gap: 14px;
+}
+
+.home-cta-map {
+    border-radius: 18px;
+    padding: 14px;
+}
+
+.home-cta-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 19px;
+}
+
+.home-stats-row {
+    gap: 8px;
+}
+
+.home-stat-card {
+    border-radius: 12px;
+    padding: 10px 8px;
+}
+
+.home-stat-value {
+    font-size: 14px;
+}
+
+.home-stat-label {
+    font-size: 10px;
+}
+
+@media (min-width: 700px) {
+    .home-header-summary {
+        grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .home-header,
+    .home-content {
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
     }
 }

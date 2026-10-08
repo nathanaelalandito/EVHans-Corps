@@ -9,10 +9,15 @@ use App\Models\ChargingSession;
 use App\Models\Location;
 use App\Models\ErrorLog;
 
+
 class Charger extends Model {
     protected $table = 'charger';
     protected $primaryKey = 'id_charger';
     protected $fillable = ['id_location', 'kode_perangkat', 'tipe_konektor', 'daya_kwh', 'tipe_charging', 'status'];
+    protected $casts = [
+        'daya_kwh' => 'integer',
+    ];
+
 
     public function location(): BelongsTo {
         return $this->belongsTo(Location::class, 'id_location', 'id_location');
@@ -26,3 +31,4 @@ class Charger extends Model {
         return $this->hasMany(ErrorLog::class, 'id_charger', 'id_charger');
     }
 }
+

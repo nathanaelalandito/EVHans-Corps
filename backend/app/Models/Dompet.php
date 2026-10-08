@@ -10,11 +10,13 @@ class Dompet extends Model
     use HasFactory;
 
     protected $table = 'dompet';
+
     protected $primaryKey = 'id_wallet';
 
     protected $fillable = [
         'id_user',
         'saldo',
+        'saldo_ditahan',
         'pin_transaksi',
         'status_dompet',
         'percobaan_pin_gagal',
@@ -28,6 +30,7 @@ class Dompet extends Model
 
     protected $casts = [
         'saldo' => 'integer',
+        'saldo_ditahan' => 'integer',
         'percobaan_pin_gagal' => 'integer',
         'locked_until' => 'datetime',
     ];
@@ -35,6 +38,11 @@ class Dompet extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'id_user', 'id_user');
+    }
+
+    public function topups()
+    {
+        return $this->hasMany(Topup::class, 'id_wallet', 'id_wallet');
     }
 
     public function hasPin(): bool

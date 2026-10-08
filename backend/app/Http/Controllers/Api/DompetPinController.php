@@ -4,7 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dompet;
+use App\Models\MetodePembayaran;
+use App\Models\Payment;
+use App\Models\Topup;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -41,6 +46,8 @@ class DompetPinController extends Controller
 
         return response()->json([
             'saldo' => $wallet->saldo,
+            'saldo_ditahan' => $wallet->saldo_ditahan,
+            'saldo_tersedia' => max(0, $wallet->saldo - $wallet->saldo_ditahan),
             'status_dompet' => $wallet->status_dompet,
             'pin_sudah_diset' => $wallet->hasPin(),
             'terkunci' => $wallet->isLocked(),
@@ -155,6 +162,96 @@ class DompetPinController extends Controller
     }
 
     /**
+     * POST /api/wallet/topup
+     * Prototype top up instant untuk driver sebelum integrasi payment gateway.
+     */
+    public function topUp(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'nominal' => ['required', 'integer', 'min:10000', 'max:5000000'],
+            'metode_pembayaran' => ['required', 'in:Mandiri,OVO,BCA,BRI,BNI'],
+            'pin' => ['nullable', 'digits:6'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $this->getOrCreateWallet($request);
+
+        $result = DB::transaction(function () use ($request) {
+            $wallet = Dompet::where('id_user', $request->user()->id_user)->lockForUpdate()->firstOrFail();
+
+            if ($wallet->status_dompet !== 'aktif') {
+                return response()->json(['message' => 'Dompet Digital sedang tidak aktif.'], 409);
+            }
+
+            if ($wallet->hasPin()) {
+                if (! $request->filled('pin')) {
+                    return response()->json(['message' => 'PIN Dompet diperlukan untuk top up.'], 422);
+                }
+
+                if ($lockResponse = $this->blockIfLocked($wallet)) {
+                    return $lockResponse;
+                }
+
+                if (! Hash::check($request->pin, $wallet->pin_transaksi)) {
+                    return $this->handleFailedAttempt($wallet, 'PIN salah.');
+                }
+            }
+
+            $method = $this->paymentMethod((string) $request->metode_pembayaran);
+            $nominal = (int) $request->nominal;
+            $reference = 'TOPUP-'.now()->format('YmdHis').'-'.$wallet->id_wallet;
+
+            $payment = Payment::create([
+                'id_session' => null,
+                'id_metode' => $method->id_metode,
+                'jenis_pembayaran' => 'topup',
+                'total_bayar' => $nominal,
+                'status_pembayaran' => 'sukses',
+                'waktu_pembayaran' => now(),
+                'referensi_gateway' => $reference,
+            ]);
+
+            Topup::create([
+                'id_wallet' => $wallet->id_wallet,
+                'id_payment' => $payment->id_payment,
+                'nominal' => $nominal,
+                'status_topup' => 'sukses',
+                'waktu_topup' => now(),
+            ]);
+
+            $wallet->saldo += $nominal;
+            $wallet->percobaan_pin_gagal = 0;
+            $wallet->locked_until = null;
+            $wallet->save();
+
+            return [
+                'wallet' => $wallet,
+                'payment' => $payment->load('method'),
+            ];
+        });
+
+        if ($result instanceof JsonResponse) {
+            return $result;
+        }
+
+        $wallet = $result['wallet'];
+        $payment = $result['payment'];
+
+        return response()->json([
+            'message' => 'Top up Dompet Digital berhasil.',
+            'id_payment' => $payment->id_payment,
+            'referensi_gateway' => $payment->referensi_gateway,
+            'metode_pembayaran' => $payment->method->nama_metode,
+            'saldo' => $wallet->saldo,
+            'saldo_ditahan' => $wallet->saldo_ditahan,
+            'saldo_tersedia' => max(0, $wallet->saldo - $wallet->saldo_ditahan),
+        ]);
+    }
+
+    /**
      * POST /api/wallet/pin/reset
      * Reset PIN saat lupa, verifikasi memakai password akun (bukan PIN lama).
      */
@@ -260,5 +357,13 @@ class DompetPinController extends Controller
         return response()->json([
             'message' => "{$message} Sisa percobaan: {$sisa}.",
         ], 422);
+    }
+
+    protected function paymentMethod(string $name): MetodePembayaran
+    {
+        return MetodePembayaran::firstOrCreate(
+            ['nama_metode' => $name],
+            ['biaya_layanan' => 0, 'status_metode' => 'aktif']
+        );
     }
 }
