@@ -24,13 +24,13 @@ class StationSeeder extends Seeder
                 'longitude' => 110.3655000,
                 'jam_buka' => '08:00:00',
                 'jam_tutup' => '22:00:00',
-                'status' => 'aktif',
+                'status_loc' => 'aktif',
                 'tarif' => ['harga_per_kwh' => 2500, 'biaya_minimum' => 10000, 'biaya_parkir_pjam' => 5000],
                 'chargers' => [
-                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 50, 'tipe_charging' => 'DC', 'status' => 'tersedia'],
-                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status' => 'sedang digunakan'],
-                    ['kode_perangkat' => 'CHG-03', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 50, 'tipe_charging' => 'DC', 'status' => 'tersedia'],
-                    ['kode_perangkat' => 'CHG-04', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status' => 'maintenance'],
+                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 50, 'tipe_charging' => 'DC', 'status_mesin' => 'tersedia'],
+                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status_mesin' => 'digunakan'],
+                    ['kode_perangkat' => 'CHG-03', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 50, 'tipe_charging' => 'DC', 'status_mesin' => 'tersedia'],
+                    ['kode_perangkat' => 'CHG-04', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status_mesin' => 'maintenance'],
                 ],
             ],
             [
@@ -41,11 +41,11 @@ class StationSeeder extends Seeder
                 'longitude' => 110.3945000,
                 'jam_buka' => '09:00:00',
                 'jam_tutup' => '21:00:00',
-                'status' => 'aktif',
+                'status_loc' => 'aktif',
                 'tarif' => ['harga_per_kwh' => 2200, 'biaya_minimum' => 10000, 'biaya_parkir_pjam' => 4000],
                 'chargers' => [
-                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 22, 'tipe_charging' => 'DC', 'status' => 'sedang digunakan'],
-                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 22, 'tipe_charging' => 'DC', 'status' => 'sedang digunakan'],
+                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 22, 'tipe_charging' => 'DC', 'status_mesin' => 'digunakan'],
+                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 22, 'tipe_charging' => 'DC', 'status_mesin' => 'digunakan'],
                 ],
             ],
             [
@@ -56,11 +56,11 @@ class StationSeeder extends Seeder
                 'longitude' => 110.3746000,
                 'jam_buka' => '07:00:00',
                 'jam_tutup' => '23:00:00',
-                'status' => 'maintenance',
+                'status_loc' => 'maintenance',
                 'tarif' => ['harga_per_kwh' => 2700, 'biaya_minimum' => 12000, 'biaya_parkir_pjam' => 6000],
                 'chargers' => [
-                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status' => 'maintenance'],
-                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'chademo', 'daya_kwh' => 60, 'tipe_charging' => 'DC', 'status' => 'rusak'],
+                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status_mesin' => 'maintenance'],
+                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'chademo', 'daya_kwh' => 60, 'tipe_charging' => 'DC', 'status_mesin' => 'rusak'],
                 ],
             ],
         ];
