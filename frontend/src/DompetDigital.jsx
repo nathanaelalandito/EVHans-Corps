@@ -817,23 +817,29 @@ export default function DompetDigital({ onBack }) {
                             </div>
                         ) : (
                             <ul className="dmp-mutasi-list">
-                                {filteredTransactions.map((trx) => (
-                                    <li key={trx.id} className="dmp-trx">
-                                        <span className={`dmp-trx-icon ${trx.tipe === 'masuk' ? 'masuk' : 'keluar'}`}>
-                                            {trx.tipe === 'masuk' ? '↓' : '↑'}
-                                        </span>
-                                        <div className="dmp-trx-info">
-                                            <p className="dmp-trx-name">{trx.jenis}</p>
-                                            <p className="dmp-trx-time">{formatWaktu(trx.waktu)}</p>
-                                        </div>
-                                        <div className="dmp-trx-right">
-                                            <p className={`dmp-trx-nominal ${trx.tipe === 'masuk' ? 'masuk' : 'keluar'}`}>
-                                                {trx.tipe === 'masuk' ? '+' : '−'} {formatRupiah(trx.nominal)}
-                                            </p>
-                                            <p className={`dmp-trx-status ${trx.status}`}>{statusLabel(trx.status)}</p>
-                                        </div>
-                                    </li>
-                                ))}
+                                {filteredTransactions.map((trx) => {
+                                    const isCharging = trx.jenis === 'Pembayaran Charging';
+                                    const arah = trx.tipe === 'masuk' ? 'masuk' : 'keluar';
+                                    const extra = isCharging ? ' charging' : '';
+
+                                    return (
+                                        <li key={trx.id} className="dmp-trx">
+                                            <span className={`dmp-trx-icon ${arah}${extra}`}>
+                                                {trx.tipe === 'masuk' ? '↓' : '↑'}
+                                            </span>
+                                            <div className="dmp-trx-info">
+                                                <p className="dmp-trx-name">{trx.jenis}</p>
+                                                <p className="dmp-trx-time">{formatWaktu(trx.waktu)}</p>
+                                            </div>
+                                            <div className="dmp-trx-right">
+                                                <p className={`dmp-trx-nominal ${arah}${extra}`}>
+                                                    {trx.tipe === 'masuk' ? '+' : '−'} {formatRupiah(trx.nominal)}
+                                                </p>
+                                                <p className={`dmp-trx-status ${trx.status}`}>{statusLabel(trx.status)}</p>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </>
