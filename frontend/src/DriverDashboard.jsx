@@ -906,17 +906,13 @@ export default function DriverDashboard({
                 >
                     <div className="home-wallet-info">
                         <p className="home-wallet-label">Saldo Dompet</p>
-                        <p className="home-wallet-value">
-<<<<<<< HEAD
-                            {walletLoading
-                                ? '...'
-                                : hideWalletSaldo
-                                    ? 'Rp ••••••'
-                                    : formatRupiah(wallet?.saldo ?? 0)}
-=======
-                            {walletLoading ? '...' : formatRupiah(wallet?.saldo_tersedia ?? wallet?.saldo ?? 0)}
->>>>>>> b9a36bb8e80a47502ff398fd4c19f33ed3d3519a
-                        </p>
+                    <p className="home-wallet-value">
+                        {walletLoading
+                            ? '...'
+                            : hideWalletSaldo
+                                ? 'Rp ••••••'
+                                : formatRupiah(wallet?.saldo_tersedia ?? wallet?.saldo ?? 0)}
+                    </p>
                     </div>
                         <button
                         className="home-wallet-eye"

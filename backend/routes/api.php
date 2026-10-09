@@ -53,3 +53,11 @@ Route::middleware('auth:sanctum')->prefix('charging')->group(function () {
     Route::post('/start', [ChargingSessionController::class, 'start']);
     Route::post('/{id}/stop', [ChargingSessionController::class, 'stop']);
 });
+
+// Top Up Saldo
+Route::middleware('auth:sanctum')->prefix('topup')->group(function () {
+    Route::get('/methods', [TopupController::class, 'methods']);
+    Route::post('/', [TopupController::class, 'store']);
+    Route::get('/{reference}', [TopupController::class, 'show']);
+    Route::post('/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
+});
