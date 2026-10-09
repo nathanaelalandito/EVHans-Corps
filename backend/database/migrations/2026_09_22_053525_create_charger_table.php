@@ -21,7 +21,7 @@ return new class extends Migration
             $table->enum('tipe_konektor', ['type_2', 'ccs2', 'chademo', 'gbt']);
             $table->integer('daya_kwh');
             $table->enum('tipe_charging', ['AC', 'DC']);
-            $table->enum('status', ['tersedia', 'digunakan', 'maintenance', 'rusak', 'offline'])->default('tersedia');
+            $table->enum('status_mesin', ['tersedia', 'digunakan', 'maintenance', 'rusak', 'offline'])->default('tersedia');
             $table->timestamps();
         });
     }

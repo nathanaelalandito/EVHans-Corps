@@ -42,8 +42,8 @@ class OperationsController extends Controller
                 'summary' => [
                     'total_station' => $locations->count(),
                     'total_charger' => $locations->sum(fn (Location $location) => $location->chargers->count()),
-                    'charger_tersedia' => Charger::where('status', 'tersedia')->count(),
-                    'charger_gangguan' => Charger::whereIn('status', ['maintenance', 'rusak', 'offline'])->count(),
+                    'charger_tersedia' => Charger::where('status_mesin', 'tersedia')->count(),
+                    'charger_gangguan' => Charger::whereIn('status_mesin', ['maintenance', 'rusak', 'offline'])->count(),
                     'sesi_berjalan' => ChargingSession::where('status', 'berlangsung')->count(),
                     'pendapatan_bulan_ini' => (clone $successfulCharging)
                         ->whereMonth('waktu_pembayaran', now()->month)
@@ -111,10 +111,10 @@ class OperationsController extends Controller
         $this->ensureStaff($request);
 
         $data = $request->validate([
-            'status' => ['required', Rule::in(['tersedia', 'sedang digunakan', 'maintenance', 'rusak', 'offline'])],
+            'status_mesin' => ['required', Rule::in(['tersedia', 'sedang digunakan', 'maintenance', 'rusak', 'offline'])],
         ]);
 
-        if ($charger->status === 'sedang digunakan' && $data['status'] !== 'sedang digunakan') {
+        if ($charger->status_mesin === 'sedang digunakan' && $data['status_mesin'] !== 'sedang digunakan') {
             $activeSessionExists = ChargingSession::where('id_charger', $charger->id_charger)
                 ->where('status', 'berlangsung')
                 ->exists();
@@ -225,8 +225,8 @@ class OperationsController extends Controller
             'jam_buka' => substr((string) $location->jam_buka, 0, 5),
             'jam_tutup' => substr((string) $location->jam_tutup, 0, 5),
             'charger_total' => $chargers->count(),
-            'charger_tersedia' => $chargers->where('status', 'tersedia')->count(),
-            'charger_gangguan' => $chargers->whereIn('status', ['maintenance', 'rusak', 'offline'])->count(),
+            'charger_tersedia' => $chargers->where('status_mesin', 'tersedia')->count(),
+            'charger_gangguan' => $chargers->whereIn('status_mesin', ['maintenance', 'rusak', 'offline'])->count(),
             'tarif' => $tarif ? [
                 'id_tarif' => $tarif->id_tarif,
                 'harga_per_kwh' => $tarif->harga_per_kwh,
@@ -245,7 +245,7 @@ class OperationsController extends Controller
             'tipe_konektor' => $charger->tipe_konektor,
             'daya_kw' => $charger->daya_kwh,
             'tipe_charging' => $charger->tipe_charging,
-            'status' => $charger->status,
+            'status' => $charger->status_mesin,
         ];
     }
 

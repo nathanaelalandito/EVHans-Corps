@@ -134,7 +134,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
             longitude: selectedStation.longitude,
             jam_buka: selectedStation.jam_buka,
             jam_tutup: selectedStation.jam_tutup,
-            status: selectedStation.status,
+            status: selectedStation.status_loc,
         });
     }, [selectedStation]);
 
@@ -193,10 +193,10 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
-    const saveChargerStatus = async (charger, status) => {
+    const saveChargerStatus = async (charger, status_mesin) => {
         setFeedback('');
         try {
-            await updateCharger(charger.id_charger, { status });
+            await updateCharger(charger.id_charger, { status_mesin });
             await fetchDashboard();
             setFeedback('Status charger berhasil diperbarui.');
         } catch (err) {

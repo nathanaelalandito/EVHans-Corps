@@ -21,7 +21,7 @@ class Location extends Model
         'longitude',
         'jam_buka',
         'jam_tutup',
-        'status',
+        'status_loc',
     ];
 
     protected $casts = [

@@ -45,7 +45,7 @@ class StationController extends Controller
     {
         $chargers = $location->chargers;
         $tarif = $location->tarifs->first();
-        $availableCount = $chargers->where('status', 'tersedia')->count();
+        $availableCount = $chargers->where('status_mesin', 'tersedia')->count();
 
         return [
             'id_location' => $location->id_location,
@@ -78,7 +78,7 @@ class StationController extends Controller
             'tipe_konektor' => self::CONNECTOR_LABELS[$charger->tipe_konektor] ?? $charger->tipe_konektor,
             'daya_kw' => $charger->daya_kwh,
             'tipe_charging' => $charger->tipe_charging,
-            'status' => $charger->status,
+            'status' => $charger->status_mesin,
         ];
     }
 

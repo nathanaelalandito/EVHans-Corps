@@ -13,7 +13,7 @@ use App\Models\ErrorLog;
 class Charger extends Model {
     protected $table = 'charger';
     protected $primaryKey = 'id_charger';
-    protected $fillable = ['id_location', 'kode_perangkat', 'tipe_konektor', 'daya_kwh', 'tipe_charging', 'status'];
+    protected $fillable = ['id_location', 'kode_perangkat', 'tipe_konektor', 'daya_kwh', 'tipe_charging', 'status_mesin'];
     protected $casts = [
         'daya_kwh' => 'integer',
     ];

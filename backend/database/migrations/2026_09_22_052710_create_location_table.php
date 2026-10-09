@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('longitude', 10, 7);
             $table->time('jam_buka');
             $table->time('jam_tutup');
-            $table->enum('status', ['aktif', 'nonaktif', 'maintenance'])->default('aktif');
+            $table->enum('status_loc', ['aktif', 'nonaktif', 'maintenance'])->default('aktif');
             $table->timestamps();
         });
     }

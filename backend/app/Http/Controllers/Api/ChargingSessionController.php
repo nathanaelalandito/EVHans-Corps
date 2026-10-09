@@ -133,7 +133,7 @@ class ChargingSessionController extends Controller
             $wallet->locked_until = null;
             $wallet->save();
 
-            $charger->status = 'sedang digunakan';
+            $charger->status_mesin = 'sedang digunakan';
             $charger->save();
 
             $session = ChargingSession::create([
@@ -234,7 +234,7 @@ class ChargingSessionController extends Controller
 
     private function ensureCanUseCharger(Charger $charger, Vehicle $vehicle): void
     {
-        if ($charger->status !== 'tersedia') {
+        if ($charger->status_mesin !== 'tersedia') {
             throw ValidationException::withMessages([
                 'charger' => 'Charger sudah digunakan atau belum siap.',
             ]);
@@ -313,7 +313,7 @@ class ChargingSessionController extends Controller
             $wallet->saldo_ditahan = max(0, $wallet->saldo_ditahan - $session->jumlah_hold);
             $wallet->save();
 
-            $charger->status = $finalStatus === 'gagal' ? 'maintenance' : 'tersedia';
+            $charger->status_mesin = $finalStatus === 'gagal' ? 'maintenance' : 'tersedia';
             $charger->save();
 
             $session->total_energi_kwh = $actualKwh;
@@ -495,7 +495,7 @@ class ChargingSessionController extends Controller
             'tipe_konektor' => self::CONNECTOR_LABELS[$charger->tipe_konektor] ?? $charger->tipe_konektor,
             'daya_kw' => $charger->daya_kwh,
             'tipe_charging' => $charger->tipe_charging,
-            'status' => $charger->status,
+            'status' => $charger->status_mesin,
         ];
     }
 
