@@ -6,6 +6,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\DompetPinController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\TopupController;
+use App\Http\Controllers\Api\StationController;
+use App\Http\Controllers\Api\ChargingSessionController;
 
 Route::get('/user', function (Request $request) {
     return $request->user()->load('profile');
@@ -39,9 +41,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
 });
 
-Route::middleware('auth:sanctum')->prefix('topup')->group(function () {
-    Route::get('/methods', [TopupController::class, 'methods']);
-    Route::post('/', [TopupController::class, 'store']);
-    Route::get('/{reference}', [TopupController::class, 'show']);
-    Route::post('/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/stations', [StationController::class, 'index']);
+    Route::get('/stations/{id}', [StationController::class, 'show']);
+});
+
+Route::middleware('auth:sanctum')->prefix('charging')->group(function () {
+    Route::get('/active', [ChargingSessionController::class, 'active']);
+    Route::post('/prepare', [ChargingSessionController::class, 'prepare']);
+    Route::post('/estimate', [ChargingSessionController::class, 'estimate']);
+    Route::post('/start', [ChargingSessionController::class, 'start']);
+    Route::post('/{id}/stop', [ChargingSessionController::class, 'stop']);
 });

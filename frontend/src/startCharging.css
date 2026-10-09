@@ -1,0 +1,145 @@
+/* Lembar "Mulai Charging" — memakai gaya dasar .sd-* dari stationDetail.css */
+.sc-vehicle { margin: 0; font-size: 13px; font-weight: 600; color: #1b4d2e; }
+
+.sc-port {
+    width: 100%;
+    background: #ffffff;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.sc-port.selected { border-color: #2e7d32; background: #f6fbf3; }
+.sc-port:focus-visible { outline: 2px solid #2e7d32; outline-offset: 2px; }
+
+.sc-radio {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #b9c29c;
+    box-sizing: border-box;
+}
+.sc-port.selected .sc-radio { border-color: #2e7d32; background: radial-gradient(#2e7d32 45%, transparent 50%); }
+
+.sc-soc {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1b4d2e;
+}
+.sc-soc input {
+    width: 96px;
+    font-family: inherit;
+    font-size: 16px; /* 16px mencegah zoom otomatis di iOS */
+    padding: 9px 12px;
+    border: 1px solid #cfd6b8;
+    border-radius: 10px;
+}
+.sc-soc input:focus-visible { outline: 2px solid #2e7d32; outline-offset: 1px; }
+
+.sc-tarif { margin-top: 12px; }
+.sc-submit:disabled { background: #b9c29c; cursor: not-allowed; }
+
+/* Blok "mulai charging" di kartu rute (DriverDashboard) */
+.route-card-start-block { display: flex; flex-direction: column; gap: 6px; }
+.route-card-start {
+    width: 100%;
+    background: #1b6b2a;
+    color: #ffffff;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    padding: 12px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+.route-card-start:disabled { background: #cfd4c2; color: #6b7259; cursor: not-allowed; }
+.route-card-start:focus-visible { outline: 2px solid #2e7d32; outline-offset: 2px; }
+.route-card-arrived,
+.route-card-hint { margin: 0; font-size: 12.5px; line-height: 1.4; }
+.route-card-arrived { color: #2e7d32; font-weight: 700; }
+.route-card-hint { color: #6b7259; }
+
+/* Langkah colok kabel & hasil baterai awal */
+.sc-plug { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 16px 4px 8px; }
+.sc-plug-icon { font-size: 44px; line-height: 1; }
+.sc-plug-title { margin: 4px 0 0; font-size: 16px; color: #1b4d2e; }
+.sc-soc-big { margin: 4px 0 0; font-size: 44px; font-weight: 800; color: #2e7d32; }
+
+/* Pilihan jumlah kWh */
+.sc-amounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; }
+.sc-amount {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 4px;
+    border: 1px solid #e3e7d2;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #1b4d2e;
+    cursor: pointer;
+}
+.sc-amount.selected { border-color: #2e7d32; background: #f6fbf3; }
+.sc-amount:focus-visible { outline: 2px solid #2e7d32; outline-offset: 2px; }
+
+/* Rincian estimasi biaya */
+.sc-breakdown { margin: 0 0 12px; display: flex; flex-direction: column; }
+.sc-breakdown > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eef0df;
+}
+.sc-breakdown dt { font-size: 13px; color: #3b4a2c; display: flex; flex-direction: column; gap: 2px; }
+.sc-breakdown dt small { font-size: 11.5px; color: #6b7259; }
+.sc-breakdown dd { margin: 0; font-size: 13.5px; font-weight: 700; color: #1b4d2e; white-space: nowrap; }
+.sc-breakdown .sc-total { border-bottom: none; padding-top: 12px; }
+.sc-breakdown .sc-total dt { font-size: 14px; font-weight: 800; color: #1b4d2e; }
+.sc-breakdown .sc-total dd { font-size: 17px; font-weight: 800; color: #2e7d32; }
+
+/* Input PIN */
+.sc-pin {
+    width: 180px;
+    text-align: center;
+    letter-spacing: 0.4em;
+    font-family: inherit;
+    font-size: 22px; /* >= 16px mencegah zoom otomatis di iOS */
+    padding: 10px 12px;
+    border: 1px solid #cfd6b8;
+    border-radius: 12px;
+}
+.sc-pin:focus-visible { outline: 2px solid #2e7d32; outline-offset: 1px; }
+
+/* Slider jumlah kWh + indikator baterai */
+.sc-soc-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0 6px;
+    font-size: 15px;
+    color: #6b7259;
+}
+.sc-soc-line strong { font-size: 30px; font-weight: 800; color: #2e7d32; }
+
+.sc-soc-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    background: #eef0df;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.sc-soc-bar-from { background: #8fb996; }
+.sc-soc-bar-add { background: #2e7d32; transition: width 0.15s ease; }
+
+.sc-slider { width: 100%; accent-color: #2e7d32; margin: 4px 0 0; }
+.sc-slider:focus-visible { outline: 2px solid #2e7d32; outline-offset: 4px; border-radius: 8px; }
+.sc-slider-scale { display: flex; justify-content: space-between; font-size: 11.5px; color: #6b7259; margin-bottom: 12px; }
+
+.sc-amount small { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: #6b7259; }
