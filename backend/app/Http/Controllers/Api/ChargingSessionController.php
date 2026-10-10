@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ChecksWalletPin;
 use App\Http\Controllers\Controller;
 use App\Models\Charger;
 use App\Models\ChargingSession;
@@ -9,17 +10,18 @@ use App\Models\Dompet;
 use App\Models\MetodePembayaran;
 use App\Models\Payment;
 use App\Models\Refund;
-use App\Models\Tarif;
+use App\Models\User;
 use App\Models\Vehicle;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class ChargingSessionController extends Controller
 {
+    use ChecksWalletPin;
+
+    private const MIN_TARGET_KWH = 0.5;
+
     private const CONNECTOR_LABELS = [
         'type_2' => 'Type 2',
         'ccs2' => 'CCS2',
@@ -27,6 +29,7 @@ class ChargingSessionController extends Controller
         'gbt' => 'GB/T',
     ];
 
+    /** Riwayat transaksi charging user (dari versi lama). */
     public function history(Request $request): JsonResponse
     {
         $sessions = ChargingSession::with(['charger.location', 'vehicle', 'tarif', 'payment.method', 'payment.refund'])
@@ -40,6 +43,7 @@ class ChargingSessionController extends Controller
         return response()->json(['data' => $sessions]);
     }
 
+    /** Detail invoice digital berdasarkan sesi (dari versi lama). */
     public function invoice(Request $request, ChargingSession $session): JsonResponse
     {
         $session = ChargingSession::with(['charger.location', 'vehicle', 'tarif', 'payment.method', 'payment.refund'])
@@ -50,282 +54,243 @@ class ChargingSessionController extends Controller
         return response()->json(['data' => $this->presentInvoice($session)]);
     }
 
+    /** Sesi charging aktif milik user. */
     public function active(Request $request): JsonResponse
     {
-        $session = ChargingSession::with(['charger.location', 'vehicle', 'tarif', 'payment.method'])
-            ->where('id_user', $request->user()->id_user)
-            ->whereIn('status', ['pending', 'berlangsung'])
-            ->latest('waktu_mulai')
-            ->first();
+        $session = $this->activeSessionOf($request->user()->id_user);
 
         return response()->json([
-            'data' => $session ? $this->presentSession($session) : null,
+            'data' => $session ? $this->present($session) : null,
         ]);
     }
 
-    public function validateCharger(Request $request): JsonResponse
+    /** Langkah persiapan: validasi port, jarak GPS, & kapasitas baterai awal. */
+    public function prepare(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'id_charger' => ['required', 'integer', 'exists:charger,id_charger'],
-            'id_vehicle' => ['required', 'integer', 'exists:vehicle,id_vehicle'],
-            'target_kwh' => ['required', 'numeric', 'min:5', 'max:100'],
+            'id_charger' => ['required', 'integer'],
+            'id_vehicle' => ['required', 'integer'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
 
-        $charger = Charger::with('location')->findOrFail($data['id_charger']);
-        $vehicle = $this->driverVehicle($request, (int) $data['id_vehicle']);
-        $tarif = $this->activeTarif($charger);
+        $ctx = $this->checkStartable($request->user(), $data);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
 
-        $this->ensureCanUseCharger($charger, $vehicle);
+        $charger = $ctx['charger'];
+        $soc = random_int(10, 80);
+        [$kapasitas, $kapasitasDefault] = $this->batteryCapacity($ctx['vehicle']);
+        $maxKwh = $this->maxTargetKwh($kapasitas, $soc);
+
+        if ($maxKwh < self::MIN_TARGET_KWH) {
+            return response()->json([
+                'message' => 'Baterai mobil sudah hampir penuh, tidak perlu charging.',
+                'kode' => 'baterai_penuh',
+            ], 422);
+        }
 
         return response()->json([
-            'message' => 'Charger tersedia dan valid untuk kendaraan aktif.',
-            'data' => $this->presentValidation($charger, $vehicle, $tarif, (float) $data['target_kwh']),
+            'data' => [
+                'soc_awal' => $soc,
+                'kapasitas_baterai_kwh' => $kapasitas,
+                'kapasitas_default' => $kapasitasDefault,
+                'min_target_kwh' => self::MIN_TARGET_KWH,
+                'max_target_kwh' => $maxKwh,
+                'id_charger' => $charger->id_charger,
+                'kode_charger' => $charger->kode_perangkat,
+                'tipe_konektor' => self::CONNECTOR_LABELS[$charger->tipe_konektor] ?? $charger->tipe_konektor,
+                'daya_kw' => $charger->daya_kwh,
+                'nama_lokasi' => $ctx['location']->nama_lokasi,
+            ],
         ]);
     }
 
+    /** Hitung estimasi biaya sebelum mulai. */
+    public function estimate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'id_charger' => ['required', 'integer'],
+            'id_vehicle' => ['required', 'integer'],
+            'soc_awal' => ['required', 'integer', 'between:0,100'],
+            'target_kwh' => ['required', 'numeric', 'min:' . self::MIN_TARGET_KWH],
+        ]);
+
+        $vehicle = $request->user()->vehicles()->find($data['id_vehicle']);
+        if (! $vehicle) {
+            return $this->fail('Kendaraan tidak ditemukan.', 422);
+        }
+        [$kapasitas] = $this->batteryCapacity($vehicle);
+        if ($over = $this->exceedsBattery((float) $data['target_kwh'], $kapasitas, (int) $data['soc_awal'])) {
+            return $over;
+        }
+
+        $charger = Charger::with('location.tarif')->find($data['id_charger']);
+        if (! $charger || ! $charger->location) {
+            return $this->fail('Port charger tidak ditemukan.', 404);
+        }
+
+        $tarif = $charger->location->activeTarif();
+        if (! $tarif) {
+            return $this->fail('Tarif belum tersedia untuk station ini.', 422);
+        }
+
+        $estimate = $this->calculateEstimate($charger, $tarif, (float) $data['target_kwh']);
+        $wallet = $this->walletOf($request->user());
+        $estimate['soc_estimasi'] = $this->socAfter($kapasitas, (int) $data['soc_awal'], $estimate['target_kwh']);
+
+        return response()->json([
+            'data' => $estimate + $this->walletSummary($wallet, $estimate['total']),
+        ]);
+    }
+
+    /** Mulai sesi: verifikasi PIN, hold saldo, buat payment pending, & klaim port. */
     public function start(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'id_charger' => ['required', 'integer', 'exists:charger,id_charger'],
-            'id_vehicle' => ['required', 'integer', 'exists:vehicle,id_vehicle'],
-            'target_kwh' => ['required', 'numeric', 'min:5', 'max:100'],
+            'id_charger' => ['required', 'integer'],
+            'id_vehicle' => ['required', 'integer'],
+            'soc_awal' => ['required', 'integer', 'between:0,100'],
+            'target_kwh' => ['required', 'numeric', 'min:' . self::MIN_TARGET_KWH],
             'pin' => ['required', 'digits:6'],
-            'soc_awal' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
 
-        $session = DB::transaction(function () use ($request, $data): ChargingSession {
-            $user = $request->user();
+        $user = $request->user();
+        $ctx = $this->checkStartable($user, $data);
+        if ($ctx instanceof JsonResponse) {
+            return $ctx;
+        }
+        $charger = $ctx['charger'];
+        $tarif = $ctx['tarif'];
 
-            $activeSessionExists = ChargingSession::where('id_user', $user->id_user)
-                ->whereIn('status', ['pending', 'berlangsung'])
-                ->lockForUpdate()
-                ->exists();
+        [$kapasitas] = $this->batteryCapacity($ctx['vehicle']);
+        if ($over = $this->exceedsBattery((float) $data['target_kwh'], $kapasitas, (int) $data['soc_awal'])) {
+            return $over;
+        }
 
-            if ($activeSessionExists) {
-                throw ValidationException::withMessages([
-                    'session' => 'Masih ada sesi charging yang berjalan.',
-                ]);
+        $estimate = $this->calculateEstimate($charger, $tarif, (float) $data['target_kwh']);
+        $total = $estimate['total'];
+
+        $wallet = $this->walletOf($user);
+        if ($wallet->status_dompet !== 'aktif') {
+            return $this->fail('Dompet digital Anda tidak aktif.', 422);
+        }
+        if ($wallet->saldoTersedia() < $total) {
+            return $this->insufficient($wallet, $total);
+        }
+
+        if ($pinError = $this->checkWalletPin($wallet, $data['pin'])) {
+            return $pinError;
+        }
+
+        $result = DB::transaction(function () use ($wallet, $total, $charger, $user, $ctx, $tarif, $estimate, $data) {
+            $w = Dompet::where('id_wallet', $wallet->id_wallet)->lockForUpdate()->first();
+            if (! $w || $w->saldoTersedia() < $total) {
+                return ['response' => $this->insufficient($w ?? $wallet, $total)];
             }
 
-            $charger = Charger::with('location')
-                ->whereKey($data['id_charger'])
-                ->lockForUpdate()
-                ->firstOrFail();
+            $claimed = Charger::where('id_charger', $charger->id_charger)
+                ->where('status', 'tersedia')
+                ->update(['status' => 'sedang digunakan']);
 
-            $vehicle = $this->driverVehicle($request, (int) $data['id_vehicle']);
-            $tarif = $this->activeTarif($charger);
-            $wallet = Dompet::where('id_user', $user->id_user)->lockForUpdate()->firstOrFail();
-
-            $this->ensureCanUseCharger($charger, $vehicle);
-            $this->ensureWalletCanPay($wallet, (string) $data['pin']);
-
-            $estimate = $this->estimateCost((float) $data['target_kwh'], $tarif);
-            $availableBalance = max(0, $wallet->saldo - $wallet->saldo_ditahan);
-
-            if ($availableBalance < $estimate) {
-                throw ValidationException::withMessages([
-                    'saldo' => 'Saldo Dompet Digital belum mencukupi untuk estimasi transaksi.',
-                ]);
+            if ($claimed === 0) {
+                return ['response' => $this->portTaken()];
             }
 
-            $wallet->saldo_ditahan += $estimate;
-            $wallet->percobaan_pin_gagal = 0;
-            $wallet->locked_until = null;
-            $wallet->save();
-
-            $charger->status_mesin = 'sedang digunakan';
-            $charger->save();
+            $w->saldo_hold = (int) $w->saldo_hold + $total;
+            $w->save();
 
             $session = ChargingSession::create([
                 'id_user' => $user->id_user,
                 'id_charger' => $charger->id_charger,
                 'id_tarif' => $tarif->id_tarif,
-                'id_vehicle' => $vehicle->id_vehicle,
+                'id_vehicle' => $ctx['vehicle']->id_vehicle,
                 'waktu_mulai' => now(),
                 'total_energi_kwh' => 0,
-                'target_energi_kwh' => $data['target_kwh'],
-                'estimasi_biaya' => $estimate,
-                'jumlah_hold' => $estimate,
                 'status' => 'berlangsung',
-                'soc_awal' => $data['soc_awal'] ?? 0,
+                'soc_awal' => $data['soc_awal'],
+                'target_energi_kwh' => $estimate['target_kwh'],
+                'estimasi_biaya_charging' => $estimate['biaya_charging'],
+                'estimasi_biaya_parkir' => $estimate['biaya_parkir'],
+                'jumlah_hold' => $total, // Kompatibel dengan kolom versi lama
+                'saldo_hold' => $total,
             ]);
 
+            // Catat ke tabel Payments (dari versi lama)
             Payment::create([
                 'id_session' => $session->id_session,
                 'id_metode' => $this->paymentMethod('Dompet Digital')->id_metode,
                 'jenis_pembayaran' => 'charging',
-                'total_bayar' => $estimate,
+                'total_bayar' => $total,
                 'status_pembayaran' => 'pending',
                 'waktu_pembayaran' => now(),
                 'referensi_gateway' => $this->paymentReference('HOLD', $session->id_session),
             ]);
 
-            return $session->load(['charger.location', 'vehicle', 'tarif', 'payment.method']);
+            return ['session' => $session->load(['charger.location', 'tarif', 'vehicle', 'payment.method'])];
         });
 
+        if (isset($result['response'])) {
+            return $result['response'];
+        }
+
         return response()->json([
-            'message' => 'Sesi charging dimulai. Saldo estimasi berhasil di-hold.',
-            'data' => $this->presentSession($session),
+            'message' => 'Sesi charging dimulai. Saldo hold berhasil dicatat.',
+            'data' => $this->present($result['session']),
         ], 201);
     }
 
-    public function finish(Request $request, ChargingSession $session): JsonResponse
+    /** Akhiri sesi: hitung biaya aktual, potong saldo, buat refund jika ada sisa hold. */
+    public function stop(Request $request, string $id): JsonResponse
     {
-        $data = $request->validate([
-            'energi_kwh' => ['nullable', 'numeric', 'min:0.1', 'max:100'],
-            'soc_akhir' => ['nullable', 'integer', 'min:0', 'max:100'],
-        ]);
+        $session = ChargingSession::where('id_user', $request->user()->id_user)
+            ->whereIn('status', ChargingSession::AKTIF)
+            ->find($id);
 
-        $finishedSession = $this->settleSession($request, $session, $data, 'selesai');
-
-        return response()->json([
-            'message' => 'Sesi charging selesai. Invoice digital berhasil diterbitkan.',
-            'data' => $this->presentInvoice($finishedSession),
-        ]);
-    }
-
-    public function interrupt(Request $request, ChargingSession $session): JsonResponse
-    {
-        $data = $request->validate([
-            'status' => ['required', 'in:dibatalkan,gagal'],
-            'energi_kwh' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'soc_akhir' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'alasan' => ['nullable', 'string', 'max:160'],
-        ]);
-
-        $finishedSession = $this->settleSession($request, $session, $data, $data['status']);
-        $message = $data['status'] === 'gagal'
-            ? 'Sesi charging gagal ditangani. Biaya aktual dihitung dan sisa hold dikembalikan.'
-            : 'Sesi charging dibatalkan. Biaya aktual dihitung dan sisa hold dikembalikan.';
-
-        return response()->json([
-            'message' => $message,
-            'data' => $this->presentInvoice($finishedSession),
-        ]);
-    }
-
-    private function driverVehicle(Request $request, int $idVehicle): Vehicle
-    {
-        $vehicle = $request->user()->vehicles()->whereKey($idVehicle)->first();
-
-        if (! $vehicle) {
-            throw (new ModelNotFoundException)->setModel(Vehicle::class, [$idVehicle]);
+        if (! $session) {
+            return $this->fail('Sesi charging yang berlangsung tidak ditemukan.', 404);
         }
 
-        return $vehicle;
-    }
+        $sim = $this->simulate($session);
 
-    private function activeTarif(Charger $charger): Tarif
-    {
-        $tarif = Tarif::where('id_location', $charger->id_location)
-            ->where('periode_mulai', '<=', now())
-            ->where('periode_berakhir', '>=', now())
-            ->latest('periode_mulai')
-            ->first();
-
-        if (! $tarif) {
-            throw ValidationException::withMessages([
-                'tarif' => 'Tarif aktif untuk station ini belum tersedia.',
-            ]);
-        }
-
-        return $tarif;
-    }
-
-    private function ensureCanUseCharger(Charger $charger, Vehicle $vehicle): void
-    {
-        if ($charger->status_mesin !== 'tersedia') {
-            throw ValidationException::withMessages([
-                'charger' => 'Charger sudah digunakan atau belum siap.',
-            ]);
-        }
-
-        if ($charger->tipe_konektor !== $vehicle->tipe_konektor) {
-            throw ValidationException::withMessages([
-                'charger' => 'Tipe konektor charger tidak sesuai dengan kendaraan aktif.',
-            ]);
-        }
-    }
-
-    private function ensureWalletCanPay(Dompet $wallet, string $pin): void
-    {
-        if ($wallet->status_dompet !== 'aktif') {
-            throw ValidationException::withMessages([
-                'wallet' => 'Dompet Digital sedang tidak aktif.',
-            ]);
-        }
-
-        if (! $wallet->hasPin()) {
-            throw ValidationException::withMessages([
-                'pin' => 'PIN Dompet belum diatur.',
-            ]);
-        }
-
-        if ($wallet->isLocked()) {
-            throw ValidationException::withMessages([
-                'pin' => 'Dompet terkunci sementara karena terlalu banyak percobaan PIN salah.',
-            ]);
-        }
-
-        if (Hash::check($pin, $wallet->pin_transaksi)) {
-            return;
-        }
-
-        $wallet->percobaan_pin_gagal += 1;
-
-        if ($wallet->percobaan_pin_gagal >= 5) {
-            $wallet->percobaan_pin_gagal = 0;
-            $wallet->locked_until = now()->addMinutes(15);
-        }
-
-        $wallet->save();
-
-        throw ValidationException::withMessages([
-            'pin' => 'PIN Dompet salah.',
-        ]);
-    }
-
-    private function settleSession(Request $request, ChargingSession $session, array $data, string $finalStatus): ChargingSession
-    {
-        return DB::transaction(function () use ($request, $session, $data, $finalStatus): ChargingSession {
+        $finishedSession = DB::transaction(function () use ($session, $sim) {
             $session = ChargingSession::with(['charger.location', 'vehicle', 'tarif'])
                 ->whereKey($session->id_session)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($session->id_user !== $request->user()->id_user) {
-                throw (new ModelNotFoundException)->setModel(ChargingSession::class, [$session->id_session]);
-            }
-
-            if ($session->status !== 'berlangsung') {
-                throw ValidationException::withMessages([
-                    'session' => 'Sesi charging tidak sedang berjalan.',
-                ]);
-            }
-
             $wallet = Dompet::where('id_user', $session->id_user)->lockForUpdate()->firstOrFail();
             $charger = Charger::whereKey($session->id_charger)->lockForUpdate()->firstOrFail();
-            $actualKwh = $this->actualEnergy($session, $data, $finalStatus);
-            $actualCost = $actualKwh > 0 ? min($session->jumlah_hold, $this->estimateCost($actualKwh, $session->tarif)) : 0;
-            $refundAmount = max(0, $session->jumlah_hold - $actualCost);
 
-            $wallet->saldo = max(0, $wallet->saldo - $actualCost);
-            $wallet->saldo_ditahan = max(0, $wallet->saldo_ditahan - $session->jumlah_hold);
+            $actualKwh = $sim['energi_kwh'];
+            $holdAmount = (int) ($session->jumlah_hold ?? $session->saldo_hold);
+            
+            // Hitung biaya aktual berdasarkan tarif
+            $actualCost = $actualKwh > 0 ? min($holdAmount, $this->calculateActualCost($actualKwh, $session->tarif)) : 0;
+            $refundAmount = max(0, $holdAmount - $actualCost);
+
+            // Potong saldo asli dan lepaskan saldo hold
+            $wallet->saldo = max(0, (int) $wallet->saldo - $actualCost);
+            $wallet->saldo_hold = max(0, (int) $wallet->saldo_hold - $holdAmount);
             $wallet->save();
 
-            $charger->status_mesin = $finalStatus === 'gagal' ? 'maintenance' : 'tersedia';
+            $charger->status = 'tersedia';
             $charger->save();
 
-            $session->total_energi_kwh = $actualKwh;
-            $session->waktu_selesai = now();
-            $session->status = $finalStatus;
-            $session->soc_akhir = $data['soc_akhir'] ?? null;
-            $session->save();
+            $session->update([
+                'status' => 'selesai',
+                'waktu_selesai' => now(),
+                'total_energi_kwh' => $actualKwh,
+                'soc_akhir' => $sim['soc_sekarang'],
+            ]);
 
+            // Update status Payment
             $payment = Payment::where('id_session', $session->id_session)->lockForUpdate()->first();
-
             if (! $payment) {
-                $payment = new Payment([
+                $payment = Payment::create([
                     'id_session' => $session->id_session,
                     'id_metode' => $this->paymentMethod('Dompet Digital')->id_metode,
                     'jenis_pembayaran' => 'charging',
@@ -333,11 +298,12 @@ class ChargingSessionController extends Controller
             }
 
             $payment->total_bayar = $actualCost;
-            $payment->status_pembayaran = $finalStatus === 'gagal' && $actualCost === 0 ? 'gagal' : 'sukses';
+            $payment->status_pembayaran = $actualCost === 0 ? 'gagal' : 'sukses';
             $payment->waktu_pembayaran = now();
             $payment->referensi_gateway = $payment->referensi_gateway ?: $this->paymentReference('PAY', $session->id_session);
             $payment->save();
 
+            // Buat record Refund jika ada sisa dana hold
             if ($refundAmount > 0) {
                 Refund::updateOrCreate(
                     ['id_payment' => $payment->id_payment],
@@ -351,152 +317,256 @@ class ChargingSessionController extends Controller
 
             return $session->fresh(['charger.location', 'vehicle', 'tarif', 'payment.method', 'payment.refund']);
         });
+
+        return response()->json([
+            'message' => 'Sesi charging selesai. Invoice berhasil diterbitkan.',
+            'data' => $this->presentInvoice($finishedSession),
+        ]);
     }
 
-    private function actualEnergy(ChargingSession $session, array $data, string $finalStatus): float
+    // ------------------------------------------------------------------
+    // Helper Methods & Presenters
+    // ------------------------------------------------------------------
+
+    private function calculateActualCost(float $kwh, $tarif): int
     {
-        if (array_key_exists('energi_kwh', $data) && $data['energi_kwh'] !== null) {
-            return round((float) $data['energi_kwh'], 2);
-        }
+        $hargaPerKwh = (int) $tarif->harga_per_kwh;
+        $biayaMinimum = (int) ($tarif->biaya_minimum ?? 0);
+        $biayaCharging = max((int) round($kwh * $hargaPerKwh), $biayaMinimum);
+        $biayaParkir = (int) $tarif->biaya_parkir_pjam;
 
-        if ($finalStatus === 'gagal') {
-            return max(0, round(((float) $session->target_energi_kwh) * 0.32, 2));
-        }
-
-        if ($finalStatus === 'dibatalkan') {
-            return max(0, round(((float) $session->target_energi_kwh) * 0.18, 2));
-        }
-
-        return max(1, round(((float) $session->target_energi_kwh) * 0.72, 2));
+        return $biayaCharging + $biayaParkir;
     }
 
-    private function estimateCost(float $targetKwh, Tarif $tarif): int
+    private function checkStartable(User $user, array $data): array|JsonResponse
     {
-        return (int) round($targetKwh * $tarif->harga_per_kwh + $tarif->biaya_parkir_pjam);
+        if ($this->activeSessionOf($user->id_user)) {
+            return $this->fail('Anda masih memiliki sesi charging yang berlangsung.', 409);
+        }
+
+        $vehicle = $user->vehicles()->find($data['id_vehicle']);
+        if (! $vehicle) {
+            return $this->fail('Kendaraan tidak ditemukan.', 422);
+        }
+
+        $charger = Charger::with('location.tarif')->find($data['id_charger']);
+        if (! $charger || ! $charger->location) {
+            return $this->fail('Port charger tidak ditemukan.', 404);
+        }
+        $location = $charger->location;
+
+        if ($location->status !== 'aktif') {
+            return $this->fail('Station sedang tidak beroperasi.', 422);
+        }
+
+        $jarakM = $this->distanceMeters(
+            (float) $data['latitude'], (float) $data['longitude'],
+            (float) $location->latitude, (float) $location->longitude
+        );
+        $radius = config('charging.arrival_radius_m', 50);
+        if (config('charging.require_arrival', false) && $jarakM > $radius) {
+            return response()->json([
+                'message' => 'Anda belum sampai di station.',
+                'jarak_m' => (int) round($jarakM),
+            ], 422);
+        }
+
+        if ($charger->tipe_konektor !== $vehicle->tipe_konektor) {
+            return $this->fail('Konektor port tidak cocok dengan kendaraan Anda.', 422);
+        }
+
+        if ($charger->status !== 'tersedia') {
+            return $this->portTaken();
+        }
+
+        $tarif = $location->activeTarif();
+        if (! $tarif) {
+            return $this->fail('Tarif belum tersedia untuk station ini.', 422);
+        }
+
+        return ['vehicle' => $vehicle, 'charger' => $charger, 'location' => $location, 'tarif' => $tarif];
     }
 
-    private function presentValidation(Charger $charger, Vehicle $vehicle, Tarif $tarif, float $targetKwh): array
+    private function calculateEstimate(Charger $charger, $tarif, float $kwh): array
     {
+        $kwh = round($kwh, 2);
+        $daya = max(1, (int) $charger->daya_kwh);
+        $durasiMenit = (int) ceil($kwh / $daya * 60);
+
+        $hargaPerKwh = (int) $tarif->harga_per_kwh;
+        $biayaMinimum = (int) ($tarif->biaya_minimum ?? 0);
+        $biayaCharging = max((int) round($kwh * $hargaPerKwh), $biayaMinimum);
+
+        $jamParkir = max(1, (int) ceil($durasiMenit / 60));
+        $parkirPerJam = (int) $tarif->biaya_parkir_pjam;
+        $biayaParkir = $jamParkir * $parkirPerJam;
+
         return [
-            'station' => [
-                'id_location' => $charger->location->id_location,
-                'nama_lokasi' => $charger->location->nama_lokasi,
-                'alamat' => $charger->location->alamat,
-            ],
-            'charger' => $this->presentCharger($charger),
-            'vehicle' => [
-                'id_vehicle' => $vehicle->id_vehicle,
-                'nama' => "{$vehicle->merek} {$vehicle->model}",
-                'nomor_polisi' => $vehicle->nomor_polisi,
-                'tipe_konektor' => self::CONNECTOR_LABELS[$vehicle->tipe_konektor] ?? $vehicle->tipe_konektor,
-            ],
-            'estimasi' => [
-                'target_kwh' => $targetKwh,
-                'tarif_per_kwh' => $tarif->harga_per_kwh,
-                'biaya_parkir' => $tarif->biaya_parkir_pjam,
-                'total' => $this->estimateCost($targetKwh, $tarif),
-            ],
+            'target_kwh' => $kwh,
+            'daya_kw' => $daya,
+            'durasi_menit' => $durasiMenit,
+            'biaya_charging' => $biayaCharging,
+            'biaya_parkir' => $biayaParkir,
+            'total' => $biayaCharging + $biayaParkir,
         ];
     }
 
-    private function presentSession(ChargingSession $session): array
+    private function batteryCapacity(Vehicle $vehicle): array
     {
+        $own = (float) ($vehicle->kapasitas_baterai_kwh ?? 0);
+        return $own > 0 ? [$own, false] : [(float) config('charging.default_battery_kwh', 60), true];
+    }
+
+    private function maxTargetKwh(float $kapasitas, int $soc): float
+    {
+        return floor($kapasitas * (100 - $soc) / 100 * 2) / 2;
+    }
+
+    private function socAfter(float $kapasitas, int $soc, float $kwh): int
+    {
+        return (int) min(100, round($soc + $kwh / max(0.1, $kapasitas) * 100));
+    }
+
+    private function exceedsBattery(float $kwh, float $kapasitas, int $soc): ?JsonResponse
+    {
+        $max = $this->maxTargetKwh($kapasitas, $soc);
+        if ($kwh <= $max) {
+            return null;
+        }
+        return response()->json(['message' => "Jumlah energi melebihi kapasitas baterai. Maksimal {$max} kWh."], 422);
+    }
+
+    private function walletOf(User $user): Dompet
+    {
+        return Dompet::firstOrCreate(['id_user' => $user->id_user], ['saldo' => 0, 'status_dompet' => 'aktif']);
+    }
+
+    private function walletSummary(Dompet $wallet, int $total): array
+    {
+        $tersedia = $wallet->saldoTersedia();
+        return ['saldo_tersedia' => $tersedia, 'saldo_cukup' => $tersedia >= $total, 'kekurangan' => max(0, $total - $tersedia)];
+    }
+
+    private function insufficient(Dompet $wallet, int $total): JsonResponse
+    {
+        return response()->json(['message' => 'Saldo dompet tidak cukup.'], 422);
+    }
+
+    private function portTaken(): JsonResponse
+    {
+        return response()->json(['message' => 'Port sedang tidak tersedia.'], 409);
+    }
+
+    private function activeSessionOf(string $idUser): ?ChargingSession
+    {
+        return ChargingSession::with(['charger.location', 'tarif', 'vehicle'])
+            ->where('id_user', $idUser)
+            ->whereIn('status', ChargingSession::AKTIF)
+            ->latest('waktu_mulai')
+            ->first();
+    }
+
+    private function present(ChargingSession $s): array
+    {
+        $charger = $s->charger;
+        $location = $charger?->location;
+        $sim = $this->simulate($s);
+
         return [
-            'id_session' => $session->id_session,
-            'id_location' => $session->charger->location->id_location,
-            'nama_lokasi' => $session->charger->location->nama_lokasi,
-            'kode_charger' => $session->charger->kode_perangkat,
-            'status' => 'Charging',
-            'energi_kwh' => (float) $session->total_energi_kwh,
-            'target_kwh' => (float) $session->target_energi_kwh,
-            'tarif_per_kwh' => $session->tarif->harga_per_kwh,
-            'biaya_parkir' => $session->tarif->biaya_parkir_pjam,
-            'jumlah_hold' => $session->jumlah_hold,
-            'waktu_mulai' => $session->waktu_mulai?->getTimestampMs(),
-            'id_payment' => $session->payment?->id_payment,
-            'status_pembayaran' => $session->payment?->status_pembayaran,
+            'id_session' => $s->id_session,
+            'nama_lokasi' => $location?->nama_lokasi,
+            'kode_charger' => $charger?->kode_perangkat,
+            'status' => $s->status,
+            'energi_kwh' => $sim['energi_kwh'],
+            'soc_sekarang' => $sim['soc_sekarang'],
+            'durasi_detik' => $sim['durasi_detik'],
+            'sudah_penuh' => $sim['selesai'],
+            'target_energi_kwh' => (float) $s->target_energi_kwh,
+            'saldo_hold' => (int) ($s->jumlah_hold ?? $s->saldo_hold),
         ];
     }
 
     private function presentInvoice(ChargingSession $session): array
     {
-        $actualCost = $this->estimateCost((float) $session->total_energi_kwh, $session->tarif);
-        $actualCost = min($session->jumlah_hold, $actualCost);
-        $chargingCost = (int) round((float) $session->total_energi_kwh * $session->tarif->harga_per_kwh);
+        $hold = (int) ($session->jumlah_hold ?? $session->saldo_hold);
+        $actualCost = $this->calculateActualCost((float) $session->total_energi_kwh, $session->tarif);
+        $actualCost = min($hold, $actualCost);
 
         return [
             'id_session' => $session->id_session,
             'nama_lokasi' => $session->charger->location->nama_lokasi,
-            'alamat' => $session->charger->location->alamat,
-            'kode_charger' => $session->charger->kode_perangkat,
-            'kendaraan' => [
-                'nama' => "{$session->vehicle->merek} {$session->vehicle->model}",
-                'nomor_polisi' => $session->vehicle->nomor_polisi,
-                'tipe_konektor' => self::CONNECTOR_LABELS[$session->vehicle->tipe_konektor] ?? $session->vehicle->tipe_konektor,
-            ],
             'energi_kwh' => (float) $session->total_energi_kwh,
-            'tarif_per_kwh' => $session->tarif->harga_per_kwh,
-            'biaya_charging' => $chargingCost,
-            'biaya_parkir' => $session->tarif->biaya_parkir_pjam,
             'biaya_aktual' => $actualCost,
-            'jumlah_hold' => $session->jumlah_hold,
-            'selisih_dikembalikan' => max(0, $session->jumlah_hold - $actualCost),
-            'id_payment' => $session->payment?->id_payment,
-            'metode_pembayaran' => $session->payment?->method?->nama_metode,
+            'jumlah_hold' => $hold,
+            'selisih_dikembalikan' => max(0, $hold - $actualCost),
             'status_pembayaran' => $session->payment?->status_pembayaran,
             'referensi_gateway' => $session->payment?->referensi_gateway,
-            'refund' => $session->payment?->refund ? [
-                'nominal' => $session->payment->refund->nominal,
-                'status' => $session->payment->refund->status_refund,
-                'waktu_execute' => $session->payment->refund->waktu_execute?->toISOString(),
-            ] : null,
-            'status' => $this->sessionStatusLabel($session->status),
-            'waktu_mulai' => $session->waktu_mulai?->toISOString(),
-            'waktu_selesai' => $session->waktu_selesai?->toISOString(),
+            'status' => $session->status,
         ];
     }
 
     private function presentTransactionSummary(ChargingSession $session): array
     {
+        $hold = (int) ($session->jumlah_hold ?? $session->saldo_hold);
         $total = $session->status === 'selesai'
-            ? min($session->jumlah_hold, $this->estimateCost((float) $session->total_energi_kwh, $session->tarif))
-            : $session->jumlah_hold;
+            ? min($hold, $this->calculateActualCost((float) $session->total_energi_kwh, $session->tarif))
+            : $hold;
 
         return [
             'id_session' => $session->id_session,
             'nama_lokasi' => $session->charger->location->nama_lokasi,
-            'kode_charger' => $session->charger->kode_perangkat,
             'tanggal' => $session->waktu_mulai?->timezone('Asia/Jakarta')->translatedFormat('d M Y, H:i'),
             'energi_kwh' => (float) $session->total_energi_kwh,
             'total' => $total,
-            'status' => $this->sessionStatusLabel($session->status),
-            'id_payment' => $session->payment?->id_payment,
-            'status_pembayaran' => $session->payment?->status_pembayaran,
+            'status' => $session->status,
         ];
     }
 
-    private function sessionStatusLabel(string $status): string
+    private function simulate(ChargingSession $s): array
     {
-        return match ($status) {
-            'pending' => 'Estimasi',
-            'berlangsung' => 'Berjalan',
-            'selesai' => 'Selesai',
-            'dibatalkan' => 'Dibatalkan',
-            'gagal' => 'Gagal',
-            default => ucfirst($status),
-        };
-    }
+        $target = (float) ($s->target_energi_kwh ?? 0);
+        $daya = max(1, (int) ($s->charger?->daya_kwh ?? 1));
+        $speed = max(0.1, (float) config('charging.simulation_speed', 1));
 
-    private function presentCharger(Charger $charger): array
-    {
+        if ($s->status === 'selesai') {
+            return [
+                'energi_kwh' => round((float) $s->total_energi_kwh, 2),
+                'soc_sekarang' => (int) ($s->soc_akhir ?? $s->soc_awal),
+                'durasi_detik' => $s->waktu_selesai && $s->waktu_mulai ? (int) $s->waktu_mulai->diffInSeconds($s->waktu_selesai, true) : 0,
+                'selesai' => true,
+                'kecepatan' => $speed,
+            ];
+        }
+
+        $realSec = max(0, $s->waktu_mulai ? $s->waktu_mulai->diffInSeconds(now(), true) : 0);
+        $simSec = $realSec * $speed;
+        $energi = min($target, $daya * $simSec / 3600);
+        $selesai = $target > 0 && $energi >= $target;
+
+        $kapasitas = $s->vehicle ? $this->batteryCapacity($s->vehicle)[0] : 60;
+        $soc = $this->socAfter($kapasitas, (int) $s->soc_awal, $energi);
+
         return [
-            'id_charger' => $charger->id_charger,
-            'kode_perangkat' => $charger->kode_perangkat,
-            'tipe_konektor' => self::CONNECTOR_LABELS[$charger->tipe_konektor] ?? $charger->tipe_konektor,
-            'daya_kw' => $charger->daya_kwh,
-            'tipe_charging' => $charger->tipe_charging,
-            'status' => $charger->status_mesin,
+            'energi_kwh' => round($energi, 2),
+            'soc_sekarang' => $soc,
+            'durasi_detik' => $selesai ? (int) ceil($target / $daya * 3600) : (int) $simSec,
+            'selesai' => $selesai,
+            'kecepatan' => $speed,
         ];
+    }
+
+    private function fail(string $message, int $status): JsonResponse
+    {
+        return response()->json(['message' => $message], $status);
+    }
+
+    private function distanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $rad = fn (float $d) => deg2rad($d);
+        $dLat = $rad($lat2 - $lat1);
+        $dLng = $rad($lng2 - $lng1);
+        $h = sin($dLat / 2) ** 2 + cos($rad($lat1)) * cos($rad($lat2)) * sin($dLng / 2) ** 2;
+        return 2 * 6371000 * asin(min(1, sqrt($h)));
     }
 
     private function paymentMethod(string $name): MetodePembayaran

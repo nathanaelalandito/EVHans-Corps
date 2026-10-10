@@ -6,6 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+<<<<<<< HEAD
+=======
+use App\Models\UserProfile;
+ use App\Models\Vehicle;
+ use App\Models\ChargingSession;
+ use App\Models\ErrorLog;
+ use App\Models\StationOperator;
+>>>>>>> driver-sesicharging
 
 class User extends Authenticatable
 {
@@ -43,5 +51,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(ErrorLog::class, 'id_user', 'id_user');
     }
+    public function stationoperator()
+    {
+        return $this->hasMany(StationOperator::class, 'id_user', 'id_user');
+    }
+
 
 }

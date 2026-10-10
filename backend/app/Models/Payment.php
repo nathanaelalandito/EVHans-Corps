@@ -14,6 +14,7 @@ class Payment extends Model
     protected $primaryKey = 'id_payment';
 
     protected $fillable = [
+<<<<<<< HEAD
         'id_session',
         'id_metode',
         'jenis_pembayaran',
@@ -21,6 +22,9 @@ class Payment extends Model
         'status_pembayaran',
         'waktu_pembayaran',
         'referensi_gateway',
+=======
+        'id_session', 'id_metode', 'total_bayar', 'status_pembayaran', 'waktu_pembayaran', 'referensi_gateway'
+>>>>>>> driver-sesicharging
     ];
 
     protected $casts = [
