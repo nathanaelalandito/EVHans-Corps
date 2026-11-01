@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
         ChargerSeeder::class,
         StationOpSeeder::class,
         PortSeeder::class,
+        TarifSeeder::class,
     ]);
     }
 

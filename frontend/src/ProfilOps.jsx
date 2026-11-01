@@ -17,7 +17,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
-export default function ProfilOps({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToOpsReport }) {
+export default function ProfilOps({ user, onLogout, setActiveMenu, onNavigateToOpsDash, onNavigateToCharger, onNavigateToOpsReport }) {
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -79,17 +79,16 @@ export default function ProfilOps({ user, onLogout, setActiveMenu, onNavigateToO
                         }}>
                             <FaTachometerAlt className="prf-menu-icon" /><span>Dashboard</span>
                         </li>
-                        <li className="prf-menu-item" onClick={() => setActiveMenu && setActiveMenu('charger')}>
+                        <li className="prf-menu-item" onClick={() => { setActiveMenu && setActiveMenu('charger');
+                            if (onNavigateToCharger) onNavigateToCharger();
+                        }}>
                             <FaChargingStation className="prf-menu-icon" /><span>Manage Charger</span>
-                        </li>
-                        <li className="prf-menu-item" onClick={() => setActiveMenu && setActiveMenu('port')}>
-                            <FaPlug className="prf-menu-icon" /><span>Manage Port</span>
                         </li>
                         <li className="prf-menu-item" onClick={() => {
                             setActiveMenu && setActiveMenu('report');
                             if (onNavigateToOpsReport) onNavigateToOpsReport();
                         }}>
-                            <FaFileAlt className="prf-menu-icon" /><span>Manage Report</span>
+                            <FaFileAlt className="prf-menu-icon" /><span>Transaction Report</span>
                         </li>
                         <li className="prf-menu-item active" onClick={() => setActiveMenu && setActiveMenu('profil')}>
                             <FaUser className="prf-menu-icon" /><span>Profil</span>

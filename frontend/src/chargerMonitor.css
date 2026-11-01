@@ -354,6 +354,14 @@
 .cm-btn.start { background: #059669; color: white; }
 .cm-btn.stop { background: #dc2626; color: white; }
 .cm-btn.reboot { background: #4b5563; color: white; }
+.cm-btn.detail {
+    background: #1b5e20;
+    color: #ffffff;
+}
+
+.cm-btn.detail:hover {
+    background: #2e7d32;
+}
 
 .cm-empty-state {
     grid-column: 1 / -1;

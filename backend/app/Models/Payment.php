@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\Refund;
 use App\Models\ChargingSession;
-use App\Models\metodePembayaran;
+use App\Models\MetodePembayaran;
 
 class Payment extends Model {
     protected $table = 'payment';

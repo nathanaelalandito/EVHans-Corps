@@ -5,94 +5,145 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\Charger;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class OperatorController extends Controller
 {
     /**
-     * 1. HALAMAN DASHBOARD: Ringkasan status stasiun, statistik port, dan error log aktif
+     * Helper untuk mengambil penugasan operator (mencegah duplikasi kode)
      */
+    private function getOperatorAssignment($user)
+    {
+        return DB::table('station_operators')
+            ->where('id_user', $user->id_user)
+            ->first();
+    }
+
+    /**
+     * 1. HALAMAN DASHBOARD
+     */
+
     public function getDashboard(Request $request)
     {
         $user = $request->user();
 
+        // Ambil penugasan operator (otomatis id_location = 2)
         $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
         if (!$assignment) {
-            return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
+            return response()->json(['message' => 'Akun operator belum ditugaskan ke stasiun manapun.'], 403);
         }
 
-        $location = DB::table('location')->where('id_location', $assignment->id_location)->first();
-        
-        // Ambil semua charger di lokasi ini
-        $chargers = DB::table('charger')->where('id_location', $location->id_location)->get();
-        
-        $totalChargers = $chargers->count();
-        $totalPorts = 0;
-        $portStats = [
-            'available' => 0,
-            'charging' => 0,
-            'reserved' => 0,
-            'out_of_order' => 0,
-        ];
+        $idLocation = $assignment->id_location;
 
-        foreach ($chargers as $charger) {
-            $ports = DB::table('ports')->where('id_charger', $charger->id_charger)->get();
-            $totalPorts += $ports->count();
-            
-            foreach ($ports as $port) {
-                $status = strtolower($port->status_port);
-                if (isset($portStats[$status])) {
-                    $portStats[$status]++;
-                }
+        // 1. STATISTIK CHARGER & PORT DARI DATABASE
+        $activeCharge = DB::table('charger')
+            ->where('id_location', $idLocation)
+            ->whereRaw('LOWER(status_mesin) = ?', ['active'])
+            ->count();
+
+        $portQuery = DB::table('ports')
+            ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
+            ->where('charger.id_location', $idLocation);
+
+        $availablePorts = (clone $portQuery)->whereRaw('LOWER(ports.status_port) = ?', ['available'])->count();
+        $activeCharging = (clone $portQuery)->whereRaw('LOWER(ports.status_port) = ?', ['charging'])->count();
+        $errorPorts     = (clone $portQuery)->whereIn(DB::raw('LOWER(ports.status_port)'), ['out of order', 'maintenance'])->count();
+
+        // 2. PENDAPATAN HARI INI REAL DARI TABEL TRANSAKSI (JIKA ADA)
+        $revenueToday = 0;
+        if (Schema::hasTable('transaksi')) {
+            $revenueToday = DB::table('transaksi')
+                ->where('id_location', $idLocation)
+                ->whereDate('created_at', Carbon::today())
+                ->sum('total_biaya') ?? 0;
+        }
+
+        // 3. LOG PERINGATAN KRITIS REAL DARI TABEL 'error_log'
+        $criticalAlerts = [];
+        if (Schema::hasTable('error_log')) {
+            $alerts = DB::table('error_log')
+                ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
+                ->where('charger.id_location', $idLocation)
+                ->where('error_log.status_tanganan', '!=', 'Selesai')
+                ->select('error_log.*', 'charger.kode_perangkat')
+                ->orderBy('error_log.created_at', 'desc')
+                ->limit(5)
+                ->get();
+
+            foreach ($alerts as $a) {
+                $criticalAlerts[] = [
+                    'id' => $a->id_log ?? $a->id,
+                    'portId' => 'charger',
+                    'message' => ($a->kode_perangkat ?? 'Mesin') . ': ' . ($a->deskripsi ?? 'Terdeteksi kendala operasional.'),
+                ];
             }
         }
 
-        // Error log yang belum selesai di lokasi ini
-        $errorLogs = DB::table('error_log')
-            ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
-            ->where('charger.id_location', $location->id_location)
-            ->where('error_log.status_tanganan', '!=', 'Selesai')
-            ->select('error_log.*', 'charger.kode_perangkat')
+        // 4. SESI PENGISIAN AKTIF (PORT YANG SEDANG STATUS CHARGING)
+        $chargingPorts = DB::table('ports')
+            ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
+            ->where('charger.id_location', $idLocation)
+            ->whereRaw('LOWER(ports.status_port) = ?', ['charging'])
+            ->select('ports.*', 'charger.kode_perangkat')
             ->get();
+
+            $activeSessions = [];
+            foreach ($chargingPorts as $cp) {
+                // Gunakan tipe_charging (fallback jika kosong)
+                $mode = $cp->tipe_charging ?? $cp->mode_daya ?? 'DC';
+                $power = $cp->daya_maks_kw ?? $cp->daya_maksimal ?? 50;
+    
+                $activeSessions[] = [
+                    'id'       => $cp->id_port,
+                    'port'     => $cp->kode_perangkat . ' - Port ' . ($cp->nomor_port ?? $cp->id_port),
+                    'type'     => ($cp->tipe_konektor ?? 'Konektor') . ' (' . $mode . ')',
+                    'user'     => 'Pengguna Aktif',
+                    'power'    => $power . ' kW',
+                    'duration' => 'Sedang Berjalan',
+                    'energy'   => '-',
+                ];
+            }
 
         return response()->json([
             'status' => 'success',
             'data' => [
-                'location' => $location,
-                'summary' => [
-                    'total_chargers' => $totalChargers,
-                    'total_ports' => $totalPorts,
-                    'port_stats' => $portStats,
+                'stats' => [
+                    'activeCharging'    => $activeCharging,
+                    'availablePorts'    => $availablePorts,
+                    'activeCharge'      => $activeCharge, // Sudah 1 tanda $
+                    'errorPorts'        => $errorPorts,
+                    'totalRevenueToday' => 'Rp ' . number_format($revenueToday, 0, ',', '.'),
                 ],
-                'active_error_logs' => $errorLogs,
+                'criticalAlerts' => $criticalAlerts,
+                'activeSessions' => $activeSessions,
             ]
         ]);
     }
-
     /**
-     * 2. HALAMAN MANAJEMEN CHARGER (Mesin Fisik): CRUD Data Mesin Charger
+     * 2. MANAJEMEN CHARGER
      */
     public function getChargers(Request $request)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
 
+        // Subquery count port agar tidak N+1
         $chargers = DB::table('charger')
             ->where('id_location', $assignment->id_location)
+            ->select('charger.*')
+            ->selectSub(function ($query) {
+                $query->from('ports')
+                    ->whereColumn('ports.id_charger', 'charger.id_charger')
+                    ->selectRaw('count(*)');
+            }, 'total_ports')
             ->get();
-
-        foreach ($chargers as $charger) {
-            $charger->total_ports = DB::table('ports')->where('id_charger', $charger->id_charger)->count();
-        }
 
         return response()->json([
             'status' => 'success',
-            'data' => $chargers
+            'data'   => $chargers
         ]);
     }
 
@@ -100,40 +151,36 @@ class OperatorController extends Controller
     {
         $request->validate([
             'kode_perangkat' => 'required|string|unique:charger,kode_perangkat|max:12',
-            'merek_model' => 'required|string|max:100',
-            'kap_tot_kw' => 'required|numeric',
-            'status_mesin' => 'sometimes|in:Active,Maintenance,Offline',
+            'merek_model'    => 'required|string|max:100',
+            'kap_tot_kw'     => 'required|numeric',
+            'status_mesin'   => 'sometimes|in:Active,Maintenance,Offline',
         ]);
 
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
 
         $chargerId = DB::table('charger')->insertGetId([
-            'id_location' => $assignment->id_location,
+            'id_location'    => $assignment->id_location,
             'kode_perangkat' => $request->kode_perangkat,
-            'merek_model' => $request->merek_model,
-            'kap_tot_kw' => $request->kap_tot_kw,
-            'status_mesin' => $request->input('status_mesin', 'Active'),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'merek_model'    => $request->merek_model,
+            'kap_tot_kw'     => $request->kap_tot_kw,
+            'status_mesin'   => $request->input('status_mesin', 'Active'),
+            'created_at'     => now(),
+            'updated_at'     => now(),
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Mesin charger berhasil ditambahkan.',
-            'data' => ['id_charger' => $chargerId]
+            'data'    => ['id_charger' => $chargerId]
         ], 201);
     }
 
     public function updateCharger(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -149,99 +196,100 @@ class OperatorController extends Controller
 
         $request->validate([
             'kode_perangkat' => 'sometimes|string|max:12|unique:charger,kode_perangkat,' . $id . ',id_charger',
-            'merek_model' => 'sometimes|string|max:100',
-            'kap_tot_kw' => 'sometimes|numeric',
-            'status_mesin' => 'sometimes|in:Active,Maintenance,Offline',
+            'merek_model'    => 'sometimes|string|max:100',
+            'kap_tot_kw'     => 'sometimes|numeric',
+            'status_mesin'   => 'sometimes|in:Active,Maintenance,Offline',
         ]);
 
         DB::table('charger')->where('id_charger', $id)->update([
             'kode_perangkat' => $request->input('kode_perangkat', $charger->kode_perangkat),
-            'merek_model' => $request->input('merek_model', $charger->merek_model),
-            'kap_tot_kw' => $request->input('kap_tot_kw', $charger->kap_tot_kw),
-            'status_mesin' => $request->input('status_mesin', $charger->status_mesin),
-            'updated_at' => now(),
+            'merek_model'    => $request->input('merek_model', $charger->merek_model),
+            'kap_tot_kw'     => $request->input('kap_tot_kw', $charger->kap_tot_kw),
+            'status_mesin'   => $request->input('status_mesin', $charger->status_mesin),
+            'updated_at'     => now(),
         ]);
 
         return response()->json(['status' => 'success', 'message' => 'Mesin charger berhasil diperbarui.']);
     }
+    public function getChargerDetail(Request $request, $id)
+{
+    $user = $request->user();
+    
+    // Ambil penugasan operator (otomatis dapat id_location = 2)
+    $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
+
+    // 1. Ambil data charger milik lokasi 2
+    $charger = DB::table('charger')
+        ->where('id_charger', $id)
+        ->where('id_location', $assignment->id_location) // id_location = 2
+        ->first();
+
+    if (!$charger) {
+        return response()->json(['message' => 'Charger tidak ditemukan'], 404);
+    }
+
+    // 2. Ambil tarif real lokasi 2 langsung dari tabel 'tarif'
+    $tarif = DB::table('tarif')
+        ->where('id_location', $assignment->id_location) // id_location = 2
+        ->latest('id_tarif')
+        ->first();
+
+    // 3. Ambil port yang terpasang pada charger ini
+    $ports = DB::table('ports')
+        ->where('id_charger', $id)
+        ->get();
+
+    // Dikirim ke frontend dalam satu paket
+    return response()->json([
+        'status' => 'success',
+        'data' => [
+            'charger' => $charger,
+            'tarif' => $tarif,   // <-- Data tarif lokasi 2 otomatis terbawa di sini
+            'ports' => $ports,
+        ]
+    ]);
+}
 
     public function startCharger(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
-        if (!$assignment) {
-            return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
-        }
-
-        $charger = DB::table('charger')
-            ->where('id_charger', $id)
-            ->where('id_location', $assignment->id_location)
-            ->first();
-
-        if (!$charger) {
-            return response()->json(['message' => 'Mesin charger tidak ditemukan atau di luar wilayah penugasan.'], 404);
-        }
-
-        DB::table('charger')->where('id_charger', $id)->update([
-            'status_mesin' => 'Active',
-            'updated_at' => now(),
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Mesin charger berhasil diaktifkan (Active).'
-        ]);
+        return $this->updateChargerStatus($request, $id, 'Active', 'Mesin charger berhasil diaktifkan (Active).');
     }
 
     public function stopCharger(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
+        return $this->updateChargerStatus($request, $id, 'Offline', 'Mesin charger berhasil dihentikan (Offline).');
+    }
 
+    public function rebootCharger(Request $request, $id)
+    {
+        return $this->updateChargerStatus($request, $id, 'Maintenance', 'Perangkat berhasil direboot dan dialihkan ke mode maintenance.');
+    }
+
+    private function updateChargerStatus(Request $request, $id, string $status, string $successMessage)
+    {
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
 
-        $charger = DB::table('charger')
+        $updated = DB::table('charger')
             ->where('id_charger', $id)
             ->where('id_location', $assignment->id_location)
-            ->first();
+            ->update([
+                'status_mesin' => $status,
+                'updated_at'   => now(),
+            ]);
 
-        if (!$charger) {
+        if (!$updated) {
             return response()->json(['message' => 'Mesin charger tidak ditemukan atau di luar wilayah penugasan.'], 404);
         }
 
-        DB::table('charger')->where('id_charger', $id)->update([
-            'status_mesin' => 'Offline',
-            'updated_at' => now(),
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Mesin charger berhasil dihentikan (Offline).'
-        ]);
-    }
-
-    public function rebootCharger($id)
-    {
-        $charger = Charger::findOrFail($id);
-        
-        $charger->update([
-            'status_mesin' => 'Maintenance'
-        ]);
-
-        return response()->json([
-            'message' => 'Perangkat berhasil direboot dan dialihkan ke mode maintenance/offline',
-            'data' => $charger
-        ]);
+        return response()->json(['status' => 'success', 'message' => $successMessage]);
     }
 
     public function destroyCharger(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -266,13 +314,11 @@ class OperatorController extends Controller
     }
 
     /**
-     * 3. HALAMAN MANAJEMEN PORT: CRUD Data Port / Nozzle Colokan & Kontrol Port
+     * 3. MANAJEMEN PORT
      */
     public function getPorts(Request $request)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -283,26 +329,21 @@ class OperatorController extends Controller
             ->select('ports.*', 'charger.kode_perangkat as nama_charger')
             ->get();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $ports
-        ]);
+        return response()->json(['status' => 'success', 'data' => $ports]);
     }
 
     public function storePort(Request $request)
     {
         $request->validate([
-            'id_charger' => 'required|exists:charger,id_charger',
-            'nomor_port' => 'required|string|max:50',
+            'id_charger'    => 'required|exists:charger,id_charger',
+            'nomor_port'    => 'required|string|max:50',
             'tipe_konektor' => 'required|string|max:50',
             'tipe_charging' => 'required|string|max:50',
-            'daya_maks_kw' => 'required|numeric',
-            'status_port' => 'sometimes|in:Available,Charging,Reserved,Out of Order',
+            'daya_maks_kw'  => 'required|numeric',
+            'status_port'   => 'sometimes|in:Available,Charging,Reserved,Out of Order',
         ]);
 
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -317,28 +358,26 @@ class OperatorController extends Controller
         }
 
         $portId = DB::table('ports')->insertGetId([
-            'id_charger' => $request->id_charger,
-            'nomor_port' => $request->nomor_port,
+            'id_charger'    => $request->id_charger,
+            'nomor_port'    => $request->nomor_port,
             'tipe_konektor' => $request->tipe_konektor,
             'tipe_charging' => $request->tipe_charging,
-            'daya_maks_kw' => $request->daya_maks_kw,
-            'status_port' => $request->input('status_port', 'Available'),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'daya_maks_kw'  => $request->daya_maks_kw,
+            'status_port'   => $request->input('status_port', 'Available'),
+            'created_at'    => now(),
+            'updated_at'    => now(),
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Port berhasil ditambahkan.',
-            'data' => ['id_port' => $portId]
+            'data'    => ['id_port' => $portId]
         ], 201);
     }
 
     public function updatePort(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -355,101 +394,43 @@ class OperatorController extends Controller
         }
 
         $request->validate([
-            'nomor_port' => 'sometimes|string|max:50',
+            'nomor_port'    => 'sometimes|string|max:50',
             'tipe_konektor' => 'sometimes|string|max:50',
             'tipe_charging' => 'sometimes|string|max:50',
-            'daya_maks_kw' => 'sometimes|numeric',
-            'status_port' => 'sometimes|in:Available,Charging,Reserved,Out of Order',
+            'daya_maks_kw'  => 'sometimes|numeric',
+            'status_port'   => 'sometimes|in:Available,Charging,Reserved,Out of Order',
         ]);
 
         DB::table('ports')->where('id_port', $id)->update([
-            'nomor_port' => $request->input('nomor_port', $port->nomor_port),
+            'nomor_port'    => $request->input('nomor_port', $port->nomor_port),
             'tipe_konektor' => $request->input('tipe_konektor', $port->tipe_konektor),
             'tipe_charging' => $request->input('tipe_charging', $port->tipe_charging),
-            'daya_maks_kw' => $request->input('daya_maks_kw', $port->daya_maks_kw),
-            'status_port' => $request->input('status_port', $port->status_port),
-            'updated_at' => now(),
+            'daya_maks_kw'  => $request->input('daya_maks_kw', $port->daya_maks_kw),
+            'status_port'   => $request->input('status_port', $port->status_port),
+            'updated_at'    => now(),
         ]);
 
         return response()->json(['status' => 'success', 'message' => 'Port berhasil diperbarui.']);
     }
 
-    /**
-     * Mengaktifkan Port (Tombol Start)
-     */
     public function startPort(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
-        if (!$assignment) {
-            return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
-        }
-
-        $port = DB::table('ports')
-            ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
-            ->where('ports.id_port', $id)
-            ->where('charger.id_location', $assignment->id_location)
-            ->select('ports.*')
-            ->first();
-
-        if (!$port) {
-            return response()->json(['message' => 'Port tidak ditemukan atau di luar wilayah penugasan.'], 404);
-        }
-
-        DB::table('ports')->where('id_port', $id)->update([
-            'status_port' => 'Available', // Atau status aktif pengisian sesuai alur bisnis Anda
-            'updated_at' => now(),
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Port berhasil diaktifkan (Available).'
-        ]);
+        return $this->updatePortStatus($request, $id, 'Available', 'Port berhasil diaktifkan (Available).');
     }
 
-    /**
-     * Mematikan Port (Tombol Stop)
-     */
     public function stopPort(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
-        if (!$assignment) {
-            return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
-        }
-
-        $port = DB::table('ports')
-            ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
-            ->where('ports.id_port', $id)
-            ->where('charger.id_location', $assignment->id_location)
-            ->select('ports.*')
-            ->first();
-
-        if (!$port) {
-            return response()->json(['message' => 'Port tidak ditemukan atau di luar wilayah penugasan.'], 404);
-        }
-
-        DB::table('ports')->where('id_port', $id)->update([
-            'status_port' => 'Out of Order',
-            'updated_at' => now(),
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Port berhasil dihentikan (Out of Order).'
-        ]);
+        return $this->updatePortStatus($request, $id, 'Out of Order', 'Port berhasil dihentikan (Out of Order).');
     }
 
-    /**
-     * Reboot Port
-     */
     public function rebootPort(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
+        return $this->updatePortStatus($request, $id, 'Out of Order', 'Port berhasil direboot.');
+    }
 
+    private function updatePortStatus(Request $request, $id, string $status, string $message)
+    {
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -458,7 +439,7 @@ class OperatorController extends Controller
             ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
             ->where('ports.id_port', $id)
             ->where('charger.id_location', $assignment->id_location)
-            ->select('ports.*')
+            ->select('ports.id_port')
             ->first();
 
         if (!$port) {
@@ -466,22 +447,16 @@ class OperatorController extends Controller
         }
 
         DB::table('ports')->where('id_port', $id)->update([
-            'status_port' => 'Out of Order',
-            'updated_at' => now(),
+            'status_port' => $status,
+            'updated_at'  => now(),
         ]);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Port berhasil direboot.',
-            'data' => DB::table('ports')->where('id_port', $id)->first()
-        ]);
+        return response()->json(['status' => 'success', 'message' => $message]);
     }
 
     public function destroyPort(Request $request, $id)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
@@ -503,51 +478,48 @@ class OperatorController extends Controller
     }
 
     /**
-     * 4. HALAMAN MANAJEMEN REPORT: Laporan / Histori Transaksi Sesi Pengisian
+     * 4. LAPORAN OPERASIONAL
      */
     public function getOperationalReports(Request $request)
     {
-        $user = $request->user();
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
-
+        $assignment = $this->getOperatorAssignment($request->user());
         if (!$assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
-
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
-        $status = $request->input('status');
 
         $query = DB::table('charging_session')
             ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
             ->where('charger.id_location', $assignment->id_location)
             ->select('charging_session.*', 'charger.kode_perangkat');
 
-        if ($startDate && $endDate) {
-            $query->whereBetween('charging_session.created_at', [$startDate, $endDate]);
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $start = Carbon::parse($request->start_date)->startOfDay();
+            $end = Carbon::parse($request->end_date)->endOfDay();
+            $query->whereBetween('charging_session.created_at', [$start, $end]);
         }
 
-        if ($status) {
-            $query->where('charging_session.status', $status);
+        if ($request->filled('status')) {
+            $query->where('charging_session.status', $request->status);
         }
 
-        $transactions = $query->orderBy('charging_session.created_at', 'desc')->get();
+        // Menggunakan paginate agar respons ringan
+        $transactions = $query->orderBy('charging_session.created_at', 'desc')->paginate(15);
 
         return response()->json([
             'status' => 'success',
-            'data' => $transactions
+            'data'   => $transactions
         ]);
     }
 
     /**
-     * 5. HALAMAN PROFIL: Informasi Profil Operator & Lokasi Penugasan
+     * 5. PROFIL OPERATOR
      */
     public function getProfile(Request $request)
     {
         $user = $request->user();
 
         $profile = DB::table('user_profile')->where('id_user', $user->id_user)->first();
-        
+
         $assignment = DB::table('station_operators')
             ->join('location', 'station_operators.id_location', '=', 'location.id_location')
             ->where('station_operators.id_user', $user->id_user)
@@ -557,8 +529,8 @@ class OperatorController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'user' => $user,
-                'profile' => $profile,
+                'user'       => $user,
+                'profile'    => $profile,
                 'assignment' => $assignment,
             ]
         ]);

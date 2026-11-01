@@ -6,15 +6,18 @@ import DriverDashboard from './DriverDashboard';
 import KelolaKendaraan from './KelolaKendaraan';
 import Bantuan from './Bantuan';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
-import OperatorDashboard from './OpsDashboard'; // Perhatikan ejaannya
+import OperatorDashboard from './OpsDashboard';
 import ChargerMonitor from './ChargerMonitor';
 import OpsReport from './OpsReport';
-import PortMonitor from './PortMonitor';
 import ProfilOps from './ProfilOps';
+import ChargerDetail from './ChargerDetail';
 
 export default function App() {
-    // Kalau sudah ada token tersimpan (login sebelumnya), langsung ke dashboard.
     const [user, setUser] = useState(getStoredUser);
+    
+    // 1. STATE UNTUK MENYIMPAN DATA CHARGER YANG DIPILIH
+    const [selectedCharger, setSelectedCharger] = useState(null);
+
     const [currentPage, setCurrentPage] = useState(() => {
         if (!getStoredToken()) return 'welcome';
         
@@ -27,14 +30,13 @@ export default function App() {
         } else if (peran === 'operator' || email.endsWith('@ops.ac.id')) {
             return 'operator-dashboard';
         } else {
-            return 'dashboard'; // Default ke driver dashboard
+            return 'dashboard';
         }
     });
 
     const handleLoginSuccess = (userData) => {
         setUser(userData);
     
-        // Cek peran dari backend atau dari ekstensi email
         const email = userData.email || '';
         const peran = userData.peran || '';
     
@@ -43,12 +45,12 @@ export default function App() {
         } else if (peran === 'operator' || email.endsWith('@ops.ac.id')) {
             setCurrentPage('operator-dashboard');
         } else {
-            setCurrentPage('dashboard'); // Driver dashboard default
+            setCurrentPage('dashboard');
         }
     };
 
     const handleLogout = async () => {
-        await logout().catch(() => {}); // tetap keluar meski request logout gagal
+        await logout().catch(() => {});
         setUser(null);
         setCurrentPage('welcome');
     };
@@ -87,29 +89,38 @@ export default function App() {
             {currentPage === 'help' && (
                 <Bantuan onBack={() => setCurrentPage('dashboard')} />
             )}
-            {currentPage == 'operator-dashboard' && (
+            {currentPage === 'operator-dashboard' && (
                 <OperatorDashboard 
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToCharger={() => setCurrentPage('charger')}
-                    onNavigateToPort={() => setCurrentPage('port')}
                     onNavigateToOpsReport={() => setCurrentPage('ops-report')}
                     onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
             )}
-            {currentPage == 'charger' &&(
+
+            {/* HALAMAN MANAGE CHARGER (GRID) */}
+            {currentPage === 'charger' && (
                 <ChargerMonitor
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
-                    onNavigateToPort={() => setCurrentPage('port')}
                     onNavigateToOpsReport={() => setCurrentPage('ops-report')}
                     onNavigateToOpsProfil={() => setCurrentPage('profil')}
+                    // KIRIM FUNGSI UNTUK PINDAH KE DETAIL CHARGER:
+                    onNavigateToDetail={(charger) => {
+                        setSelectedCharger(charger);
+                        setCurrentPage('chargerdetail');
+                    }}
                 />
             )}
-            {currentPage == 'port' &&(
-                <PortMonitor
+
+            {/* HALAMAN DETAIL CHARGER BESERTA TARIF & PORT */}
+            {currentPage === 'chargerdetail' && (
+                <ChargerDetail
                     user={user}
+                    charger={selectedCharger}
+                    onBack={() => setCurrentPage('charger')}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
                     onNavigateToCharger={() => setCurrentPage('charger')}
@@ -117,27 +128,26 @@ export default function App() {
                     onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
             )}
-            {currentPage == 'ops-report' &&(
+
+            {currentPage === 'ops-report' && (
                 <OpsReport
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
                     onNavigateToCharger={() => setCurrentPage('charger')}
-                    onNavigateToPort={() => setCurrentPage('port')}
                     onNavigateToOpsProfil={() => setCurrentPage('profil')}
                 />
             )}
-            {currentPage == 'profil' && (
+            {currentPage === 'profil' && (
                 <ProfilOps
                     user={user}
                     onLogout={handleLogout}
                     onNavigateToOpsDash={() => setCurrentPage('operator-dashboard')}
                     onNavigateToCharger={() => setCurrentPage('charger')}
-                    onNavigateToPort={() => setCurrentPage('port')}
                     onNavigateToOpsReport={() => setCurrentPage('ops-report')}
                 />
             )}
-            {currentPage == 'admin-dashboard' && (
+            {currentPage === 'admin-dashboard' && (
                 <AdminDaashboard onLoginSuccess={handleLoginSuccess} />
             )}
         </div>

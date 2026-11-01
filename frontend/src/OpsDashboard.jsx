@@ -4,6 +4,8 @@ import {
     FaFileAlt, FaUser, FaSignOutAlt, FaBolt, FaCheckCircle, 
     FaExclamationTriangle, FaDollarSign, FaSyncAlt, FaPowerOff, FaStop, FaChartLine, FaExclamationCircle
 } from 'react-icons/fa';
+import axios from 'axios'; // <-- Tambahkan import axios
+import { getStoredToken } from './api/auth'; // <-- Tambahkan import token auth
 import './opsDashboard.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
@@ -17,9 +19,10 @@ function getGreeting() {
 
 export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNavigateToCharger, 
     onNavigateToPort, onNavigateToOpsReport, onNavigateToOpsProfil}) {
+    
     const [stats, setStats] = useState({
         activeCharging: 0,
-        availablePorts: 0,
+        activeCharge: 0,
         errorPorts: 0,
         totalRevenueToday: 'Rp 0'
     });
@@ -34,31 +37,28 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
 
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
+    // AMBIL DATA REAL DARI DATABASE
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            // TODO: Ganti dengan pemanggilan API ke backend Laravel Anda (Axios / Fetch)
-            // const res = await axios.get('/api/dashboard/summary');
-            
-            // Simulasi data dari database
-            setStats({
-                activeCharging: 4,
-                availablePorts: 8,
-                errorPorts: 2,
-                totalRevenueToday: 'Rp 2.150.000'
+            const token = getStoredToken();
+            const res = await axios.get('http://127.0.0.1:8000/api/operator/dashboard', {
+                headers: { Authorization: `Bearer ${token}` }
             });
 
-            setCriticalAlerts([
-                { id: 1, portId: 'ports', message: 'Port 03: Suhu Tinggi 75°C terdeteksi pada modul DC.' },
-                { id: 2, portId: 'ports', message: 'Port 05: Koneksi OCPP server terputus sementara.' }
-            ]);
-
-            setActiveSessions([
-                { id: 1, port: 'Port SPKLU 01', type: 'CCS2 (DC)', user: 'B 1234 XYZ', power: '45 kW', duration: '35 mnt', energy: '26.4 kWh' },
-                { id: 2, port: 'Port SPKLU 04', type: 'AC Type 2', user: 'H 5678 AB', power: '22 kW', duration: '12 mnt', energy: '4.2 kWh' },
-            ]);
+            if (res.data?.data) {
+                // Pasang data real ke state
+                setStats(res.data.data.stats || {
+                    activeCharging: 0,
+                    availablePorts: 0,
+                    errorPorts: 0,
+                    totalRevenueToday: 'Rp 0'
+                });
+                setCriticalAlerts(res.data.data.criticalAlerts || []);
+                setActiveSessions(res.data.data.activeSessions || []);
+            }
         } catch (error) {
-            console.error("Gagal memuat data dari database:", error);
+            console.error("Gagal memuat data real dashboard:", error);
         } finally {
             setLoading(false);
         }
@@ -68,14 +68,23 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
         fetchDashboardData();
     }, []);
 
-    const handleRemoteAction = async (actionType, portName) => {
+    // Remote Control Port dari Dashboard
+    const handleRemoteAction = async (actionType, portId, portName) => {
         if (window.confirm(`Konfirmasi: Kirim perintah ${actionType} untuk ${portName}?`)) {
             try {
-                // TODO: Hubungkan ke endpoint Laravel Controller (contoh: POST /api/chargers/remote)
-                alert(`Perintah ${actionType} berhasil dikirim ke ${portName}`);
+                const token = getStoredToken();
+                const headers = { Authorization: `Bearer ${token}` };
+                
+                if (actionType === 'STOP') {
+                    await axios.post(`http://127.0.0.1:8000/api/operator/port/${portId}/stop`, {}, { headers });
+                } else if (actionType === 'REBOOT') {
+                    await axios.post(`http://127.0.0.1:8000/api/operator/port/${portId}/reboot`, {}, { headers });
+                }
+
+                alert(`Perintah ${actionType} berhasil dikirim.`);
                 fetchDashboardData();
             } catch (err) {
-                alert(`Gagal mengeksekusi perintah: ${err.message}`);
+                alert(`Gagal mengeksekusi perintah: ${err.response?.data?.message || err.message}`);
             }
         }
     };
@@ -97,9 +106,9 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                 <div className="op-header-right">
                     <button className="op-icon-btn" title="Notifikasi">
                         <FaBell />
-                        <span className="op-badge">2</span>
+                        <span className="op-badge">{criticalAlerts.length}</span>
                     </button>
-                    <button className="op-icon-btn" title="Pengaturan Akun" onClick={() => setActiveMenu && setActiveMenu('profils')}>
+                    <button className="op-icon-btn" title="Pengaturan Akun" onClick={() => onNavigateToOpsProfil && onNavigateToOpsProfil()}>
                         <FaCog />
                     </button>
                 </div>
@@ -111,31 +120,19 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                 {/* --- SIDEBAR --- */}
                 <aside className="op-sidebar">
                     <ul className="op-menu-list">
-                        <li className="op-menu-item active" onClick={() => setActiveMenu && setActiveMenu('dashboard')}>
+                        <li className="op-menu-item active">
                             <FaTachometerAlt className="op-menu-icon" />
                             <span>Dashboard</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('charger'); 
-                            if (onNavigateToCharger) onNavigateToCharger(); 
-                        }}>
+                        <li className="op-menu-item" onClick={onNavigateToCharger}>
                             <FaChargingStation className="op-menu-icon" />
                             <span>Manage Charger</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('ports');
-                            if(onNavigateToPort) onNavigateToPort();
-                        }}>
-                            <FaPlug className="op-menu-icon" />
-                            <span>Manage port</span>
-                        </li>
-                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('reports');
-                            if(onNavigateToOpsReport) onNavigateToOpsReport();
-                        }}>
+                        <li className="op-menu-item" onClick={onNavigateToOpsReport}>
                             <FaFileAlt className="op-menu-icon" />
-                            <span>Manage Report</span>
+                            <span>Transaction Report</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('profils');
-                            if (onNavigateToOpsProfil) onNavigateToOpsProfil();
-                        }}>
+                        <li className="op-menu-item" onClick={onNavigateToOpsProfil}>
                             <FaUser className="op-menu-icon" />
                             <span>Profil</span>
                         </li>
@@ -163,7 +160,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                             </button>
                         </div>
 
-                        {/* 1. WIDGET "QUICK ALERT / LIVE TICKER" */}
+                        {/* 1. WIDGET "QUICK ALERT / LIVE TICKER" (DARI TABEL ERROR_LOG) */}
                         {criticalAlerts.length > 0 && (
                             <div className="op-alert-ticker">
                                 <FaExclamationCircle className="op-alert-icon-left" />
@@ -173,16 +170,16 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                                         <span 
                                             key={alert.id} 
                                             className="op-alert-link"
-                                            onClick={() => setActiveMenu && setActiveMenu(alert.portId)}
+                                            onClick={onNavigateToCharger}
                                         >
-                                            {alert.message} (Klik untuk periksa port &rarr;)
+                                            {alert.message} (Klik untuk periksa unit &rarr;)
                                         </span>
                                     ))}
                                 </div>
                             </div>
                         )}
 
-                        {/* Kartu Statistik Ringkas */}
+                        {/* KARTU STATISTIK RINGKAS (DATA REAL) */}
                         <div className="op-stats-grid">
                             <div className="op-stat-card">
                                 <div className="op-stat-icon bolt"><FaBolt /></div>
@@ -195,8 +192,8 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                             <div className="op-stat-card">
                                 <div className="op-stat-icon check"><FaCheckCircle /></div>
                                 <div className="op-stat-info">
-                                    <p>Port Tersedia</p>
-                                    <h3>{stats.availablePorts} Port</h3>
+                                    <p>Unit Aktif</p>
+                                    <h3>{stats.activeCharge} Unit</h3>
                                 </div>
                             </div>
 
@@ -204,7 +201,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                                 <div className="op-stat-icon warning"><FaExclamationTriangle /></div>
                                 <div className="op-stat-info">
                                     <p>Port Bermasalah (Fault)</p>
-                                    <h3>{stats.errorPorts} Port</h3>
+                                    <h3>{stats.errorPorts} Unit</h3>
                                 </div>
                             </div>
 
@@ -217,16 +214,14 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                             </div>
                         </div>
 
-                        {/* 2 & 3. BAGIAN ANALITIK: GRAFIK UTILITAS & TREN KEBERHASILAN SESI */}
+                        {/* 2 & 3. BAGIAN ANALITIK: GRAFIK UTILITAS & TREN KEBERHASILAN */}
                         <div className="op-analytics-grid">
-                            
-                            {/* Grafik Jam Sibuk (Peak Hours) */}
                             <div className="op-table-card op-chart-box">
                                 <div className="op-chart-header">
                                     <h3>Utilitas Jam Sibuk (Peak Hours)</h3>
                                     <FaChartLine className="op-chart-icon-title" />
                                 </div>
-                                <p className="op-chart-desc">Estimasi kepadatan stasiun berdasarkan data mingguan operasional.</p>
+                                <p className="op-chart-desc">Estimasi kepadatan stasiun berdasarkan data operasional.</p>
                                 <div className="op-bar-chart-container">
                                     <div className="op-bars-wrapper">
                                         <div className="op-bar-item"><div className="op-bar bar-low" style={{ height: '50px' }}></div><span className="op-bar-label">08:00</span></div>
@@ -235,42 +230,48 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                                         <div className="op-bar-item"><div className="op-bar bar-peak" style={{ height: '125px' }} title="Puncak Tertinggi"></div><span className="op-bar-label bold">18:00</span></div>
                                         <div className="op-bar-item"><div className="op-bar bar-low" style={{ height: '35px' }}></div><span className="op-bar-label">21:00</span></div>
                                     </div>
-                                    <span className="op-chart-footer-note">⚡ Puncak kepadatan tertinggi terjadi pada pukul 12:00 & 18:00 WIB.</span>
+                                    <span className="op-chart-footer-note">⚡ Puncak kepadatan stasiun terjadi pada pukul 12:00 & 18:00 WIB.</span>
                                 </div>
                             </div>
 
-                            {/* Tren Success Rate Sesi Hari Ini */}
                             <div className="op-table-card op-chart-box">
                                 <div className="op-chart-header">
-                                    <h3>Success Rate</h3>
-                                    <span className="op-success-pill">95.2% Berhasil</span>
+                                    <h3>Status Performa Port</h3>
+                                    <span className="op-success-pill">
+                                        {stats.availablePorts + stats.activeCharging > 0 
+                                            ? `${Math.round(((stats.availablePorts + stats.activeCharging) / (stats.availablePorts + stats.activeCharging + stats.errorPorts || 1)) * 100)}% Operasional`
+                                            : '100% Siap'}
+                                    </span>
                                 </div>
-                                <p className="op-chart-desc">Perbandingan sesi sukses vs gagal hari ini.</p>
+                                <p className="op-chart-desc">Rasio kesiapan port nozzle pengisian hari ini.</p>
                                 <div className="op-progress-container">
                                     <div className="op-progress-row">
                                         <div className="op-progress-info">
-                                            <span>Berhasil (Success)</span>
-                                            <span className="text-success">40 Sesi</span>
+                                            <span>Siap / Digunakan</span>
+                                            <span className="text-success">{stats.availablePorts + stats.activeCharging} Port</span>
                                         </div>
                                         <div className="op-progress-track">
-                                            <div className="op-progress-fill success" style={{ width: '95%' }}></div>
+                                            <div className="op-progress-fill success" style={{ 
+                                                width: `${Math.round(((stats.availablePorts + stats.activeCharging) / ((stats.availablePorts + stats.activeCharging + stats.errorPorts) || 1)) * 100)}%` 
+                                            }}></div>
                                         </div>
                                     </div>
                                     <div className="op-progress-row">
                                         <div className="op-progress-info">
-                                            <span>Gagal (Failed)</span>
-                                            <span className="text-danger">2 Sesi</span>
+                                            <span>Bermasalah / Maintenance</span>
+                                            <span className="text-danger">{stats.errorPorts} Port</span>
                                         </div>
                                         <div className="op-progress-track">
-                                            <div className="op-progress-fill danger" style={{ width: '5%' }}></div>
+                                            <div className="op-progress-fill danger" style={{ 
+                                                width: `${Math.round((stats.errorPorts / ((stats.availablePorts + stats.activeCharging + stats.errorPorts) || 1)) * 100)}%` 
+                                            }}></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
 
-                        {/* Sesi Pengisian Daya Aktif & Kontrol Cepat */}
+                        {/* SESI PENGISIAN DAYA AKTIF (DATA REAL DARI PORT CHARGING) */}
                         <div className="op-table-card">
                             <h3>Sesi Pengisian Daya Aktif (Live Database)</h3>
                             <div className="op-table-responsive">
@@ -302,14 +303,14 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                                                             <button 
                                                                 className="op-btn-remote stop"
                                                                 title="Remote Stop" 
-                                                                onClick={() => handleRemoteAction('STOP', session.port)}
+                                                                onClick={() => handleRemoteAction('STOP', session.id, session.port)}
                                                             >
                                                                 <FaStop size={12} />
                                                             </button>
                                                             <button 
-                                                                className="op-btn_remote reboot"
+                                                                className="op-btn-remote reboot"
                                                                 title="Remote Reboot Mesin" 
-                                                                onClick={() => handleRemoteAction('REBOOT', session.port)}
+                                                                onClick={() => handleRemoteAction('REBOOT', session.id, session.port)}
                                                             >
                                                                 <FaPowerOff size={12} />
                                                             </button>
@@ -320,7 +321,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
                                         ) : (
                                             <tr>
                                                 <td colSpan="6" className="op-empty-row">
-                                                    Tidak ada sesi pengisian aktif saat ini.
+                                                    Tidak ada sesi pengisian aktif saat ini di stasiun.
                                                 </td>
                                             </tr>
                                         )}

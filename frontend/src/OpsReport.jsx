@@ -17,7 +17,7 @@ function getGreeting() {
 }
 
 export default function OpsReport({ user, onLogout, setActiveMenu, onNavigateToOpsDash, 
-    onNavigateToCharger, onNavigateToPort, onNavigateToProfil}) {
+    onNavigateToCharger, onNavigateToProfil}) {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('');
@@ -108,17 +108,12 @@ export default function OpsReport({ user, onLogout, setActiveMenu, onNavigateToO
                             <FaChargingStation className="rep-menu-icon" />
                             <span>Manage Charger</span>
                         </li>
-                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('ports');
-                            if(onNavigateToPort) onNavigateToPort();
-                        }}>
-                            <FaPlug className="op-menu-icon" /><span>Manage port</span>
-                        </li>
                         <li className="rep-menu-item active" onClick={() => setActiveMenu && setActiveMenu('reports')}>
                             <FaFileAlt className="op-menu-icon" />
                             <span>Transaction Report</span>
                         </li>
                         <li className="rep-menu-item" onClick={() => {setActiveMenu && setActiveMenu('profils')
-                            if (onNavigateToOpsProfil) onNavigateToOpsProfil();
+                            if (onNavigateToProfil) onNavigateToProfil();
                         }}>
                             <FaUser className="rep-menu-icon" />
                             <span>Profil</span>

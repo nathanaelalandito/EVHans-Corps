@@ -7,6 +7,7 @@ import {
 import axios from 'axios';
 import { getStoredToken } from './api/auth';
 import './chargerMonitor.css';
+import ChargerDetail from './ChargerDetail';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
 function getGreeting() {
@@ -18,7 +19,7 @@ function getGreeting() {
 }
 
 export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNavigateToOpsDash, 
-    onNavigateToPort, onNavigateToOpsReport, onNavigateToOpsProfil}) {
+     onNavigateToOpsReport, onNavigateToOpsProfil, onNavigateToDetail}) {
     const [chargers, setChargers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -155,6 +156,7 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNaviga
             }
         }
     };
+    const [selectedCharger, setSelectedCharger] = useState(null);
 
     // Filter status berdasarkan status_mesin (Active, Maintenance, Offline)
     const filteredChargers = filterStatus === 'ALL' 
@@ -192,11 +194,6 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNaviga
                         }}><FaTachometerAlt className="cm-menu-icon" /><span>Dashboard</span></li>
                         <li className="cm-menu-item active" onClick={() => setActiveMenu && setActiveMenu('charger')}>
                             <FaChargingStation className="cm-menu-icon" /><span>Manage Charger</span></li>
-                        <li className="op-menu-item" onClick={() => { setActiveMenu && setActiveMenu('ports');
-                            if(onNavigateToPort) onNavigateToPort();
-                        }}>
-                            <FaPlug className="op-menu-icon" /><span>Manage port</span>
-                        </li>
                         <li className="cm-menu-item" onClick={() => {setActiveMenu && setActiveMenu('report')
                             if (onNavigateToOpsReport) onNavigateToOpsReport();
                         }}><FaFileAlt className="cm-menu-icon" /><span>Manage Report</span></li>
@@ -277,6 +274,7 @@ export default function ChargerMonitor({ user, onLogout, setActiveMenu, onNaviga
                                                     <button className="cm-btn start" onClick={() => handleRemoteControl('START', chargerId, charger.kode_perangkat)}><FaPlay /> Start</button>
                                                 )}
                                                 <button className="cm-btn reboot" onClick={() => handleRemoteControl('REBOOT', chargerId, charger.kode_perangkat)}><FaPowerOff /> Reboot</button>
+                                                <button className="cm-btn detail" onClick={() => onNavigateToDetail && onNavigateToDetail(charger)}><FaPlug/>Detail Port</button>
                                             </div>
 
                                         </div>
