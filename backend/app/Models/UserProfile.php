@@ -21,6 +21,7 @@ class UserProfile extends Model
         'tanggal_lahir',
     ];
      protected $casts = [ 'tanggal_lahir' => 'date',];
+
     // Relasi balik ke User
     public function user()
     {

@@ -64,7 +64,7 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'peran' => $prefix === 'ADM' ? 'admin' : ($prefix === 'OPS' ? 'operator' : 'user'),
-            'status_akun' => 'aktif',
+            'status_akun' => 'Aktif',
         ]);
 
         // 3. Simpan ke tabel User_Profile (dengan data lengkap)
@@ -113,7 +113,7 @@ class AuthController extends Controller
             ], 401);
         }
 
-        if ($user->status_akun !== 'aktif') {
+        if ($user->status_akun !== 'Aktif') {
             return response()->json([
                 'message' => 'Akun Anda tidak aktif. Hubungi admin.'
             ], 403);

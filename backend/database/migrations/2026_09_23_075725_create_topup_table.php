@@ -6,28 +6,31 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('topup', function (Blueprint $table) {
             $table->id('id_topup');
-
-            // Dompet yang saldonya bertambah
-            $table->unsignedBigInteger('id_wallet');
-            // Metode pembayaran (GoPay, DANA, VA BRI, SeaBank)
-            $table->unsignedBigInteger('id_metode');
-            $table->string('referensi', 50)->unique();   // EVT20261003-ABC123 (kode transaksi)
-            $table->string('kode_pembayaran', 100); // nomor telepon (GoPay/DANA) atau nomor VA (kode bank + telepon)
-            $table->integer('nominal');                  // saldo yang masuk ke dompet
-            $table->integer('biaya_layanan')->default(0); // biaya metode saat transaksi dibuat
-            $table->enum('status_topup', ['pending', 'sukses', 'gagal'])->default('pending');
-            $table->dateTime('waktu_topup');             // dibuat; diperbarui saat pembayaran diterima
-            $table->dateTime('kedaluwarsa_pada');        // waktu_topup + 24 jam
+            $table->foreignId('id_wallet')
+                ->constrained('dompet', 'id_wallet')
+                ->cascadeOnUpdate()
+                ->cascadeOnDelete();
+            $table->foreignId('id_payment')
+                ->constrained('payment', 'id_payment')
+                ->cascadeOnUpdate()
+                ->cascadeOnDelete();
+            $table->integer('nominal');
+            $table->enum('status_topup', ['Pending', 'Sukses', 'Gagal'])->default('Pending');
+            $table->datetime('waktu_topup');
             $table->timestamps();
-            $table->foreign('id_wallet')->references('id_wallet')->on('dompet')->cascadeOnDelete();
-            $table->foreign('id_metode')->references('id_metode')->on('metode_pembayaran')->restrictOnDelete();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('topup');

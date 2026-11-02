@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class Dompet extends Model
 {
     use HasFactory;
 
     protected $table = 'dompet';
+
     protected $primaryKey = 'id_wallet';
 
     protected $fillable = [
@@ -39,10 +41,14 @@ class Dompet extends Model
         return $this->belongsTo(User::class, 'id_user', 'id_user');
     }
 
-    /** Saldo yang bisa dipakai = saldo dikurangi dana yang sedang di-hold untuk sesi charging. */
     public function saldoTersedia(): int
     {
         return max(0, (int) $this->saldo - (int) $this->saldo_hold);
+    }
+
+    public function topups()
+    {
+        return $this->hasMany(Topup::class, 'id_wallet', 'id_wallet');
     }
 
     public function hasPin(): bool

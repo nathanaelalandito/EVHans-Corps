@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
             $table->string('peran');
-            $table->enum('status_akun', ['aktif', 'nonaktif', 'suspend', 'banned'])->default('aktif');
+            $table->enum('status_akun', ['Aktif', 'Nonaktif', 'Suspend', 'Banned'])->default('Aktif');
             $table->timestamps();
         });
 

@@ -24,7 +24,7 @@ class TopupController extends Controller
     public function methods()
     {
         $methods = DB::table('metode_pembayaran')
-            ->where('status_metode', 'aktif')
+            ->where('status_metode', 'Aktif')
             ->orderBy('id_metode')
             ->get()
             ->map(function ($m) {
@@ -57,14 +57,14 @@ class TopupController extends Controller
     {
         $validated = $request->validate([
             'method' => ['required', 'integer',
-                Rule::exists('metode_pembayaran', 'id_metode')->where('status_metode', 'aktif')],
+                Rule::exists('metode_pembayaran', 'id_metode')->where('status_metode', 'Aktif')],
             'amount' => ['required', 'integer', 'min:' . self::MIN_AMOUNT, 'max:' . self::MAX_AMOUNT],
         ]);
 
         $metode = DB::table('metode_pembayaran')->where('id_metode', $validated['method'])->first();
         $dompet = $this->dompetOf($request);
 
-        if ($dompet->status_dompet !== 'aktif') {
+        if ($dompet->status_dompet !== 'Aktif') {
             return response()->json(['success' => false, 'message' => 'Dompet Anda sedang nonaktif.'], 422);
         }
 
@@ -93,7 +93,7 @@ class TopupController extends Controller
             'kode_pembayaran'  => $kodePembayaran,
             'nominal'          => $validated['amount'],
             'biaya_layanan'    => (int) $metode->biaya_layanan,
-            'status_topup'     => 'pending',
+            'status_topup'     => 'Pending',
             'waktu_topup'      => now(),
             'kedaluwarsa_pada' => now()->addHours(self::EXPIRY_HOURS),
         ]);
@@ -120,7 +120,7 @@ class TopupController extends Controller
 
         $topup = $this->expireIfNeeded($this->findOwned($request, $reference));
 
-        if ($topup->status_topup === 'gagal') {
+        if ($topup->status_topup === 'Gagal') {
             return response()->json(['success' => false, 'message' => 'Kode pembayaran sudah kedaluwarsa.'], 422);
         }
 
@@ -135,12 +135,12 @@ class TopupController extends Controller
         DB::transaction(function () use ($topupId) {
             $topup = Topup::lockForUpdate()->find($topupId);
 
-            if (! $topup || $topup->status_topup !== 'pending') {
+            if (! $topup || $topup->status_topup !== 'Pending') {
                 return;
             }
 
             // waktu_topup diperbarui menjadi waktu pembayaran diterima
-            $topup->update(['status_topup' => 'sukses', 'waktu_topup' => now()]);
+            $topup->update(['status_topup' => 'Sukses', 'waktu_topup' => now()]);
 
             DB::table('dompet')->where('id_wallet', $topup->id_wallet)
                 ->increment('saldo', $topup->nominal, ['updated_at' => now()]);
@@ -204,8 +204,8 @@ class TopupController extends Controller
 
     private function expireIfNeeded(Topup $topup): Topup
     {
-        if ($topup->status_topup === 'pending' && $topup->kedaluwarsa_pada->isPast()) {
-            $topup->update(['status_topup' => 'gagal']);
+        if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada->isPast()) {
+            $topup->update(['status_topup' => 'Gagal']);
         }
 
         return $topup;
@@ -227,9 +227,9 @@ class TopupController extends Controller
             'total'        => $topup->nominal + $topup->biaya_layanan,
             'payment_code' => $topup->kode_pembayaran,
             'phone_number' => $this->phoneOfWallet($topup->id_wallet),
-            'status'       => ['pending' => 'pending', 'sukses' => 'paid', 'gagal' => 'expired'][$topup->status_topup],
+            'status'       => ['Pending' => 'pending', 'Sukses' => 'paid', 'Gagal' => 'expired'][$topup->status_topup],
             'expires_at'   => $topup->kedaluwarsa_pada->toIso8601String(),
-            'paid_at'      => $topup->status_topup === 'sukses' ? $topup->waktu_topup->toIso8601String() : null,
+            'paid_at'      => $topup->status_topup === 'Sukses' ? $topup->waktu_topup->toIso8601String() : null,
         ];
 
         if ($withBalance) {

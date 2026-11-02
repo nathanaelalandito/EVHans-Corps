@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTopup, getTopup, getTopupMethods, simulatePayTopup } from './api/Topup';
-import './topup.css';
+import './Topup.css';
 
 // Logo metode pembayaran (folder: src/assets/payment foto)
 import gopayLogo from './assets/payment foto/gopay.png';

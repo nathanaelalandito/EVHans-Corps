@@ -51,7 +51,7 @@ function statusLabel(status) {
     return STATUS_LABEL[status] ?? status;
 }
 
-export default function DompetDigital({ onBack }) {
+export default function DompetDigital({ onBack, onNavigateToTopUp }) {
     // Inisialisasi langsung dari cache modul supaya layar PIN/buat-PIN
     // tampil seketika; data fresh tetap di-refresh di latar belakang.
     const [status, setStatus] = useState(() => {

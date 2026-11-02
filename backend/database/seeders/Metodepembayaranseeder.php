@@ -22,7 +22,7 @@ class MetodePembayaranSeeder extends Seeder
                 ['nama_metode' => $m['nama_metode']],
                 [
                     'biaya_layanan' => $m['biaya_layanan'],
-                    'status_metode' => 'aktif',
+                    'status_metode' => 'Aktif',
                     'created_at'    => now(),
                     'updated_at'    => now(),
                 ]

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import './registrasi.css';
+import { register } from './api/auth';
 
 export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
     const [formData, setFormData] = useState({
@@ -30,24 +30,17 @@ export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
         setServerMessage('');
 
         try {
-            const response = await axios.post('http://127.0.0.1:8000/api/register', formData);
-            setServerMessage(response.data.message);
-            
-            // Kosongkan form setelah berhasil registrasi
-            setFormData({
-                name: '',
-                email: '',
-                password: '',
-                nomor_telepon: '',
-                alamat: '',
-                tanggal_lahir: '',
-            });
-
+            await register(formData);
+            onNavigateToLogin();
         } catch (error) {
+            console.error("DETAIL ERROR ASLI:", error); // Cek ini di F12 -> Console
+        
             if (error.response && error.response.status === 422) {
                 setErrors(error.response.data.errors);
             } else {
-                setServerMessage('Terjadi kesalahan pada server. Silakan coba lagi.');
+                // Tampilkan pesan error asli dari Laravel jika ada
+                const pesanAsli = error.response?.data?.message || error.message;
+                setServerMessage(`Error: ${pesanAsli}`);
             }
         } finally {
             setLoading(false);

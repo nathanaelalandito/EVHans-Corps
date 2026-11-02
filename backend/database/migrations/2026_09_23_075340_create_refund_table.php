@@ -19,7 +19,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
             $table->integer('nominal');
             $table->datetime('waktu_execute');
-            $table->enum('status_refund', ['pending', 'sukses', 'gagal'])->default('pending');
+            $table->enum('status_refund', ['Pending', 'Sukses', 'Gagal'])->default('Pending');
             $table->timestamps();
         });
     }
