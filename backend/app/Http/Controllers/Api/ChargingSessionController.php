@@ -228,7 +228,6 @@ class ChargingSessionController extends Controller
    public function stop(Request $request, string $id): JsonResponse
 {
     $idUser = $request->user()->id_user;
-
     $result = DB::transaction(function () use ($id, $idUser) {
         // Kunci sesi supaya klik ganda tidak memotong saldo dua kali.
         $session = ChargingSession::with(['charger', 'tarif', 'vehicle'])
@@ -240,49 +239,40 @@ class ChargingSessionController extends Controller
         if (! $session || ! in_array($session->status, ChargingSession::AKTIF, true)) {
             return null;
         }
-
         $sim = $this->simulate($session);
         $tarif = $session->tarif;
-
         // Rumus sama dengan calculateEstimate(), tapi memakai energi & durasi aktual.
         $kwh = (float) $sim['energi_kwh'];
         $biayaCharging = max((int) round($kwh * (int) $tarif->harga_per_kwh), (int) $tarif->biaya_minimum);
         $jamParkir = max(1, (int) ceil($sim['durasi_detik'] / 3600));
         $biayaParkir = $jamParkir * (int) $tarif->biaya_parkir_pjam;
-
         $total = $biayaCharging + $biayaParkir;
         // Tidak boleh melebihi dana yang di-hold (kalau ada hold).
         if ((int) $session->saldo_hold > 0) {
             $total = min($total, (int) $session->saldo_hold);
         }
-
         $w = Dompet::where('id_user', $idUser)->lockForUpdate()->first();
         $total = min($total, (int) ($w->saldo ?? 0)); // jaga-jaga agar saldo tidak minus
-
         $session->update([
             'status' => 'selesai',
             'waktu_selesai' => now(),
             'total_energi_kwh' => $kwh,
             'soc_akhir' => $sim['soc_sekarang'],
         ]);
-
         Charger::where('id_charger', $session->id_charger)
             ->where('status', 'sedang digunakan')
             ->update(['status' => 'tersedia']);
-
         if ($w) {
             // Lepas hold, lalu potong biaya aktual dari saldo.
             $w->saldo_hold = max(0, (int) $w->saldo_hold - (int) $session->saldo_hold);
             $w->saldo = (int) $w->saldo - $total;
             $w->save();
         }
-
         if ($total > 0) {
             // Ambil id metode "Saldo Dompet"; kalau belum ada di tabel, dibuat otomatis.
             $idMetode = DB::table('metode_pembayaran')
                 ->where('nama_metode', 'Saldo Dompet')
                 ->value('id_metode');
-
             if (! $idMetode) {
                 $idMetode = DB::table('metode_pembayaran')->insertGetId([
                     'nama_metode' => 'Saldo Dompet',
@@ -292,7 +282,6 @@ class ChargingSessionController extends Controller
                     'updated_at' => now(),
                 ]);
             }
-
             DB::table('payment')->insert([
                 'id_session' => $session->id_session,
                 'id_metode' => $idMetode,
@@ -303,7 +292,6 @@ class ChargingSessionController extends Controller
                 'updated_at' => now(),
             ]);
         }
-
         return [
             'session' => $session,
             'biaya_charging' => $biayaCharging,
@@ -312,11 +300,9 @@ class ChargingSessionController extends Controller
             'saldo' => (int) ($w->saldo ?? 0),
         ];
     });
-
     if ($result === null) {
         return $this->fail('Sesi charging yang berlangsung tidak ditemukan.', 404);
     }
-
     return response()->json([
         'message' => 'Sesi charging selesai dan pembayaran berhasil.',
         'data' => $this->present($result['session']->fresh(['charger.location', 'tarif', 'vehicle'])) + [
