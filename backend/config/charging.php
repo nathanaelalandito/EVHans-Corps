@@ -17,4 +17,12 @@ return [
     // Energi dihitung dari lama sesi berjalan: daya port (kW) x waktu x kecepatan.
     // 60 = 1 menit nyata dianggap 1 jam charging. Set 1 untuk waktu nyata.
     'simulation_speed' => (float) env('CHARGING_SIMULATION_SPEED', 60),
+
+    // WATCHDOG: sesi yang tidak mengirim heartbeat melewati batas ini dianggap
+    // terputus mendadak (listrik padam/perangkat mati) dan ditangani otomatis.
+    'heartbeat_timeout_seconds' => (int) env('CHARGING_HEARTBEAT_TIMEOUT', 120),
+
+    // Set CHARGING_FAILURE_DETECTION=false untuk mematikan deteksi otomatis
+    // saat pengembangan atau saat menjalankan pengujian manual.
+    'failure_detection_enabled' => (bool) env('CHARGING_FAILURE_DETECTION', true),
 ];

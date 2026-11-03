@@ -12,10 +12,10 @@ use App\Models\Location;
 use App\Models\MetodePembayaran;
 use App\Models\Payment;
 use App\Models\Port;
-use App\Models\Refund;
 use App\Models\Tarif;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\ChargingSessionSettler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,8 +32,11 @@ class ChargingSessionController extends Controller
 {
     use ChecksWalletPin;
 
+    public function __construct(private ChargingSessionSettler $settler) {}
+
     /** Jumlah energi terkecil yang bisa dipilih dalam satu sesi (kWh). */
     private const MIN_TARGET_KWH = 0.5;
+
     private const MAX_TARGET_KWH = 100;
 
     private const RELATIONS = ['charger.location', 'port', 'vehicle', 'tarif', 'payment.method', 'payment.refund'];
@@ -70,8 +73,41 @@ class ChargingSessionController extends Controller
     {
         $session = $this->activeSessionOf($request->user());
 
+        // Polling sesi aktif dari aplikasi driver sekaligus berfungsi sebagai heartbeat.
+        if ($session) {
+            $session->heartbeat_terakhir = now();
+            $session->save();
+        }
+
         return response()->json([
             'data' => $session ? $this->presentSession($session) : null,
+        ]);
+    }
+
+    /**
+     * Heartbeat eksplisit dari aplikasi driver. Selama sesi berjalan, aplikasi
+     * mengirim sinyal ini berkala. Kalau sinyal berhenti melewati batas,
+     * watchdog akan menandai sesi sebagai gagal (mis. listrik padam / app mati).
+     */
+    public function heartbeat(Request $request, ChargingSession $session): JsonResponse
+    {
+        if ($session->id_user !== $request->user()->id_user) {
+            abort(404);
+        }
+
+        if ($session->status !== 'Berlangsung') {
+            return $this->fail('Sesi charging tidak sedang berjalan.', 422);
+        }
+
+        $session->heartbeat_terakhir = now();
+        $session->save();
+
+        return response()->json([
+            'message' => 'Heartbeat diterima.',
+            'data' => [
+                'id_session' => $session->id_session,
+                'heartbeat_terakhir' => $session->heartbeat_terakhir?->toISOString(),
+            ],
         ]);
     }
 
@@ -291,6 +327,7 @@ class ChargingSessionController extends Controller
                 'saldo_hold' => $total,
                 'status' => 'Berlangsung',
                 'soc_awal' => $data['soc_awal'],
+                'heartbeat_terakhir' => now(),
             ]);
 
             Payment::create([
@@ -352,16 +389,33 @@ class ChargingSessionController extends Controller
             'energi_kwh' => ['nullable', 'numeric', 'min:0', 'max:'.self::MAX_TARGET_KWH],
             'soc_akhir' => ['nullable', 'integer', 'min:0', 'max:100'],
             'alasan' => ['nullable', 'string', 'max:160'],
+            'kategori' => ['nullable', 'in:listrik,perangkat,konektor,lainnya'],
+            'catatan' => ['nullable', 'string', 'max:500'],
         ]);
 
         $finalStatus = ucfirst(strtolower($data['status']));
+
+        if ($finalStatus === 'Gagal') {
+            $kategori = $data['kategori'] ?? 'lainnya';
+            $label = ChargingSession::KATEGORI_GANGGUAN[$kategori] ?? 'Gangguan lain';
+
+            $data['kegagalan'] = [
+                'kategori' => $kategori,
+                'sumber' => 'driver',
+                'catatan' => $data['catatan'] ?? $data['alasan'] ?? 'Gangguan charger dilaporkan oleh driver.',
+                'jenis_error' => 'Gangguan: '.$label,
+                'tingkat' => $kategori === 'listrik' ? 'Kritis' : 'Tinggi',
+                'deteksi_otomatis' => false,
+            ];
+        }
+
         $settled = $this->settleSession($request, $session, $data, $finalStatus);
         if ($settled instanceof JsonResponse) {
             return $settled;
         }
 
         $message = $finalStatus === 'Gagal'
-            ? 'Sesi charging gagal ditangani. Biaya aktual dihitung dan sisa hold dikembalikan.'
+            ? 'Gangguan tercatat. Operator station sudah dinotifikasi dan sisa hold dikembalikan.'
             : 'Sesi charging dibatalkan. Biaya aktual dihitung dan sisa hold dikembalikan.';
 
         return response()->json([
@@ -370,94 +424,58 @@ class ChargingSessionController extends Controller
         ]);
     }
 
+    /** Laporan keluhan tambahan dari driver untuk sesi yang sudah gagal/terhenti. */
+    public function report(Request $request, ChargingSession $session): JsonResponse
+    {
+        if ($session->id_user !== $request->user()->id_user) {
+            abort(404);
+        }
+
+        $data = $request->validate([
+            'kategori' => ['nullable', 'in:listrik,perangkat,konektor,lainnya'],
+            'catatan' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $kategori = $data['kategori'] ?? $session->kegagalan_kategori ?? 'lainnya';
+        $label = ChargingSession::KATEGORI_GANGGUAN[$kategori] ?? 'Gangguan lain';
+
+        ErrorLog::create([
+            'id_charger' => $session->id_charger,
+            'id_session' => $session->id_session,
+            'id_port' => $session->id_port,
+            'id_user' => $session->id_user,
+            'jenis_error' => 'Laporan keluhan driver: '.$label,
+            'kategori' => $kategori,
+            'sumber' => 'driver',
+            'tingkat' => $kategori === 'listrik' ? 'Kritis' : 'Tinggi',
+            'desk_mslh' => $data['catatan'] ?? 'Keluhan tambahan dari driver setelah pengisian terhenti.',
+            'waktu_terjadi' => now(),
+            'status_tanganan' => 'Menunggu',
+        ]);
+
+        return response()->json([
+            'message' => 'Laporan keluhan berhasil dikirim ke operator.',
+            'data' => [
+                'id_session' => $session->id_session,
+                'kategori' => $kategori,
+                'label' => $label,
+            ],
+        ]);
+    }
+
     private function settleSession(Request $request, ChargingSession $session, array $data, string $finalStatus): ChargingSession|JsonResponse
     {
-        return DB::transaction(function () use ($request, $session, $data, $finalStatus) {
-            $session = ChargingSession::with(['charger.location', 'port', 'vehicle', 'tarif'])
-                ->whereKey($session->id_session)
-                ->lockForUpdate()
-                ->firstOrFail();
+        if ($session->id_user !== $request->user()->id_user) {
+            abort(404);
+        }
 
-            if ($session->id_user !== $request->user()->id_user) {
-                abort(404);
-            }
+        $settled = $this->settler->settle($session, $finalStatus, $data);
 
-            if ($session->status !== 'Berlangsung') {
-                return $this->fail('Sesi charging tidak sedang berjalan.', 422);
-            }
+        if (! $settled) {
+            return $this->fail('Sesi charging tidak sedang berjalan.', 422);
+        }
 
-            $wallet = Dompet::where('id_user', $session->id_user)->lockForUpdate()->firstOrFail();
-            $port = $session->id_port ? Port::whereKey($session->id_port)->lockForUpdate()->first() : null;
-
-            $simulation = $this->simulate($session);
-            $actualKwh = isset($data['energi_kwh'])
-                ? round((float) $data['energi_kwh'], 2)
-                : $simulation['energi_kwh'];
-            $finalSoc = $data['soc_akhir'] ?? $simulation['soc_sekarang'];
-
-            $hold = (int) $session->saldo_hold;
-            $actualCost = $actualKwh > 0
-                ? min($hold, $session->tarif->costFor($actualKwh, $this->powerOf($session))['total'])
-                : 0;
-            $refundAmount = max(0, $hold - $actualCost);
-
-            $wallet->saldo = max(0, (int) $wallet->saldo - $actualCost);
-            $wallet->saldo_hold = max(0, (int) $wallet->saldo_hold - $hold);
-            $wallet->save();
-
-            // Port kembali tersedia; kalau gagal, tandai rusak supaya operator memeriksanya.
-            if ($port) {
-                $port->status_port = $finalStatus === 'Gagal' ? 'Out of Order' : Port::AVAILABLE;
-                $port->save();
-            }
-
-            $session->total_energi_kwh = $actualKwh;
-            $session->waktu_selesai = now();
-            $session->status = $finalStatus;
-            $session->soc_akhir = $finalSoc;
-            $session->save();
-
-            $payment = Payment::where('id_session', $session->id_session)->lockForUpdate()->first();
-            if (! $payment) {
-                $payment = new Payment([
-                    'id_session' => $session->id_session,
-                    'id_metode' => $this->paymentMethod('Dompet Digital')->id_metode,
-                    'jenis_pembayaran' => 'charging',
-                ]);
-            }
-
-            $payment->total_bayar = $actualCost;
-            $payment->status_pembayaran = $finalStatus === 'Gagal' && $actualCost === 0 ? 'Gagal' : 'Sukses';
-            $payment->waktu_pembayaran = now();
-            $payment->referensi_gateway = $payment->referensi_gateway ?: $this->paymentReference('PAY', $session->id_session);
-            $payment->save();
-
-            if ($refundAmount > 0) {
-                Refund::updateOrCreate(
-                    ['id_payment' => $payment->id_payment],
-                    [
-                        'nominal' => $refundAmount,
-                        'waktu_execute' => now(),
-                        'status_refund' => 'Sukses',
-                    ]
-                );
-            }
-
-            // Laporan gangguan driver -> muncul di notifikasi operator station.
-            if ($finalStatus === 'Gagal') {
-                ErrorLog::create([
-                    'id_charger' => $session->id_charger,
-                    'id_session' => $session->id_session,
-                    'id_user' => $session->id_user,
-                    'jenis_error' => 'Gangguan dilaporkan driver',
-                    'desk_mslh' => $data['alasan'] ?? 'Gangguan charger dilaporkan oleh driver.',
-                    'waktu_terjadi' => now(),
-                    'status_tanganan' => 'Menunggu',
-                ]);
-            }
-
-            return $session->fresh(self::RELATIONS);
-        });
+        return $settled;
     }
 
     // ------------------------------------------------------------------
@@ -651,7 +669,7 @@ class ChargingSessionController extends Controller
     /** Daya port (kW) untuk sesi; cadangan: kapasitas mesin, lalu 1 kW. */
     private function powerOf(ChargingSession $session): float
     {
-        return (float) ($session->port?->daya_maks_kw ?? $session->charger?->kap_tot_kw ?? 1);
+        return $this->settler->powerOf($session);
     }
 
     /**
@@ -662,29 +680,7 @@ class ChargingSessionController extends Controller
      */
     private function simulate(ChargingSession $session): array
     {
-        $target = (float) ($session->target_energi_kwh ?? 0);
-        $power = max(1, $this->powerOf($session));
-        $speed = max(0.1, (float) config('charging.simulation_speed', 60));
-
-        $realSeconds = $session->waktu_mulai
-            ? max(0, now()->getTimestamp() - $session->waktu_mulai->getTimestamp())
-            : 0;
-        $simSeconds = $realSeconds * $speed;
-        $kwh = min($target, $power * $simSeconds / 3600);
-        $isFull = $target > 0 && $kwh >= $target;
-
-        $capacity = $session->vehicle
-            ? $this->batteryCapacity($session->vehicle)[0]
-            : (float) config('charging.default_battery_kwh', 50);
-
-        return [
-            'energi_kwh' => round($kwh, 2),
-            'soc_sekarang' => $this->socAfter($capacity, (int) $session->soc_awal, $kwh),
-            // Durasi berhenti bertambah begitu target tercapai.
-            'durasi_detik' => $isFull ? (int) ceil($target / $power * 3600) : (int) $simSeconds,
-            'sudah_penuh' => $isFull,
-            'kecepatan' => $speed,
-        ];
+        return $this->settler->simulate($session);
     }
 
     // ------------------------------------------------------------------
@@ -817,6 +813,7 @@ class ChargingSessionController extends Controller
                 'status' => $session->payment->refund->status_refund,
                 'waktu_execute' => $session->payment->refund->waktu_execute?->toISOString(),
             ] : null,
+            'kegagalan' => $this->presentFailure($session),
             'status' => $this->sessionStatusLabel($session->status),
             'waktu_mulai' => $session->waktu_mulai?->toISOString(),
             'waktu_selesai' => $session->waktu_selesai?->toISOString(),
@@ -833,9 +830,26 @@ class ChargingSessionController extends Controller
             'tanggal' => $session->waktu_mulai?->timezone('Asia/Jakarta')->translatedFormat('d M Y, H:i'),
             'energi_kwh' => (float) $session->total_energi_kwh,
             'total' => $this->sessionTotal($session),
+            'kegagalan' => $this->presentFailure($session),
             'status' => $this->sessionStatusLabel($session->status),
             'id_payment' => $session->payment?->id_payment,
             'status_pembayaran' => $session->payment?->status_pembayaran,
+        ];
+    }
+
+    /** Ringkasan penyebab gangguan untuk invoice & riwayat driver. */
+    private function presentFailure(ChargingSession $session): ?array
+    {
+        if (! $session->kegagalan_kategori && ! $session->kegagalan_catatan) {
+            return null;
+        }
+
+        return [
+            'kategori' => $session->kegagalan_kategori,
+            'label' => ChargingSession::KATEGORI_GANGGUAN[$session->kegagalan_kategori] ?? 'Gangguan lain',
+            'sumber' => $session->kegagalan_sumber,
+            'catatan' => $session->kegagalan_catatan,
+            'deteksi_otomatis' => (bool) $session->deteksi_otomatis,
         ];
     }
 

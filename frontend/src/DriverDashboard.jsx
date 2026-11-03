@@ -8,7 +8,7 @@ import { getVehicles } from './api/vehicle';
 import { getDrivingRoute, googleMapsDirectionsUrl, formatJarak, formatDurasi } from './api/routing';
 import { getStations, distanceKm, distanceMeters, ARRIVAL_RADIUS_M, konektorLabel, sameConnector } from './api/station';
 import { getActiveSession } from './api/charging';
-import { finishChargingSession, interruptChargingSession } from './api/chargingSessions';
+import { finishChargingSession, interruptChargingSession, getChargingInvoice, reportChargingIssue } from './api/chargingSessions';
 import { getPaymentDetail, getPaymentHistory } from './api/payments';
 import StationDetail from './StationDetail';
 import StartCharging from './StartCharging';
@@ -38,9 +38,23 @@ const DUMMY_STATS = {
 };
 
 const FALLBACK_DRIVER_POSITION = { lat: -7.8014, lng: 110.3644 };
+
+// Khusus pengembangan: bila true, syarat "harus sampai di station" dilewati
+// supaya alur mulai charging bisa diuji tanpa GPS presisi.
+// Aktifkan lewat frontend/.env.local -> VITE_SKIP_ARRIVAL=true
+const SKIP_ARRIVAL = import.meta.env.VITE_SKIP_ARRIVAL === 'true';
+
+// sesi charging aktif — set ke objek (lihat bentuk di bawah) untuk
+// melihat tampilan sesi berjalan, atau null untuk tampilan kosong.
 const DUMMY_ACTIVE_SESSION = null;
 const CONNECTOR_FILTERS = ['Semua', 'CCS2', 'Type 2', 'CHAdeMO'];
 const TOP_UP_METHODS = ['Mandiri', 'OVO', 'BCA', 'BRI', 'BNI'];
+const ISSUE_CATEGORIES = [
+    { value: 'listrik', label: 'Listrik Padam' },
+    { value: 'perangkat', label: 'Perangkat Charger Error' },
+    { value: 'konektor', label: 'Konektor Bermasalah' },
+    { value: 'lainnya', label: 'Gangguan Lainnya' },
+];
 
 function formatRupiah(value) {
     if (value == null) return '-';
@@ -144,9 +158,18 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [selectedStationId, setSelectedStationId] = useState(null);
     const [showNotif, setShowNotif] = useState(!!DUMMY_ACTIVE_SESSION);
     const [showSettings, setShowSettings] = useState(false);
+    const [showIssueModal, setShowIssueModal] = useState(false);
+    const [issueKategori, setIssueKategori] = useState('perangkat');
+    const [issueCatatan, setIssueCatatan] = useState('');
+    const [showAutoFailModal, setShowAutoFailModal] = useState(false);
+    const [autoFailStep, setAutoFailStep] = useState(1);
+    const [autoFailInvoice, setAutoFailInvoice] = useState(null);
+    const [autoFailKategori, setAutoFailKategori] = useState('perangkat');
+    const [autoFailCatatan, setAutoFailCatatan] = useState('');
 
     const [wallet, setWallet] = useState(null);
     const [walletLoading, setWalletLoading] = useState(true);
+    const [showBalance, setShowBalance] = useState(true);
     const fetchWallet = async () => {
         try {
             const data = await getWallet();
@@ -350,6 +373,8 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const distToSelectedM =
         selectedStation && locationStatus === 'live' ? distanceMeters(driverPosition, selectedStation) : null;
     const hasArrived = distToSelectedM != null && distToSelectedM <= ARRIVAL_RADIUS_M;
+    // Boleh buka lembar "Mulai Charging" kalau sudah sampai, atau saat mode uji.
+    const canStartCharging = hasArrived || SKIP_ARRIVAL;
 
     const [route, setRoute] = useState(null);
     const [routeStatus, setRouteStatus] = useState('idle');
@@ -474,15 +499,66 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     }, [view]);
 
     const activeSessionId = activeSession?.id_session;
-    const activeSessionFull = activeSession?.sudah_penuh;
+    const invoiceFetchedRef = useRef(false);
+    const activeSessionRef = useRef(activeSession);
+    const autoFailTriggeredRef = useRef(false);
+
     useEffect(() => {
-        if (!activeSessionId || activeSessionFull) return;
+        activeSessionRef.current = activeSession;
+    }, [activeSession]);
+    useEffect(() => {
+        if (!activeSessionId) return;
         let cancelled = false;
         const poll = () => {
             getActiveSession()
                 .then((session) => {
-                    if (cancelled || !session || session.id_session !== activeSessionId) return;
+                    if (cancelled) return;
+                    if (!session || session.id_session !== activeSessionId) {
+                        setActiveSession(null);
+                        setShowNotif(false);
+                        if (!invoiceFetchedRef.current) {
+                            invoiceFetchedRef.current = true;
+                            getChargingInvoice(activeSessionId)
+                                .then((inv) => {
+                                    if (cancelled) return;
+                                    setAutoFailInvoice(inv);
+                                    setAutoFailStep(1);
+                                    setShowAutoFailModal(true);
+                                })
+                                .catch(() => {});
+                        }
+                        return;
+                    }
                     setActiveSession(session);
+                    // Demo auto-fail khusus CHG-02: tiba-tiba gagal saat mencapai setengah target.
+                    if (
+                        session.kode_charger === 'CHG-02' &&
+                        session.target_kwh > 0 &&
+                        session.energi_kwh / session.target_kwh >= 0.5 &&
+                        !autoFailTriggeredRef.current
+                    ) {
+                        autoFailTriggeredRef.current = true;
+                        (async () => {
+                            try {
+                                const interruptedInvoice = await interruptChargingSession(session.id_session, {
+                                    status: 'gagal',
+                                    kategori: 'perangkat',
+                                    catatan: 'Pengisian terhenti mendadak (otomatis).',
+                                    alasan: 'Gangguan charger terdeteksi otomatis.',
+                                });
+                                setAutoFailInvoice(interruptedInvoice);
+                                setAutoFailStep(1);
+                                setShowAutoFailModal(true);
+                                setActiveSession(null);
+                                setShowNotif(false);
+                                reloadStations();
+                                await fetchWallet();
+                                await fetchTransactionHistory();
+                            } catch (err) {
+                                setSessionError(extractErrorMessage(err, 'Gagal memproses gangguan sesi charging.'));
+                            }
+                        })();
+                    }
                 })
                 .catch(() => {});
         };
@@ -491,7 +567,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
             cancelled = true;
             clearInterval(interval);
         };
-    }, [activeSessionId, activeSessionFull]);
+    }, [activeSessionId]);
 
     const sessionProgressPct =
         activeSession && activeSession.target_kwh > 0
@@ -547,15 +623,26 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
-    const handleInterruptSession = async () => {
+    const handleInterruptSession = () => {
+        if (!activeSession || stoppingSession) return;
+        setSessionError('');
+        setIssueKategori('perangkat');
+        setIssueCatatan('');
+        setShowIssueModal(true);
+    };
+
+    const submitIssueReport = async () => {
         if (!activeSession || stoppingSession) return;
         setStoppingSession(true);
         setSessionError('');
         try {
             const interruptedInvoice = await interruptChargingSession(activeSession.id_session, {
                 status: 'gagal',
+                kategori: issueKategori,
+                catatan: issueCatatan.trim() || undefined,
                 alasan: 'Gangguan charger dilaporkan oleh driver.',
             });
+            setShowIssueModal(false);
             await afterSessionSettled(interruptedInvoice);
         } catch (err) {
             setSessionError(extractErrorMessage(err, 'Gagal memproses gangguan sesi charging.'));
@@ -564,7 +651,35 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    const confirmAutoFailCost = () => {
+        setAutoFailStep(2);
+    };
+
+    const submitAutoFailReport = async () => {
+        if (!autoFailInvoice || stoppingSession) return;
+        setStoppingSession(true);
+        try {
+            await reportChargingIssue(autoFailInvoice.id_session, {
+                kategori: autoFailKategori,
+                catatan: autoFailCatatan.trim() || undefined,
+            });
+            setShowAutoFailModal(false);
+            setInvoice(autoFailInvoice);
+            setActiveSession(null);
+            setShowNotif(false);
+            reloadStations();
+            await fetchWallet();
+            await fetchTransactionHistory();
+        } catch (err) {
+            setSessionError(extractErrorMessage(err, 'Gagal mengirim laporan keluhan.'));
+        } finally {
+            setStoppingSession(false);
+        }
+    };
+
     const handleSessionStarted = (session) => {
+        invoiceFetchedRef.current = false;
+        autoFailTriggeredRef.current = false;
         setShowStartCharging(false);
         setStartPortId(null);
         clearRoute();
@@ -886,10 +1001,32 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <div>
                                 <p className="home-wallet-label">Saldo Dompet</p>
                                 <p className="home-wallet-value">
-                                    {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
+                                    {walletLoading ? '...' : (showBalance ? formatRupiah(wallet?.saldo ?? 0) : 'Rp ••••••')}
                                 </p>
                             </div>
-                            <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
+                            <div className="home-balance-actions">
+                                <button
+                                    type="button"
+                                    className="home-balance-eye"
+                                    onClick={() => setShowBalance((v) => !v)}
+                                    aria-label={showBalance ? 'Sembunyikan saldo' : 'Tampilkan saldo'}
+                                >
+                                    {showBalance ? (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" strokeWidth="1.8" />
+                                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                                        </svg>
+                                    ) : (
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                            <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                            <path d="M10.6 10.6a2 2 0 002.8 2.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                            <path d="M9.9 4.2A10.4 10.4 0 0112 4c6.5 0 10 8 10 8a17.6 17.6 0 01-4.1 5.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                            <path d="M6.1 6.1C3.4 8.2 2 12 2 12s3.5 8 10 8c1.4 0 2.7-.3 3.9-.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                        </svg>
+                                    )}
+                                </button>
+                                <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
+                            </div>
                         </div>
 
                         <div className="home-vehicle-panel">
@@ -965,9 +1102,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <div className="home-session-actions">
                                 <button className="dash-btn-stop" onClick={handleStopSession}>
                                     {activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
-                                </button>
-                                <button className="dash-btn-issue" onClick={handleInterruptSession}>
-                                    Laporkan Gangguan
                                 </button>
                             </div>
                         </section>
@@ -1113,12 +1247,15 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                             <p className="transaction-meta">
                                                 {trx.tanggal}
                                                 {trx.energi_kwh !== null ? ` · ${trx.energi_kwh} kWh` : ` · ${trx.metode_pembayaran}`}
+                                                {trx.kegagalan ? ` · ${trx.kegagalan.label}` : ''}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="transaction-side">
                                         <strong>{formatRupiah(trx.total)}</strong>
-                                        <span className="dash-status-badge ok">{trx.status}</span>
+                                        <span className={`dash-status-badge ${trx.status_sesi === 'Gagal' ? 'danger' : 'ok'}`}>
+                                            {trx.status_sesi === 'Gagal' ? 'Gagal' : trx.status}
+                                        </span>
                                     </div>
                                 </button>
                             ))}
@@ -1212,8 +1349,10 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         )}
 
                         <div className="route-card-start-block">
-                            {hasArrived ? (
-                                <p className="route-card-arrived">✅ Anda sudah sampai di station.</p>
+                            {canStartCharging ? (
+                                <p className="route-card-arrived">
+                                    {hasArrived ? '✅ Anda sudah sampai di station.' : '🧪 Mode uji: syarat sampai di station dilewati.'}
+                                </p>
                             ) : (
                                 <p className="route-card-hint">
                                     {distToSelectedM != null
@@ -1224,7 +1363,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <button
                                 className="route-card-start"
                                 onClick={() => openStartCharging(selectedStation, null)}
-                                disabled={!hasArrived}
+                                disabled={!canStartCharging}
                             >
                                 ⚡ Mulai Charging
                             </button>
@@ -1320,9 +1459,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <div className="home-session-actions">
                                 <button className="dash-btn-stop" onClick={handleStopSession}>
                                     {activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
-                                </button>
-                                <button className="dash-btn-issue" onClick={handleInterruptSession}>
-                                    Gangguan
                                 </button>
                             </div>
                         </div>
@@ -1514,6 +1650,171 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 </div>
             )}
 
+            {showIssueModal && (
+                <div className="charge-flow-overlay" onClick={() => !stoppingSession && setShowIssueModal(false)}>
+                    <div className="charge-flow-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="settings-panel-header">
+                            <span className="settings-panel-title">Laporkan Gangguan Charging</span>
+                            <button
+                                type="button"
+                                className="mapdash-notif-close"
+                                onClick={() => setShowIssueModal(false)}
+                                aria-label="Tutup laporan gangguan"
+                                disabled={stoppingSession}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <p className="charge-flow-note">
+                            Pilih penyebab gangguan. Sesi akan dihentikan, sisa dana hold dikembalikan, dan
+                            operator station menerima laporan untuk perbaikan.
+                        </p>
+
+                        <label className="settings-pin-label">Penyebab Gangguan</label>
+                        <div className="topup-method-grid">
+                            {ISSUE_CATEGORIES.map((category) => (
+                                <button
+                                    key={category.value}
+                                    type="button"
+                                    className={`topup-method-btn ${issueKategori === category.value ? 'active' : ''}`}
+                                    onClick={() => setIssueKategori(category.value)}
+                                    disabled={stoppingSession}
+                                >
+                                    {category.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <label className="settings-pin-label" htmlFor="issue-note">Catatan (opsional)</label>
+                        <textarea
+                            id="issue-note"
+                            className="issue-note-input"
+                            rows={3}
+                            maxLength={500}
+                            placeholder="Contoh: layar charger mati setelah 5 menit."
+                            value={issueCatatan}
+                            onChange={(e) => setIssueCatatan(e.target.value)}
+                            disabled={stoppingSession}
+                        />
+
+                        {sessionError && <p className="settings-pin-error">{sessionError}</p>}
+
+                        <button
+                            type="button"
+                            className="settings-pin-submit"
+                            onClick={submitIssueReport}
+                            disabled={stoppingSession}
+                        >
+                            {stoppingSession ? 'Memproses...' : 'Kirim Laporan & Hentikan Sesi'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {showAutoFailModal && autoFailInvoice && (
+                <div className="evfail-overlay">
+                    <div className="evfail-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="evfail-header">
+                            <div className="evfail-icon" aria-hidden="true">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 3L2.5 20h19L12 3z" stroke="#F59E0B" strokeWidth="1.8" strokeLinejoin="round" />
+                                    <path d="M12 9v5" stroke="#F59E0B" strokeWidth="1.8" strokeLinecap="round" />
+                                    <circle cx="12" cy="17" r="1" fill="#F59E0B" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="evfail-title">
+                                    {autoFailStep === 1 ? 'Pengisian Daya Terhenti' : 'Laporkan Keluhan'}
+                                </h3>
+                                <p className="evfail-subtitle">
+                                    {autoFailStep === 1
+                                        ? 'Pengisian pada station ini terhenti karena kendala teknis.'
+                                        : 'Bantu operator dengan detail kendala yang terjadi.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {autoFailStep === 1 ? (
+                            <>
+                                <div className="evfail-alert">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="9" stroke="#F59E0B" strokeWidth="1.6" />
+                                        <path d="M12 8v5" stroke="#F59E0B" strokeWidth="1.6" strokeLinecap="round" />
+                                        <circle cx="12" cy="16" r="0.9" fill="#F59E0B" />
+                                    </svg>
+                                    <div>
+                                        <strong>{autoFailInvoice.nama_lokasi}</strong>
+                                        <span>Pengisian terhenti mendadak. Biaya final dihitung dari energi yang sudah tersalurkan.</span>
+                                    </div>
+                                </div>
+
+                                <div className="evfail-summary">
+                                    <div className="evfail-row">
+                                        <span className="evfail-label">Energi tersalurkan</span>
+                                        <strong className="evfail-value">{autoFailInvoice.energi_kwh} kWh</strong>
+                                    </div>
+                                    <div className="evfail-row evfail-row--final">
+                                        <span className="evfail-label">Biaya final</span>
+                                        <strong className="evfail-value evfail-value--final">{formatRupiah(autoFailInvoice.biaya_aktual)}</strong>
+                                    </div>
+                                    <div className="evfail-row">
+                                        <span className="evfail-label">Refund</span>
+                                        <strong className="evfail-value evfail-value--refund">{formatRupiah(autoFailInvoice.selisih_dikembalikan)}</strong>
+                                    </div>
+                                </div>
+
+                                <div className="evfail-actions">
+                                    <button type="button" className="evfail-btn evfail-btn--secondary" onClick={() => setSelectedInvoice(autoFailInvoice)}>
+                                        Lihat Detail
+                                    </button>
+                                    <button type="button" className="evfail-btn evfail-btn--primary" onClick={confirmAutoFailCost}>
+                                        Konfirmasi Biaya
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="evfail-subtitle evfail-subtitle--body">
+                                    Kirim laporan keluhan ke operator station untuk tindak lanjut.
+                                </p>
+                                <label className="evfail-label evfail-label--form" htmlFor="auto-fail-kategori">Penyebab</label>
+                                <div className="evfail-category-grid">
+                                    {ISSUE_CATEGORIES.map((category) => (
+                                        <button
+                                            key={category.value}
+                                            type="button"
+                                            className={`evfail-category ${autoFailKategori === category.value ? 'is-active' : ''}`}
+                                            onClick={() => setAutoFailKategori(category.value)}
+                                            disabled={stoppingSession}
+                                        >
+                                            {category.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <label className="evfail-label evfail-label--form" htmlFor="auto-fail-note">Catatan (opsional)</label>
+                                <textarea
+                                    id="auto-fail-note"
+                                    className="evfail-textarea"
+                                    rows={3}
+                                    maxLength={500}
+                                    value={autoFailCatatan}
+                                    onChange={(e) => setAutoFailCatatan(e.target.value)}
+                                    disabled={stoppingSession}
+                                    placeholder="Contoh: layar charger mati setelah 5 menit."
+                                />
+                                {sessionError && <p className="evfail-error">{sessionError}</p>}
+                                <div className="evfail-actions">
+                                    <button type="button" className="evfail-btn evfail-btn--primary" onClick={submitAutoFailReport} disabled={stoppingSession}>
+                                        {stoppingSession ? 'Mengirim...' : 'Kirim Laporan & Selesai'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {(selectedInvoice || invoiceLoading) && (
                 <div className="charge-flow-overlay" onClick={() => setSelectedInvoice(null)}>
                     <div className="charge-flow-panel invoice-detail-panel" onClick={(e) => e.stopPropagation()}>
@@ -1615,6 +1916,19 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                                 <strong>{formatRupiah(selectedInvoice.biaya_aktual ?? 0)}</strong>
                                             </div>
                                         </div>
+
+                                        {selectedInvoice.kegagalan && (
+                                            <div className="invoice-failure-box">
+                                                <strong>Gangguan: {selectedInvoice.kegagalan.label}</strong>
+                                                {selectedInvoice.kegagalan.catatan && <p>{selectedInvoice.kegagalan.catatan}</p>}
+                                                <span>
+                                                    {selectedInvoice.kegagalan.deteksi_otomatis
+                                                        ? 'Terdeteksi otomatis oleh sistem'
+                                                        : 'Dilaporkan oleh driver'}
+                                                    {' · '}Sumber: {selectedInvoice.kegagalan.sumber}
+                                                </span>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </>
