@@ -1,11 +1,9 @@
-// station.js — panggilan API untuk charging station (daftar & detail).
-// Fungsi melempar error axios apa adanya kalau gagal.
 import api from './client';
 
 const KONEKTOR_LABEL = { type_2: 'Type 2', ccs2: 'CCS2', chademo: 'CHAdeMO', gbt: 'GB/T' };
 export const konektorLabel = (v) => KONEKTOR_LABEL[v] ?? v;
 
-const STATUS_LOKASI = { aktif: 'Aktif', maintenance: 'Dalam Perawatan', nonaktif: 'Nonaktif' };
+const STATUS_LOKASI = { Aktif: 'Aktif', Maintenance: 'Dalam Perawatan', Nonaktif: 'Nonaktif' };
 
 // Bentuk respons API -> bentuk yang dipakai peta/daftar di DriverDashboard.
 function toDashboardStation(s) {
@@ -13,16 +11,21 @@ function toDashboardStation(s) {
         id_location: s.id_location,
         nama_lokasi: s.nama_lokasi,
         alamat: s.alamat,
-        lat: s.latitude,
-        lng: s.longitude,
+        lat: s.lat ?? s.latitude,       // Menangani kedua kemungkinan nama key
+        lng: s.lng ?? s.longitude,
         status: STATUS_LOKASI[s.status] ?? s.status,
         charger_tersedia: s.charger_tersedia,
         charger_total: s.charger_total,
         tipe_konektor: (s.tipe_konektor ?? []).map(konektorLabel),
         daya_kw_max: s.daya_kw_max,
         tarif_per_kwh: s.tarif?.harga_per_kwh ?? null,
-        jam_buka: s.jam_buka,
-        jam_tutup: s.jam_tutup,
+        jam_buka: s.jam_operasional?.buka ?? s.jam_buka,
+        jam_tutup: s.jam_operasional?.tutup ?? s.jam_tutup,
+        jarak_km: s.jarak_km,
+        rating: s.rating,
+        biaya_parkir: s.biaya_parkir ?? 0,
+        // Daftar charger + port (dipakai pemilih port di daftar station).
+        chargers: s.chargers ?? [],
     };
 }
 
@@ -36,6 +39,11 @@ export async function getStationDetail(id) {
     const { data } = await api.get(`/stations/${id}`);
     return data.data ?? data;
 }
+
+// Kendaraan menyimpan 'type_2'/'ccs2', form operator menyimpan 'Type 2'/'CCS2'.
+// Samakan keduanya sebelum membandingkan (sama dengan Port::connectorKey di backend).
+const connectorKey = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export const sameConnector = (a, b) => connectorKey(a) === connectorKey(b);
 
 // Jarak garis lurus (haversine) dalam km, dibulatkan 1 desimal.
 export function distanceKm(a, b) {
@@ -51,7 +59,7 @@ export function distanceKm(a, b) {
 
 // Driver dianggap "sudah sampai" kalau jaraknya <= nilai ini (meter).
 // Harus sama dengan CHARGING_ARRIVAL_RADIUS_M di backend (config/charging.php).
-export const ARRIVAL_RADIUS_M = 300;
+export const ARRIVAL_RADIUS_M = 200;
 
 // Jarak garis lurus (haversine) dalam meter.
 export function distanceMeters(a, b) {
@@ -63,4 +71,3 @@ export function distanceMeters(a, b) {
         Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
     return 2 * 6371000 * Math.asin(Math.sqrt(h));
 }
-

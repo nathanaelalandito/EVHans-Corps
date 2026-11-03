@@ -16,7 +16,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'budi.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'aktif',
+                'status_akun' => 'Aktif',
                 'nama_lengkap' => 'Budi Santoso',
                 'nomor_telepon' => '081234567890',
                 'alamat' => 'Jl. Merdeka No. 10, Purwokerto',
@@ -25,7 +25,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'siti.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'aktif',
+                'status_akun' => 'Aktif',
                 'nama_lengkap' => 'Siti Rahmawati',
                 'nomor_telepon' => '081298765432',
                 'alamat' => 'Jl. Sudirman No. 25, Purwokerto',
@@ -34,7 +34,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'agus.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'nonaktif',
+                'status_akun' => 'Nonaktif',
                 'nama_lengkap' => 'Agus Setiawan',
                 'nomor_telepon' => '081356789012',
                 'alamat' => 'Jl. Gatot Subroto No. 5, Purwokerto',
@@ -43,7 +43,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'admin.utama@admin.ac.id',
                 'peran' => 'admin',
-                'status_akun' => 'aktif',
+                'status_akun' => 'Aktif',
                 'nama_lengkap' => 'Ahmad Fauzi',
                 'nomor_telepon' => '081411223344',
                 'alamat' => 'Jl. Ahmad Yani No. 1, Purwokerto',
@@ -52,7 +52,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'ops.lapangan@ops.ac.id',
                 'peran' => 'operator',
-                'status_akun' => 'aktif',
+                'status_akun' => 'Aktif',
                 'nama_lengkap' => 'Dewi Lestari',
                 'nomor_telepon' => '081533445566',
                 'alamat' => 'Jl. Dr. Angka No. 8, Purwokerto',
@@ -61,7 +61,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'joko.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'suspend',
+                'status_akun' => 'Suspend',
                 'nama_lengkap' => 'Joko Prasetyo',
                 'nomor_telepon' => '081699887766',
                 'alamat' => null,
@@ -70,7 +70,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'rina.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'banned',
+                'status_akun' => 'Banned',
                 'nama_lengkap' => 'Rina Amelia',
                 'nomor_telepon' => '081777889900',
                 'alamat' => 'Jl. Veteran No. 12, Purwokerto',

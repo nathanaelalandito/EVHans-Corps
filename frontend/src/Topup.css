@@ -1,0 +1,486 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
+
+/* ==================================================================
+   TOP UP SALDO — tema sama dengan driverDashboard.css
+   Hijau tua #163d24 / #1b4d2e, hijau #2e7d32, krem #eef0df,
+   border #eee6c9, hijau muda #eaf7e5.
+   GANTI SELURUH ISI topUp.css DENGAN FILE INI.
+   ================================================================== */
+
+/* Latar luar krem: hilangkan area putih di kiri/kanan */
+html,
+body {
+    margin: 0;
+    background: #eef0df;
+}
+
+#root {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: #eef0df;
+}
+
+@keyframes tuFadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tuPop {
+    from { transform: scale(0.4); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- Kolom halaman ---------- */
+.tu-page {
+    box-sizing: border-box;
+    max-width: 480px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: 0 0 calc(28px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: #eef0df;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #1b1f16;
+    text-align: left;
+}
+
+.tu-page button,
+.tu-page input {
+    font-family: inherit;
+}
+
+/* Semua anak selain header diberi jarak samping 16px */
+.tu-page > :not(.tu-header) {
+    margin-left: 16px;
+    margin-right: 16px;
+}
+
+/* ---------- Header hijau melengkung (sama seperti home) ---------- */
+.tu-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 64px;
+    border-radius: 0 0 28px 28px;
+}
+
+.tu-header h1 {
+    margin: 0;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    color: #ffffff;
+}
+
+.tu-icon-btn {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+.tu-icon-btn:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* ---------- Kartu ---------- */
+.tu-card {
+    background: #ffffff;
+    border: 1px solid #eee6c9;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
+    padding: 16px;
+    animation: tuFadeUp 0.35s ease both;
+}
+
+/* Kartu pertama menimpa lengkungan header */
+.tu-header + .tu-card {
+    margin-top: -44px;
+    position: relative;
+    z-index: 2;
+}
+
+.tu-card h2 {
+    margin: 0 0 10px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 14.5px;
+    color: #1b4d2e;
+}
+
+.tu-muted {
+    font-size: 12px;
+    color: #8a927a;
+}
+
+/* ---------- Input nominal ---------- */
+.tu-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1.5px solid #dfe3d2;
+    border-radius: 14px;
+    padding: 13px 14px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: #1b4d2e;
+    background: #f9faf3;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.tu-input:focus {
+    outline: none;
+    border-color: #2e7d32;
+    background: #ffffff;
+}
+
+/* ---------- Chip nominal ---------- */
+.tu-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.tu-chip {
+    border: 1px solid #eee6c9;
+    background: #ffffff;
+    color: #55603a;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.tu-chip:hover { background: #f6fbef; }
+.tu-chip.is-active {
+    background: #1b4d2e;
+    border-color: #1b4d2e;
+    color: #ffffff;
+}
+
+/* ---------- Metode pembayaran ---------- */
+.tu-methods {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Satu baris penuh: logo | nama + keterangan | centang */
+.tu-method {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #ffffff;
+    border: 1.5px solid #eee6c9;
+    border-radius: 14px;
+    text-align: left;
+    color: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.tu-method:hover { border-color: #c7e8bb; }
+.tu-method.is-active {
+    border-color: #2e7d32;
+    background: #f6fbef;
+}
+
+.tu-method-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.tu-method-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #1b4d2e;
+}
+.tu-method .tu-muted {
+    font-size: 11.5px;
+    color: #8a927a;
+}
+.tu-method-check {
+    flex-shrink: 0;
+    color: #2e7d32;
+    font-size: 17px;
+    font-weight: 800;
+}
+
+/* Logo metode (gambar) */
+.tu-logo {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    padding: 6px;
+    object-fit: contain;
+    background: #ffffff;
+    border: 1px solid #eee6c9;
+    border-radius: 12px;
+}
+/* Jika file logo belum ada: inisial di kotak hijau muda */
+.tu-logo-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: #eaf7e5;
+    border-color: #c7e8bb;
+    color: #1b4d2e;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* ---------- Tombol ---------- */
+.tu-btn {
+    box-sizing: border-box;
+    border: none;
+    background: #1b4d2e;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14.5px;
+    padding: 14px;
+    border-radius: 14px;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(27, 77, 46, 0.22);
+    transition: background 0.15s ease;
+}
+.tu-page > .tu-btn { width: auto; }
+.tu-btn:hover { background: #163f26; }
+.tu-btn:disabled {
+    background: #cfd4c2;
+    color: #6b7a6f;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.tu-btn-ghost {
+    background: #ffffff;
+    color: #4a5240;
+    border: 1.5px solid #dfe3d2;
+    box-shadow: none;
+}
+.tu-btn-ghost:hover { background: #f9faf3; }
+
+/* ---------- Pesan error ---------- */
+.tu-error {
+    background: #fdf1f1;
+    color: #c23a3a;
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+.tu-page > .tu-error { margin-top: 0; }
+
+/* ---------- Langkah 2: pembayaran ---------- */
+.tu-pay { text-align: center; }
+
+.tu-qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin: 14px 0 6px;
+}
+.tu-qr svg {
+    box-sizing: content-box;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid #eee6c9;
+    border-radius: 16px;
+}
+.tu-qr code {
+    max-width: 100%;
+    background: #f9faf3;
+    border: 1px dashed #dfe3d2;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    color: #55603a;
+    word-break: break-all;
+}
+
+.tu-va {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 14px 0 6px;
+    background: #f9faf3;
+    border: 1px dashed #dfe3d2;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.tu-va-number {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    color: #1b4d2e;
+    word-break: break-all;
+    text-align: left;
+}
+.tu-copy {
+    border: none;
+    background: #eaf7e5;
+    color: #2e7d32;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.tu-copy:hover { background: #d7f0cd; }
+
+.tu-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: 14px;
+}
+.tu-timer strong {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: #1b4d2e;
+}
+.tu-timer strong.tu-expired { color: #c23a3a; }
+
+.tu-amount {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eee6c9;
+    text-align: left;
+}
+.tu-amount strong {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: #1b4d2e;
+    white-space: nowrap;
+}
+
+.tu-note {
+    margin: 14px 0 0;
+    background: #eaf7e5;
+    border: 1px solid #c7e8bb;
+    color: #235a2f;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: left;
+}
+
+.tu-waiting {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #55603a;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ---------- Langkah 3: berhasil ---------- */
+.tu-success {
+    background: #ffffff;
+    border: 1px solid #eee6c9;
+    border-radius: 22px;
+    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
+    padding: 28px 18px 20px;
+    text-align: center;
+    animation: tuFadeUp 0.4s ease both;
+}
+.tu-page > .tu-success { margin-top: 32px; }
+
+.tu-check {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    background: linear-gradient(150deg, #1b4d2e, #2e7d32);
+    color: #ffffff;
+    font-size: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 18px rgba(27, 77, 46, 0.28);
+    animation: tuPop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.tu-success h1 {
+    margin: 0 0 4px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: #1b4d2e;
+}
+.tu-success > p {
+    margin: 0 0 16px;
+    font-size: 12.5px;
+    color: #8a927a;
+}
+
+.tu-detail {
+    margin: 0 0 16px;
+    text-align: left;
+}
+.tu-detail > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eee6c9;
+}
+.tu-detail > div:last-child { border-bottom: none; }
+.tu-detail dt {
+    font-size: 12.5px;
+    color: #8a927a;
+}
+.tu-detail dd {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #223423;
+    text-align: right;
+    word-break: break-word;
+}
+.tu-success .tu-btn { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    .tu-card,
+    .tu-success,
+    .tu-check { animation: none; }
+}

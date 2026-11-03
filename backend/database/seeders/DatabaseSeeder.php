@@ -23,9 +23,11 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
         UserSeeder::class,
+        PaymentMethodSeeder::class,
+        MetodePembayaranSeeder::class,
         StationSeeder::class,
+        StationOpSeeder::class,
+        TarifSeeder::class,
     ]);
     }
-
-    
 }

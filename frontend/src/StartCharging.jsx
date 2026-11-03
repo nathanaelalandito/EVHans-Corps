@@ -1,20 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import './startCharging.css';
-import { getStationDetail, konektorLabel } from './api/station';
+import { getStationDetail, konektorLabel, sameConnector } from './api/station';
 import { prepareCharging, estimateCharging, startCharging } from './api/charging';
 
-// Persen baterai tujuan untuk tombol cepat.
 const TARGET_PERCENT_SHORTCUTS = [80, 100];
 
 const roundDownHalf = (x) => Math.floor(x * 2) / 2;
 
-// kWh yang dibutuhkan agar baterai mencapai `percent`, dibatasi min/max dari backend.
 function kwhToReach(percent, p) {
     const need = (p.kapasitas_baterai_kwh * (percent - p.soc_awal)) / 100;
     return Math.min(p.max_target_kwh, Math.max(p.min_target_kwh, roundDownHalf(need)));
 }
 
-// Perkiraan persen baterai setelah menambah `kwh` (maks. 100).
 const socAfter = (kwh, p) => Math.min(100, Math.round(p.soc_awal + (kwh / p.kapasitas_baterai_kwh) * 100));
 
 const rupiah = (v) => (v == null ? '-' : 'Rp' + Number(v).toLocaleString('id-ID'));
@@ -42,20 +39,13 @@ function errorMessage(err, fallback) {
 
 const STEP_NUMBER = { port: 1, plug: 2, battery: 3, amount: 4, estimate: 5, pin: 6, ready: 6 };
 
-// Lembar "Mulai Charging" — dibuka setelah driver sampai di station.
-// Mengikuti alur proses utama (bagian C–E):
-//   1. 'port'     pilih port yang cocok & kosong
-//   2. 'plug'     colokkan kabel pengisian ke mobil
-//   3. 'battery'  baterai awal terdeteksi (diacak backend untuk sementara)
-//   4. 'amount'   driver memilih jumlah kWh yang ingin diisi
-//   5. 'estimate' sistem menghitung estimasi biaya + cek saldo; driver konfirmasi
-//   6. 'pin'      otorisasi PIN -> saldo di-hold -> sesi charging dimulai
-//   +  'ready'    sesi sudah dimulai
-export default function StartCharging({ station, vehicle, position, onClose, onStarted }) {
-    const [step, setStep] = useState('port');
+// initialPortId: port yang sudah dipilih dari daftar station -> langsung ke langkah colok kabel.
+// onTopUp: dipanggil saat saldo tidak cukup (membuka modal Top Up di dashboard).
+export default function StartCharging({ station, vehicle, position, initialPortId = null, onClose, onStarted, onTopUp }) {
+    const [step, setStep] = useState(initialPortId != null ? 'plug' : 'port');
     const [detail, setDetail] = useState(null);
-    const [loadStatus, setLoadStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
-    const [chargerId, setChargerId] = useState(null);
+    const [loadStatus, setLoadStatus] = useState('loading');
+    const [selectedPortId, setSelectedPortId] = useState(initialPortId);
     const [prep, setPrep] = useState(null);
     const [targetKwh, setTargetKwh] = useState('');
     const [estimate, setEstimate] = useState(null);
@@ -80,8 +70,6 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
         };
     }, [station.id_location]);
 
-    // Sesi sudah berjalan di server begitu langkah 'ready' tampil, jadi
-    // menutup lembar di langkah itu tetap harus memberi tahu dashboard.
     const handleClose = () => {
         if (busy) return;
         if (session) onStarted(session);
@@ -92,20 +80,41 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
         const onKey = (e) => e.key === 'Escape' && handleClose();
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [busy, session]);
 
     const connector = vehicle?.tipe_konektor ?? null;
-    const ports = (detail?.chargers ?? []).filter(
-        (c) => c.tipe_konektor === connector && c.status === 'tersedia'
-    );
-    const chosen = (detail?.chargers ?? []).find((c) => c.id_charger === chargerId) ?? null;
 
-    // Kalau hanya ada satu port yang cocok, langsung pilih.
+    // Kumpulkan semua port dari seluruh charger di lokasi ini yang sesuai dengan tipe konektor mobil & statusnya Available
+    const availablePorts = [];
+    if (detail?.chargers) {
+        detail.chargers.forEach((charger) => {
+            if (charger.ports) {
+                charger.ports.forEach((port) => {
+                    // Cek kecocokan konektor (case-insensitive) dan status port 'Available' / 'Tersedia'
+                    const matchConnector = connector ? sameConnector(port.tipe_konektor, connector) : true;
+                    const isAvailable = port.status_port === 'Available' || port.status_port === 'Tersedia';
+                    const machineOk = !charger.status_mesin || charger.status_mesin === 'Active';
+                    
+                    if (matchConnector && isAvailable && machineOk) {
+                        availablePorts.push({
+                            ...port,
+                            kode_perangkat: charger.kode_perangkat,
+                            merek_model: charger.merek_model,
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    const chosenPort = availablePorts.find((p) => p.id_port === selectedPortId) ?? null;
+
+    // Kalau hanya ada satu port yang cocok, langsung pilih otomatis
     useEffect(() => {
-        if (ports.length === 1 && chargerId == null) setChargerId(ports[0].id_charger);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [detail]);
+        if (availablePorts.length === 1 && selectedPortId == null) {
+            setSelectedPortId(availablePorts[0].id_port);
+        }
+    }, [detail, availablePorts, selectedPortId]);
 
     const minKwh = prep?.min_target_kwh ?? 0.5;
     const maxKwh = prep?.max_target_kwh ?? 100;
@@ -113,7 +122,6 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
     const kwhValid = targetKwh !== '' && Number.isFinite(kwhNum) && kwhNum >= minKwh && kwhNum <= maxKwh;
     const sliderValue = Number.isFinite(kwhNum) && targetKwh !== '' ? Math.min(maxKwh, Math.max(minKwh, kwhNum)) : minKwh;
 
-    // Rapikan isian ketik: kalau melewati batas, tarik ke batas terdekat.
     const clampTarget = () => {
         if (targetKwh === '' || !Number.isFinite(kwhNum)) return;
         if (kwhNum > maxKwh) setTargetKwh(String(maxKwh));
@@ -126,38 +134,37 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
         setStep(next);
     };
 
-    // 2 -> 3: kabel terpasang; validasi port + kedatangan, ambil baterai awal.
+    // Langkah 2 -> 3: Kirim id_port ke backend untuk validasi & ambil SOC awal
     const handlePlugged = async () => {
-        if (!vehicle || chargerId == null || busy) return;
+        if (!vehicle || selectedPortId == null || busy) return;
         setBusy(true);
         setError('');
         try {
             const result = await prepareCharging({
-                id_charger: chargerId,
+                id_port: selectedPortId, // Menggunakan id_port
                 id_vehicle: vehicle.id_vehicle,
                 latitude: position.lat,
                 longitude: position.lng,
             });
             setPrep(result);
-            // Isian awal: cukup untuk mencapai 80% (atau penuh kalau sudah di atas 80%).
             setTargetKwh(String(kwhToReach(result.soc_awal >= 80 ? 100 : 80, result)));
             setStep('battery');
         } catch (err) {
             setError(errorMessage(err, 'Gagal memeriksa port. Periksa koneksi lalu coba lagi.'));
-            if (err?.response?.data?.kode === 'port_dipakai') backToPortStep();
+            if (['port_dipakai', 'konektor_tidak_cocok'].includes(err?.response?.data?.kode)) backToPortStep();
         } finally {
             setBusy(false);
         }
     };
 
-    // 4 -> 5: hitung estimasi biaya untuk jumlah kWh yang dipilih.
+    // Langkah 4 -> 5: Hitung estimasi biaya
     const handleCalculate = async () => {
         if (!kwhValid || busy) return;
         setBusy(true);
         setError('');
         try {
             const result = await estimateCharging({
-                id_charger: chargerId,
+                id_port: selectedPortId,
                 id_vehicle: vehicle.id_vehicle,
                 soc_awal: prep.soc_awal,
                 target_kwh: kwhNum,
@@ -171,14 +178,14 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
         }
     };
 
-    // 6: otorisasi PIN -> hold saldo -> mulai sesi.
+    // Langkah 6: Otorisasi PIN & Mulai Sesi
     const handleStart = async () => {
         if (!pinValid || busy) return;
         setBusy(true);
         setError('');
         try {
             const started = await startCharging({
-                id_charger: chargerId,
+                id_port: selectedPortId,
                 id_vehicle: vehicle.id_vehicle,
                 soc_awal: prep.soc_awal,
                 target_kwh: estimate.target_kwh,
@@ -192,12 +199,11 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
             const kode = err?.response?.data?.kode;
             setError(errorMessage(err, 'Gagal memulai sesi charging. Periksa koneksi lalu coba lagi.'));
             setPin('');
-            if (kode === 'port_dipakai') {
+            if (kode === 'port_dipakai' || kode === 'konektor_tidak_cocok') {
                 backToPortStep();
             } else if (kode === 'saldo_tidak_cukup') {
-                // Saldo berubah sejak estimasi — hitung ulang supaya info saldo terbaru.
                 estimateCharging({
-                    id_charger: chargerId,
+                    id_port: selectedPortId,
                     id_vehicle: vehicle.id_vehicle,
                     soc_awal: prep.soc_awal,
                     target_kwh: estimate.target_kwh,
@@ -211,9 +217,8 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
         }
     };
 
-    // Port baru diambil orang lain — kembali pilih port & muat ulang daftar.
     const backToPortStep = () => {
-        setChargerId(null);
+        setSelectedPortId(null);
         setPrep(null);
         setStep('port');
         getStationDetail(station.id_location).then(setDetail).catch(() => {});
@@ -253,7 +258,7 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                 </header>
 
                 <div className="sd-body">
-                    {/* 1 — pilih port */}
+                    {/* 1 — Pilih Port */}
                     {step === 'port' && (
                         <>
                             {!vehicle && (
@@ -271,26 +276,26 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                             {loadStatus === 'error' && (
                                 <p className="sd-error" role="alert">Daftar port tidak dapat dimuat. Tutup lalu coba lagi.</p>
                             )}
-                            {loadStatus === 'ok' && vehicle && ports.length === 0 && (
+                            {loadStatus === 'ok' && vehicle && availablePorts.length === 0 && (
                                 <p className="sd-fit none">
                                     Tidak ada port {konektorLabel(connector)} yang tersedia saat ini.
                                 </p>
                             )}
-                            {loadStatus === 'ok' && ports.length > 0 && (
+                            {loadStatus === 'ok' && availablePorts.length > 0 && (
                                 <ul className="sd-ports" role="radiogroup" aria-label="Port charger">
-                                    {ports.map((c) => (
-                                        <li key={c.id_charger}>
+                                    {availablePorts.map((p) => (
+                                        <li key={p.id_port}>
                                             <button
                                                 type="button"
                                                 role="radio"
-                                                aria-checked={chargerId === c.id_charger}
-                                                className={`sd-port sc-port ${chargerId === c.id_charger ? 'selected' : ''}`}
-                                                onClick={() => setChargerId(c.id_charger)}
+                                                aria-checked={selectedPortId === p.id_port}
+                                                className={`sd-port sc-port ${selectedPortId === p.id_port ? 'selected' : ''}`}
+                                                onClick={() => setSelectedPortId(p.id_port)}
                                             >
                                                 <span className="sd-port-main">
-                                                    <span className="sd-port-code">{c.kode_perangkat}</span>
+                                                    <span className="sd-port-code">{p.kode_perangkat} — {p.nomor_port}</span>
                                                     <span className="sd-port-meta">
-                                                        {konektorLabel(c.tipe_konektor)} · {c.tipe_charging} · {c.daya_kw} kW
+                                                        {konektorLabel(p.tipe_konektor)} · {p.tipe_charging} · {p.daya_maks_kw} kW
                                                     </span>
                                                 </span>
                                                 <span className="sc-radio" aria-hidden="true" />
@@ -303,20 +308,20 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                         </>
                     )}
 
-                    {/* 2 — colok kabel */}
+                    {/* 2 — Colok Kabel */}
                     {step === 'plug' && (
                         <div className="sc-plug">
                             <div className="sc-plug-icon" aria-hidden="true">🔌</div>
                             <h3 className="sc-plug-title">Colokkan kabel pengisian ke mobil Anda</h3>
                             <p className="sd-muted">
-                                Sambungkan kabel dari port <strong>{chosen?.kode_perangkat}</strong> ({konektorLabel(chosen?.tipe_konektor)})
+                                Sambungkan kabel dari port <strong>{chosenPort?.kode_perangkat} ({chosenPort?.nomor_port})</strong> ({konektorLabel(chosenPort?.tipe_konektor)})
                                 ke lubang charging di mobil. Pastikan terpasang kuat, lalu tekan tombol di bawah.
                             </p>
                             {error && <p className="sd-error" role="alert">{error}</p>}
                         </div>
                     )}
 
-                    {/* 3 — baterai terdeteksi */}
+                    {/* 3 — Baterai Terdeteksi */}
                     {step === 'battery' && prep && (
                         <div className="sc-plug">
                             <div className="sc-plug-icon" aria-hidden="true">🔋</div>
@@ -327,7 +332,7 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                         </div>
                     )}
 
-                    {/* 4 — pilih jumlah kWh (maks. sampai baterai 100%) */}
+                    {/* 4 — Jumlah Pengisian */}
                     {step === 'amount' && prep && (
                         <>
                             <p className="sd-muted">
@@ -412,7 +417,7 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                         </>
                     )}
 
-                    {/* 5 — estimasi biaya + cek saldo */}
+                    {/* 5 — Estimasi Biaya */}
                     {step === 'estimate' && estimate && (
                         <>
                             <dl className="sc-breakdown">
@@ -463,6 +468,11 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                             <p className="sd-muted">
                                 Estimasi durasi dihitung dari daya port; durasi sebenarnya tergantung kemampuan mobil Anda.
                             </p>
+                            {!estimate.saldo_cukup && onTopUp && (
+                                <button type="button" className="sd-primary sc-submit" onClick={onTopUp}>
+                                    + Top Up Dompet
+                                </button>
+                            )}
                             {error && <p className="sd-error" role="alert">{error}</p>}
                         </>
                     )}
@@ -491,7 +501,7 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                         </div>
                     )}
 
-                    {/* ready */}
+                    {/* Ready */}
                     {step === 'ready' && session && (
                         <div className="sc-plug">
                             <div className="sc-plug-icon" aria-hidden="true">⚡</div>
@@ -509,7 +519,7 @@ export default function StartCharging({ station, vehicle, position, onClose, onS
                         <button
                             className="sd-primary sc-submit"
                             onClick={() => goTo('plug')}
-                            disabled={!vehicle || chargerId == null}
+                            disabled={!vehicle || selectedPortId == null}
                         >
                             Lanjut
                         </button>

@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Charger;
 
 class ChargingSession extends Model
 {
     use HasFactory;
 
-    public const AKTIF = ['pending', 'berlangsung'];
+    /** Status sesi yang dianggap masih aktif (sama dengan enum kolom `status`). */
+    public const AKTIF = ['Pending', 'Berlangsung'];
 
     protected $table = 'charging_session';
     protected $primaryKey = 'id_session';
@@ -19,6 +21,10 @@ class ChargingSession extends Model
         'waktu_mulai' => 'datetime',
         'waktu_selesai' => 'datetime',
         'total_energi_kwh' => 'float',
+        'target_energi_kwh' => 'float',
+        'estimasi_biaya_charging' => 'integer',
+        'estimasi_biaya_parkir' => 'integer',
+        'saldo_hold' => 'integer',
         'soc_awal' => 'integer',
         'soc_akhir' => 'integer',
     ];
@@ -33,6 +39,12 @@ class ChargingSession extends Model
         return $this->belongsTo(Charger::class, 'id_charger', 'id_charger');
     }
 
+    /** Port (konektor) yang dipakai sesi ini. */
+    public function port()
+    {
+        return $this->belongsTo(Port::class, 'id_port', 'id_port');
+    }
+
     public function tarif()
     {
         return $this->belongsTo(Tarif::class, 'id_tarif', 'id_tarif');
@@ -41,5 +53,16 @@ class ChargingSession extends Model
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class, 'id_vehicle', 'id_vehicle');
+    }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class, 'id_session', 'id_session');
+    }
+
+    /** Estimasi total (charging + parkir) yang di-hold saat sesi dimulai. */
+    public function estimasiBiaya(): int
+    {
+        return (int) $this->estimasi_biaya_charging + (int) $this->estimasi_biaya_parkir;
     }
 }

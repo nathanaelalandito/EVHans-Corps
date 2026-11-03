@@ -22,7 +22,7 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
             $table->integer('total_bayar');
-            $table->enum('status_pembayaran', ['pending', 'sukses', 'gagal'])->default('pending');
+            $table->enum('status_pembayaran', ['Pending', 'Sukses', 'Gagal'])->default('Pending');
             $table->datetime('waktu_pembayaran');
             $table->string('referensi_gateway')->nullable();
             $table->timestamps();

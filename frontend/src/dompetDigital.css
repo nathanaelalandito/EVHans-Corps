@@ -550,6 +550,15 @@
 .dmp-trx-nominal.keluar {
     color: #555555;
 }
+/* Pembayaran Charging: merah */
+.dmp-trx-icon.charging {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.dmp-trx-nominal.charging {
+    color: #c62828;
+}
 
 .dmp-trx-status {
     font-size: 12px;

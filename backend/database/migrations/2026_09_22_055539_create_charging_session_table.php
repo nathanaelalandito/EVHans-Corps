@@ -34,7 +34,7 @@ return new class extends Migration
             $table->datetime('waktu_mulai');
             $table->datetime('waktu_selesai')->nullable();
             $table->decimal('total_energi_kwh', 8, 2);
-            $table->enum('status', ['pending', 'berlangsung', 'selesai', 'dibatalkan'])->default('pending');
+            $table->enum('status', ['Pending', 'Berlangsung', 'Selesai', 'Dibatalkan'])->default('Pending');
             $table->unsignedTinyInteger('soc_awal');
             $table->unsignedTinyInteger('soc_akhir')->nullable();
             $table->timestamps();

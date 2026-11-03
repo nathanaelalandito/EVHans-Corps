@@ -4,22 +4,80 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Tarif extends Model
 {
     use HasFactory;
 
     protected $table = 'tarif';
+
     protected $primaryKey = 'id_tarif';
-    protected $guarded = [];
+
+    protected $fillable = [
+        'id_location',
+        'harga_per_kwh',
+        'biaya_minimum',
+        'biaya_parkir_pjam',
+        'periode_mulai',
+        'periode_berakhir',
+    ];
 
     protected $casts = [
+        'harga_per_kwh' => 'integer',
+        'biaya_minimum' => 'integer',
+        'biaya_parkir_pjam' => 'integer',
         'periode_mulai' => 'datetime',
         'periode_berakhir' => 'datetime',
     ];
 
+    /**
+     * Relasi: Tarif ini dimiliki oleh sebuah Lokasi Stasiun
+     */
     public function location()
     {
         return $this->belongsTo(Location::class, 'id_location', 'id_location');
+    }
+
+    /**
+     * Scope query: Mempermudah filter tarif yang sedang aktif saat ini
+     */
+    public function scopeAktif($query)
+    {
+        $now = Carbon::now();
+        return $query->where('periode_mulai', '<=', $now)
+                     ->where('periode_berakhir', '>=', $now);
+    }
+
+    /**
+     * Rincian biaya untuk sejumlah kWh pada port berdaya $powerKw:
+     *  - biaya charging = kWh x tarif/kWh, minimal biaya minimum
+     *  - durasi         = kWh / daya port (kW)
+     *  - biaya parkir   = tarif parkir x jam berjalan (dibulatkan ke atas, min. 1 jam)
+     * Dipakai bersama oleh estimasi (start), penyelesaian sesi, dan invoice.
+     */
+    public function costFor(float $kwh, float $powerKw): array
+    {
+        $kwh = round($kwh, 2);
+        $powerKw = max(1, $powerKw);
+        $durationMinutes = (int) ceil($kwh / $powerKw * 60);
+
+        $chargingCost = max((int) round($kwh * $this->harga_per_kwh), (int) $this->biaya_minimum);
+
+        $parkingHours = max(1, (int) ceil($durationMinutes / 60));
+        $parkingCost = $parkingHours * (int) $this->biaya_parkir_pjam;
+
+        return [
+            'target_kwh' => $kwh,
+            'daya_kw' => $powerKw,
+            'durasi_menit' => $durationMinutes,
+            'harga_per_kwh' => (int) $this->harga_per_kwh,
+            'biaya_minimum' => (int) $this->biaya_minimum,
+            'biaya_charging' => $chargingCost,
+            'jam_parkir' => $parkingHours,
+            'biaya_parkir_per_jam' => (int) $this->biaya_parkir_pjam,
+            'biaya_parkir' => $parkingCost,
+            'total' => $chargingCost + $parkingCost,
+        ];
     }
 }

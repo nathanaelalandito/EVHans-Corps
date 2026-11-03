@@ -21,7 +21,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
             $table->integer('saldo')->default(0);
             $table->string('pin_transaksi');
-            $table->enum('status_dompet', ['aktif', 'nonaktif'])->default('aktif');
+            $table->enum('status_dompet', ['Aktif', 'Nonaktif'])->default('Aktif');
             $table->timestamps();
         });
     }

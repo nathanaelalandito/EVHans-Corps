@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import TopUp from './Topup'; // sesuaikan nama file: Topup.jsx / TopUp.jsx
 import './dompetDigital.css';
 import {
     getWallet,
@@ -50,7 +51,7 @@ function statusLabel(status) {
     return STATUS_LABEL[status] ?? status;
 }
 
-export default function DompetDigital({ onBack }) {
+export default function DompetDigital({ onBack, onNavigateToTopUp }) {
     // Inisialisasi langsung dari cache modul supaya layar PIN/buat-PIN
     // tampil seketika; data fresh tetap di-refresh di latar belakang.
     const [status, setStatus] = useState(() => {
@@ -112,6 +113,21 @@ export default function DompetDigital({ onBack }) {
 
     const handleDigits = (setter) => (e) => {
         setter(e.target.value.replace(/\D/g, '').slice(0, 6));
+    };
+    // Dipanggil TopUp saat user menekan "Kembali ke Beranda"
+    const handleTopupDone = async (saldoBaru) => {
+        if (typeof saldoBaru === 'number') {
+            setWallet((prev) => ({ ...(prev || {}), saldo: saldoBaru }));
+        }
+        try {
+            // Ambil ulang saldo + riwayat supaya top up baru langsung muncul
+            const data = await getTransactions();
+            setTransactions(data.transactions || []);
+            setWallet((prev) => ({ ...(prev || {}), saldo: data.saldo }));
+        } catch {
+            /* abaikan, data lama tetap tampil */
+        }
+        setStatus('wallet');
     };
 
     const handleVerifyPin = async (e) => {
@@ -658,6 +674,15 @@ export default function DompetDigital({ onBack }) {
             </div>
         );
     }
+    
+    if (status === 'topup') {
+    return (
+        <TopUp
+            onBack={() => setStatus('wallet')}
+            onDone={handleTopupDone}
+        />
+    );
+    }
 
     // status === 'wallet'
     const locked = wallet?.terkunci;
@@ -719,11 +744,10 @@ export default function DompetDigital({ onBack }) {
             </div>
 
             <div className="dmp-actions">
-                <button className="dmp-action" onClick={() => {}} disabled title="Fitur Top Up">
-                    <span className="dmp-action-icon">➕</span>
-                    <span className="dmp-action-label">Top Up</span>
-                    <span className="dmp-action-tag">Segera hadir</span>
-                </button>
+                   <button className="dmp-action"   onClick={() => setStatus('topup')}disabled={locked || wallet?.status_dompet !== 'aktif'}title="Top Up saldo">
+                         <span className="dmp-action-icon">➕</span>
+                        <span className="dmp-action-label">Top Up</span>
+                    </button>
                 <button className="dmp-action" onClick={() => setStatus('managePin')}>
                     <span className="dmp-action-icon">🔒</span>
                     <span className="dmp-action-label">Kelola PIN</span>
@@ -793,23 +817,29 @@ export default function DompetDigital({ onBack }) {
                             </div>
                         ) : (
                             <ul className="dmp-mutasi-list">
-                                {filteredTransactions.map((trx) => (
-                                    <li key={trx.id} className="dmp-trx">
-                                        <span className={`dmp-trx-icon ${trx.tipe === 'masuk' ? 'masuk' : 'keluar'}`}>
-                                            {trx.tipe === 'masuk' ? '↓' : '↑'}
-                                        </span>
-                                        <div className="dmp-trx-info">
-                                            <p className="dmp-trx-name">{trx.jenis}</p>
-                                            <p className="dmp-trx-time">{formatWaktu(trx.waktu)}</p>
-                                        </div>
-                                        <div className="dmp-trx-right">
-                                            <p className={`dmp-trx-nominal ${trx.tipe === 'masuk' ? 'masuk' : 'keluar'}`}>
-                                                {trx.tipe === 'masuk' ? '+' : '−'} {formatRupiah(trx.nominal)}
-                                            </p>
-                                            <p className={`dmp-trx-status ${trx.status}`}>{statusLabel(trx.status)}</p>
-                                        </div>
-                                    </li>
-                                ))}
+                                {filteredTransactions.map((trx) => {
+                                    const isCharging = trx.jenis === 'Pembayaran Charging';
+                                    const arah = trx.tipe === 'masuk' ? 'masuk' : 'keluar';
+                                    const extra = isCharging ? ' charging' : '';
+
+                                    return (
+                                        <li key={trx.id} className="dmp-trx">
+                                            <span className={`dmp-trx-icon ${arah}${extra}`}>
+                                                {trx.tipe === 'masuk' ? '↓' : '↑'}
+                                            </span>
+                                            <div className="dmp-trx-info">
+                                                <p className="dmp-trx-name">{trx.jenis}</p>
+                                                <p className="dmp-trx-time">{formatWaktu(trx.waktu)}</p>
+                                            </div>
+                                            <div className="dmp-trx-right">
+                                                <p className={`dmp-trx-nominal ${arah}${extra}`}>
+                                                    {trx.tipe === 'masuk' ? '+' : '−'} {formatRupiah(trx.nominal)}
+                                                </p>
+                                                <p className={`dmp-trx-status ${trx.status}`}>{statusLabel(trx.status)}</p>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </>
