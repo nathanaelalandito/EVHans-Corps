@@ -359,9 +359,9 @@ class ChargingSessionController extends Controller
         }
         $location = $charger->location;
 
-        if ($location->status !== 'aktif') {
-            return $this->fail('Station sedang tidak beroperasi.', 422);
-        }
+        if (strtolower(trim((string) $location->status)) !== 'aktif') {
+                return $this->fail('Station sedang tidak beroperasi.', 422);
+            }
         if (! $this->isOpenNow($location->jam_buka, $location->jam_tutup)) {
             return $this->fail('Station sedang tutup.', 422);
         }

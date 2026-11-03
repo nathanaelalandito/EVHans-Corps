@@ -627,6 +627,7 @@ export default function DriverDashboard({
             if (isNotFound) {
                 setActiveSession(null);
                 setShowNotif(false);
+                setSessionError('');
                 reloadStations();
                 fetchWallet();
             }
