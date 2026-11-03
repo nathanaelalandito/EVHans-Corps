@@ -3149,3 +3149,46 @@
         margin: -40px auto 0;
     }
 }
+
+/* FIX: bottom sheet tidak boleh menutupi top bar & filter konektor */
+
+/* HP */
+.mapdash-sheet.expanded {
+    max-height: calc(100vh - 130px); /* fallback browser lama */
+    max-height: calc(100dvh - 130px);
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Tablet */
+@media (min-width: 700px) {
+    .mapdash-sheet.expanded {
+        max-height: calc(100dvh - 146px);
+    }
+}
+
+/* Laptop / desktop: panel kiri mulai di bawah baris filter */
+@media (min-width: 1024px) {
+    .mapdash-sheet {
+        top: 130px;
+    }
+
+    .mapdash-sheet.expanded {
+        max-height: none;
+    }
+}
+
+/* Tombol "Selesai" setelah sesi charging dihentikan */
+.dash-btn-stop.done {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #ffffff;
+}
+.dash-btn-stop.done:hover {
+    background: #1b4d2e;
+}
+
+/* Sheet peta saat ada sesi: tinggi mengikuti isi, scroll bila struk panjang */
+.mapdash-sheet.expanded {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}

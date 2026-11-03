@@ -11,6 +11,7 @@ import { getStations, distanceKm, distanceMeters, ARRIVAL_RADIUS_M, konektorLabe
 import { getActiveSession, stopCharging } from './api/charging';
 import StationDetail from './StationDetail';
 import StartCharging from './StartCharging';
+import StrukDigital from './StrukDigital';
 
 // Ambil pesan error yang enak dibaca dari response axios (baik yang
 // bentuknya {message} maupun {errors: {field: [..]}} ala Laravel).
@@ -165,6 +166,9 @@ export default function DriverDashboard({
     const [sheetExpanded, setSheetExpanded] = useState(false);
     const [selectedStationId, setSelectedStationId] = useState(null);
     const [showNotif, setShowNotif] = useState(!!DUMMY_ACTIVE_SESSION);
+    const [showStruk, setShowStruk] = useState(false);
+    const [strukData, setStrukData] = useState(null);
+    const sessionEnded = showStruk && !!strukData;
     const [showSettings, setShowSettings] = useState(false);
 
     // --- Dompet & PIN Dompet (data asli dari backend) -----------------
@@ -520,12 +524,12 @@ export default function DriverDashboard({
     // Timer sesi charging berjalan — di production, energi_kwh & waktu
     // sebaiknya di-refresh dari data yang dikirim Perangkat Charger (FR19).
     useEffect(() => {
-        if (!activeSession) return;
-        const tick = () => setElapsed(Date.now() - activeSession.waktu_mulai);
-        tick();
-        const interval = setInterval(tick, 1000 * 30);
-        return () => clearInterval(interval);
-    }, [activeSession]);
+    if (!activeSession || sessionEnded) return;
+    const tick = () => setElapsed(Date.now() - activeSession.waktu_mulai);
+    tick();
+    const interval = setInterval(tick, 1000 * 30);
+    return () => clearInterval(interval);
+}, [activeSession, sessionEnded]);
 
     // ---------------------------------------------------------------
     // Peta disembunyikan lewat CSS (display:none) saat view === 'home',
@@ -551,22 +555,22 @@ export default function DriverDashboard({
     const activeSessionId = activeSession?.id_session;
     const activeSessionFull = activeSession?.sudah_penuh;
     useEffect(() => {
-        if (!activeSessionId || activeSessionFull) return;
-        let cancelled = false;
-        const poll = () => {
-            getActiveSession()
-                .then((session) => {
-                    if (cancelled || !session || session.id_session !== activeSessionId) return;
-                    setActiveSession(session);
-                })
-                .catch(() => {});
-        };
-        const interval = setInterval(poll, 3000);
-        return () => {
-            cancelled = true;
-            clearInterval(interval);
-        };
-    }, [activeSessionId, activeSessionFull]);
+    if (!activeSessionId || activeSessionFull || sessionEnded) return;
+    let cancelled = false;
+    const poll = () => {
+        getActiveSession()
+            .then((session) => {
+                if (cancelled || !session || session.id_session !== activeSessionId) return;
+                setActiveSession(session);
+            })
+            .catch(() => {});
+    };
+    const interval = setInterval(poll, 3000);
+    return () => {
+        cancelled = true;
+        clearInterval(interval);
+    };
+}, [activeSessionId, activeSessionFull, sessionEnded]);
 
     const sessionProgressPct =
         activeSession && activeSession.target_kwh > 0
@@ -581,19 +585,51 @@ export default function DriverDashboard({
           Math.round(activeSession.energi_kwh * activeSession.tarif_per_kwh + activeSession.biaya_parkir)
         : 0;
 
+    // Dipanggil saat tombol "Selesai" ditekan setelah struk muncul.
+    const finishSession = () => {
+        setShowStruk(false);
+        setStrukData(null);
+        setActiveSession(null);
+        setShowNotif(false);
+        setSheetExpanded(false);
+        setView('home');
+    };
+
     const handleStopSession = async () => {
         if (!activeSession || stoppingSession) return;
         setStoppingSession(true);
         setSessionError('');
         try {
-            await stopCharging(activeSession.id_session);
-            // TODO: tampilkan hasil penyelesaian transaksi (FR34 / FR37).
-            setActiveSession(null);
+            const receipt = await stopCharging(activeSession.id_session);
+            if (receipt && typeof receipt === 'object') {
+                setStrukData(receipt);
+                setShowStruk(true);
+                // activeSession sengaja TIDAK dihapus: kartu sesi tetap tampil,
+                // struk muncul di bawah tombol, tombol berubah jadi "Selesai".
+            } else {
+                setSessionError('Gagal memuat struk digital. Data transaksi tidak valid.');
+            }
             setShowNotif(false);
             reloadStations();
-            fetchWallet(); // dana yang di-hold sudah dilepas
+            fetchWallet();
         } catch (err) {
-            setSessionError(extractErrorMessage(err, 'Gagal menghentikan sesi charging. Coba lagi.'));
+            const message = extractErrorMessage(err, 'Gagal menghentikan sesi charging. Coba lagi.');
+            setSessionError(message);
+
+            if (err?.response?.status === 401) {
+                onLogout?.();
+            }
+
+            const isNotFound =
+                err?.response?.status === 404 ||
+                (err?.response?.data?.message || '').includes('tidak ditemukan');
+
+            if (isNotFound) {
+                setActiveSession(null);
+                setShowNotif(false);
+                reloadStations();
+                fetchWallet();
+            }
         } finally {
             setStoppingSession(false);
         }
@@ -945,11 +981,20 @@ export default function DriverDashboard({
                         </div>
                     )}
 
+                    {sessionError && !activeSession && (
+                        <div className="mapdash-notif home-notif" role="alert">
+                            <span>⚠️ {sessionError}</span>
+                            <button className="mapdash-notif-close" onClick={() => setSessionError('')}>✕</button>
+                        </div>
+                    )}
+
                     {activeSession && (
                         <section className="home-session-card">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title home-session-title">Sesi Charging Berlangsung</span>
-                                <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
+                              <span className="dash-status-badge ok">
+                                ● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Penuh' : activeSession.status}
+                            </span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}</p>
 
@@ -974,17 +1019,22 @@ export default function DriverDashboard({
                                     <p className="stat-label">Estimasi Biaya</p>
                                 </div>
                             </div>
-                            {sessionError && <p className="route-card-error" role="alert">{sessionError}</p>}
                             <div className="home-session-actions">
-                                <button className="dash-btn-navigate home-session-map-btn" onClick={goToActiveSessionOnMap}>
-                                    🗺️ Lihat di Peta
-                                </button>
-                                <button className="dash-btn-stop" onClick={handleStopSession} disabled={stoppingSession}>
-                                    {stoppingSession ? 'Menghentikan…' : activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
-                                </button>
-                            </div>
+                            <button className="dash-btn-navigate home-session-map-btn" onClick={goToActiveSessionOnMap}>
+                                🗺️ Lihat di Peta
+                            </button>
+                            <button
+                                className={`dash-btn-stop ${sessionEnded ? 'done' : ''}`}
+                                onClick={sessionEnded ? finishSession : handleStopSession}
+                                disabled={stoppingSession}
+                            >
+                                {stoppingSession ? 'Menghentikan…' : sessionEnded ? 'Selesai' : 'Hentikan Sesi Charging'}
+                            </button>
+                        </div>
+                        {sessionEnded && <StrukDigital data={strukData} />}
                         </section>
                     )}
+                    
 
                     <button className="home-cta-map" onClick={() => goToMap()}>
                         <span className="home-cta-icon">🗺️</span>
@@ -1250,7 +1300,7 @@ export default function DriverDashboard({
                 </button>
 
                 {/* Bottom sheet */}
-                <div className={`mapdash-sheet ${sheetExpanded ? 'expanded' : ''}`}>
+               <div className={`mapdash-sheet ${sheetExpanded || activeSession ? 'expanded' : ''}`}>
                     <button
                         className="mapdash-sheet-handle"
                         onClick={() => setSheetExpanded((v) => !v)}
@@ -1261,7 +1311,9 @@ export default function DriverDashboard({
                         <div className="mapdash-session">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title">Sesi Charging Berlangsung</span>
-                                <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
+                               <span className="dash-status-badge ok">
+                                    ● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Penuh' : activeSession.status}
+                                </span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}</p>
 
@@ -1286,12 +1338,18 @@ export default function DriverDashboard({
                                     <p className="stat-label">Estimasi Biaya</p>
                                 </div>
                             </div>
-                            {sessionError && <p className="route-card-error" role="alert">{sessionError}</p>}
-                            <button className="dash-btn-stop" onClick={handleStopSession} disabled={stoppingSession}>
-                                {stoppingSession ? 'Menghentikan…' : activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi Charging'}
+                            <button
+                                className={`dash-btn-stop ${sessionEnded ? 'done' : ''}`}
+                                onClick={sessionEnded ? finishSession : handleStopSession}
+                                disabled={stoppingSession}
+                            >
+                                {stoppingSession ? 'Menghentikan…' : sessionEnded ? 'Selesai' : 'Hentikan Sesi Charging'}
                             </button>
-                        </div>
-                    ) : (
+
+                            {sessionEnded && <StrukDigital data={strukData} />}
+                            </div>
+                            ) : null}
+                    {activeSession ? null : (
                         <>
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title">{filteredStations.length} Charging Station Terdekat</span>

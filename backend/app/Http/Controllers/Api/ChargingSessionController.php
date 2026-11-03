@@ -227,7 +227,8 @@ class ChargingSessionController extends Controller
  */
    public function stop(Request $request, string $id): JsonResponse
 {
-    $idUser = $request->user()->id_user;
+    $user = $request->user();
+    $idUser = $user->id_user;
     $result = DB::transaction(function () use ($id, $idUser) {
         // Kunci sesi supaya klik ganda tidak memotong saldo dua kali.
         $session = ChargingSession::with(['charger', 'tarif', 'vehicle'])
@@ -298,18 +299,37 @@ class ChargingSessionController extends Controller
             'biaya_parkir' => $biayaParkir,
             'total' => $total,
             'saldo' => (int) ($w->saldo ?? 0),
+            'jam_parkir' => $jamParkir,
+            'biaya_minimum' => (int) $tarif->biaya_minimum,
+            'durasi_menit' => max(1, (int) ceil($sim['durasi_detik'] / 3600)),
         ];
     });
     if ($result === null) {
         return $this->fail('Sesi charging yang berlangsung tidak ditemukan.', 404);
     }
+    $metodePembayaran = $result['total'] > 0
+        ? ($result['session']->payment?->metode?->nama_metode ?? 'Saldo Dompet')
+        : 'Saldo Dompet';
+
     return response()->json([
         'message' => 'Sesi charging selesai dan pembayaran berhasil.',
-        'data' => $this->present($result['session']->fresh(['charger.location', 'tarif', 'vehicle'])) + [
+        'data' => $this->present($result['session']->fresh(['charger.location', 'tarif', 'vehicle', 'payment.metode'])) + [
             'biaya_charging_aktual' => $result['biaya_charging'],
             'biaya_parkir_aktual' => $result['biaya_parkir'],
             'total_bayar' => $result['total'],
             'saldo' => $result['saldo'],
+            'kendaraan' => $result['session']->vehicle ? [
+                'model' => $result['session']->vehicle->model,
+                'nomor_polisi' => $result['session']->vehicle->nomor_polisi,
+            ] : null,
+            'pengguna' => optional($user->profile)->nama_lengkap
+                ?? $user->email
+                ?? null,
+            'jam_parkir' => $result['jam_parkir'],
+            'biaya_minimum' => $result['biaya_minimum'],
+            'durasi_menit' => $result['durasi_menit'],
+            'metode_pembayaran' => $metodePembayaran,
+            'status_label' => 'Selesai',
         ],
     ]);
 }

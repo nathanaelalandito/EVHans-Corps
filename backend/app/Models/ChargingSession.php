@@ -40,4 +40,9 @@ class ChargingSession extends Model
     {
         return $this->belongsTo(Vehicle::class, 'id_vehicle', 'id_vehicle');
     }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class, 'id_session', 'id_session');
+    }
 }

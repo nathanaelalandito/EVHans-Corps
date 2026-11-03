@@ -52,6 +52,10 @@ export async function getActiveSession() {
 }
 
 export async function stopCharging(idSession) {
-    const { data } = await api.post(`/charging/${idSession}/stop`);
-    return data;
+    const response = await api.post(`/charging/${idSession}/stop`);
+    const payload = response.data?.data ?? response.data;
+    if (typeof payload === 'string') {
+        throw new Error('Sesi berakhir. Silakan login kembali.');
+    }
+    return payload;
 }
