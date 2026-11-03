@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class UserSeeder extends Seeder
 {
@@ -90,28 +89,32 @@ class UserSeeder extends Seeder
             }
 
             // Generate id_user 13 karakter: prefix (3) + nomor urut (10 digit)
-            $idUser = $prefix . str_pad($counter, 10, '0', STR_PAD_LEFT);
+            $idUser = $prefix.str_pad($counter, 10, '0', STR_PAD_LEFT);
 
-            DB::table('users')->insert([
-                'id_user' => $idUser,
-                'email' => $data['email'],
-                'email_verified_at' => Carbon::now(),
-                'password' => Hash::make('password123'), // password default untuk semua dummy
-                'peran' => $data['peran'],
-                'status_akun' => $data['status_akun'],
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]);
+            DB::table('users')->updateOrInsert(
+                ['id_user' => $idUser],
+                [
+                    'email' => $data['email'],
+                    'email_verified_at' => Carbon::now(),
+                    'password' => Hash::make('password123'), // password default untuk semua dummy
+                    'peran' => $data['peran'],
+                    'status_akun' => $data['status_akun'],
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]
+            );
 
-            DB::table('user_profile')->insert([
-                'id_user' => $idUser,
-                'nama_lengkap' => $data['nama_lengkap'],
-                'nomor_telepon' => $data['nomor_telepon'],
-                'alamat' => $data['alamat'],
-                'tanggal_lahir' => $data['tanggal_lahir'],
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]);
+            DB::table('user_profile')->updateOrInsert(
+                ['id_user' => $idUser],
+                [
+                    'nama_lengkap' => $data['nama_lengkap'],
+                    'nomor_telepon' => $data['nomor_telepon'],
+                    'alamat' => $data['alamat'],
+                    'tanggal_lahir' => $data['tanggal_lahir'],
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]
+            );
 
             $counter++;
         }
