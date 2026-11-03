@@ -17,6 +17,7 @@ class PaymentController extends Controller
             'method',
             'refund',
             'session.charger.location',
+            'session.port',
             'session.vehicle',
             'session.tarif',
             'topup.wallet',
@@ -37,6 +38,7 @@ class PaymentController extends Controller
             'method',
             'refund',
             'session.charger.location',
+            'session.port',
             'session.vehicle',
             'session.tarif',
             'topup.wallet',
@@ -116,7 +118,10 @@ class PaymentController extends Controller
         }
 
         $session = $payment->session;
-        $chargingCost = $session ? (int) round((float) $session->total_energi_kwh * $session->tarif->harga_per_kwh) : 0;
+        $actualKwh = $session ? (float) $session->total_energi_kwh : 0;
+        $costBreakdown = $session && $actualKwh > 0
+            ? $session->tarif->costFor($actualKwh, (float) ($session->port?->daya_maks_kw ?? $session->charger?->kap_tot_kw ?? 1))
+            : null;
 
         return [
             'id_payment' => $payment->id_payment,
@@ -125,17 +130,19 @@ class PaymentController extends Controller
             'nama_lokasi' => $session?->charger?->location?->nama_lokasi ?? 'Charging EV',
             'alamat' => $session?->charger?->location?->alamat,
             'kode_charger' => $session?->charger?->kode_perangkat,
+            'nomor_port' => $session?->port?->nomor_port,
             'kendaraan' => $session ? [
                 'nama' => "{$session->vehicle->merek} {$session->vehicle->model}",
                 'nomor_polisi' => $session->vehicle->nomor_polisi,
-                'tipe_konektor' => $session->vehicle->tipe_konektor,
+                'tipe_konektor' => \App\Models\Port::CONNECTOR_LABELS[$session->vehicle->tipe_konektor] ?? $session->vehicle->tipe_konektor,
             ] : null,
             'energi_kwh' => $session ? (float) $session->total_energi_kwh : 0,
             'tarif_per_kwh' => $session?->tarif?->harga_per_kwh ?? 0,
-            'biaya_charging' => $chargingCost,
-            'biaya_parkir' => $session?->tarif?->biaya_parkir_pjam ?? 0,
+            'biaya_charging' => $costBreakdown['biaya_charging'] ?? 0,
+            'biaya_parkir' => $costBreakdown['biaya_parkir'] ?? 0,
             'biaya_aktual' => $payment->total_bayar,
-            'jumlah_hold' => $session?->jumlah_hold ?? 0,
+            'saldo_hold' => $session?->saldo_hold ?? 0,
+            'jumlah_hold' => $session?->saldo_hold ?? 0,
             'selisih_dikembalikan' => $payment->refund?->nominal ?? 0,
             'metode_pembayaran' => $payment->method?->nama_metode,
             'status' => $this->paymentStatusLabel($payment->status_pembayaran),
@@ -154,7 +161,7 @@ class PaymentController extends Controller
 
     private function paymentStatusLabel(string $status): string
     {
-        return match ($status) {
+        return match (strtolower($status)) {
             'pending' => 'Pending',
             'sukses' => 'Sukses',
             'gagal' => 'Gagal',

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Dompet;
 use App\Models\User;
 use App\Models\UserProfile;
 use Illuminate\Support\Facades\Hash;
@@ -42,29 +43,29 @@ class AuthController extends Controller
             $prefix = 'OPS';
         }
 
-        // Generate ID otomatis (ADM001, OPS001, DRV001)
+        // Generate ID otomatis (ADM, OPS, DRV) - format char(13)
         $lastUser = User::where('id_user', 'LIKE', "{$prefix}%")
                         ->orderBy('id_user', 'desc')
                         ->first();
 
+        $nextNumber = 1;
         if ($lastUser) {
-            $lastNumber = (int) str_replace($prefix, '', $lastUser->id_user);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
+            $cleaned = preg_replace('/[^0-9]/', '', $lastUser->id_user);
+            $nextNumber = ((int) $cleaned) + 1;
         }
 
-        $year = date('Y'); // Mengambil tahun saat ini (misal: 2026)
-        $paddedNumber = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-        $customId = "{$prefix}-{$year}-{$paddedNumber}";
+        $paddedNumber = str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
+        $customId = "{$prefix}{$paddedNumber}";
+
+        $peran = $prefix === 'ADM' ? 'admin' : ($prefix === 'OPS' ? 'operator' : 'driver');
 
         // 2. Simpan ke tabel Users
         $user = User::create([
             'id_user' => $customId,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'peran' => $prefix === 'ADM' ? 'admin' : ($prefix === 'OPS' ? 'operator' : 'user'),
-            'status_akun' => 'aktif',
+            'peran' => $peran,
+            'status_akun' => 'Aktif',
         ]);
 
         // 3. Simpan ke tabel User_Profile (dengan data lengkap)
@@ -75,6 +76,12 @@ class AuthController extends Controller
             'alamat' => $request->alamat,
             'tanggal_lahir' => $request->tanggal_lahir,
         ]);
+
+        // 4. Buat Dompet Digital EVChargeHub otomatis (PRD 7.1)
+        Dompet::firstOrCreate(
+            ['id_user' => $user->id_user],
+            ['saldo' => 0, 'saldo_hold' => 0, 'status_dompet' => 'Aktif']
+        );
 
         DB::commit();
 
@@ -113,7 +120,7 @@ class AuthController extends Controller
             ], 401);
         }
 
-        if ($user->status_akun !== 'aktif') {
+        if ($user->status_akun !== 'Aktif') {
             return response()->json([
                 'message' => 'Akun Anda tidak aktif. Hubungi admin.'
             ], 403);

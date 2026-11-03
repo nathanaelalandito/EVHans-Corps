@@ -25,7 +25,32 @@ export async function createTarif(idLocation, payload) {
     return data.data ?? data;
 }
 
+export async function assignOperatorStation(idUser, idLocation) {
+    const { data } = await api.put(`/operations/operators/${idUser}/station`, { id_location: idLocation });
+    return data.data ?? data;
+}
+
+export async function updateOperatorStatus(idUser, statusAkun) {
+    const { data } = await api.put(`/operations/operators/${idUser}/status`, { status_akun: statusAkun });
+    return data.data ?? data;
+}
+
 export async function createOperator(payload) {
     const { data } = await api.post('/operations/operators', payload);
+    return data.data ?? data;
+}
+
+export async function getAuditLogs() {
+    const { data } = await api.get('/operations/audit-logs');
+    return data.data ?? data;
+}
+
+export async function getSystemConfig() {
+    const { data } = await api.get('/operations/config');
+    return data.data ?? data;
+}
+
+export async function updateSystemConfig(payload) {
+    const { data } = await api.put('/operations/config', payload);
     return data.data ?? data;
 }

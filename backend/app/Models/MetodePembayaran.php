@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Payment;
 
 class MetodePembayaran extends Model
 {
-    protected $table = 'metode_pembayaran';
+    use HasFactory;
 
+    protected $table = 'metode_pembayaran';
     protected $primaryKey = 'id_metode';
 
     protected $fillable = [
@@ -19,4 +22,8 @@ class MetodePembayaran extends Model
     protected $casts = [
         'biaya_layanan' => 'integer',
     ];
+    public function payment(){
+        return $this->hasMany(Payment::class, 'id_metode', 'id_metode');
+    }
+
 }

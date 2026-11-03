@@ -6,33 +6,31 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('dompet', function (Blueprint $table) {
-            $table->integer('saldo_ditahan')->default(0)->after('saldo');
+            // Dana yang ditahan (hold) untuk sesi charging yang sedang berjalan.
+            $table->integer('saldo_hold')->default(0);
         });
 
         Schema::table('charging_session', function (Blueprint $table) {
-            $table->decimal('target_energi_kwh', 8, 2)->default(0)->after('total_energi_kwh');
-            $table->integer('estimasi_biaya')->default(0)->after('target_energi_kwh');
-            $table->integer('jumlah_hold')->default(0)->after('estimasi_biaya');
+            // Jumlah energi yang dipilih driver + estimasi biaya saat sesi dimulai.
+            $table->decimal('target_energi_kwh', 8, 2)->nullable();
+            $table->integer('estimasi_biaya_charging')->nullable();
+            $table->integer('estimasi_biaya_parkir')->nullable();
+            // Total dana yang di-hold dari dompet untuk sesi ini.
+            $table->integer('saldo_hold')->default(0);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('charging_session', function (Blueprint $table) {
-            $table->dropColumn(['target_energi_kwh', 'estimasi_biaya', 'jumlah_hold']);
+            $table->dropColumn(['target_energi_kwh', 'estimasi_biaya_charging', 'estimasi_biaya_parkir', 'saldo_hold']);
         });
 
         Schema::table('dompet', function (Blueprint $table) {
-            $table->dropColumn('saldo_ditahan');
+            $table->dropColumn('saldo_hold');
         });
     }
 };

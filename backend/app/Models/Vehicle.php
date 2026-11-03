@@ -18,6 +18,7 @@ class Vehicle extends Model
         'model',
         'nomor_polisi',
         'tipe_konektor',
+        'kapasitas_baterai_kwh',
     ];
  
     public function user()

@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Refund;
+use App\Models\ChargingSession;
+use App\Models\MetodePembayaran;
 
 class Payment extends Model
 {
@@ -13,13 +16,7 @@ class Payment extends Model
     protected $primaryKey = 'id_payment';
 
     protected $fillable = [
-        'id_session',
-        'id_metode',
-        'jenis_pembayaran',
-        'total_bayar',
-        'status_pembayaran',
-        'waktu_pembayaran',
-        'referensi_gateway',
+        'id_session', 'id_metode', 'jenis_pembayaran', 'total_bayar', 'status_pembayaran', 'waktu_pembayaran', 'referensi_gateway'
     ];
 
     protected $casts = [

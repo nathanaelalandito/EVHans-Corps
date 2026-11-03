@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class Dompet extends Model
 {
@@ -16,7 +17,7 @@ class Dompet extends Model
     protected $fillable = [
         'id_user',
         'saldo',
-        'saldo_ditahan',
+        'saldo_hold',
         'pin_transaksi',
         'status_dompet',
         'percobaan_pin_gagal',
@@ -30,7 +31,7 @@ class Dompet extends Model
 
     protected $casts = [
         'saldo' => 'integer',
-        'saldo_ditahan' => 'integer',
+        'saldo_hold' => 'integer',
         'percobaan_pin_gagal' => 'integer',
         'locked_until' => 'datetime',
     ];
@@ -38,6 +39,11 @@ class Dompet extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'id_user', 'id_user');
+    }
+
+    public function saldoTersedia(): int
+    {
+        return max(0, (int) $this->saldo - (int) $this->saldo_hold);
     }
 
     public function topups()

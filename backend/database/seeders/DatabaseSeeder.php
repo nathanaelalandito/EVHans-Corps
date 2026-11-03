@@ -22,9 +22,12 @@ class DatabaseSeeder extends Seeder
         //     'email' => 'test@example.com',
         // ]);
         $this->call([
-            UserSeeder::class,
-            PaymentMethodSeeder::class,
-            StationSeeder::class,
-        ]);
+        UserSeeder::class,
+        PaymentMethodSeeder::class,
+        MetodePembayaranSeeder::class,
+        StationSeeder::class,
+        StationOpSeeder::class,
+        TarifSeeder::class,
+    ]);
     }
 }

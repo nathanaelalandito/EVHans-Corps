@@ -6,7 +6,9 @@ use App\Http\Controllers\Api\OperationsController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProfileDriverController;
 use App\Http\Controllers\Api\StationController;
+use App\Http\Controllers\Api\TopupController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\OperatorController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -40,20 +42,65 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/vehicles', [VehicleController::class, 'store']);
     Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
     Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
+});
+Route::middleware('auth:sanctum')->group(function (){
     Route::get('/stations', [StationController::class, 'index']);
+    Route::get('/stations/{id}', [StationController::class, 'show']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
     Route::get('/payments/history', [PaymentController::class, 'history']);
     Route::get('/payments/{payment}', [PaymentController::class, 'show']);
+
     Route::get('/operations/dashboard', [OperationsController::class, 'dashboard']);
     Route::post('/operations/stations', [OperationsController::class, 'createStation']);
     Route::put('/operations/stations/{station}', [OperationsController::class, 'updateStation']);
     Route::put('/operations/chargers/{charger}', [OperationsController::class, 'updateCharger']);
     Route::post('/operations/stations/{station}/tarifs', [OperationsController::class, 'updateTarif']);
     Route::post('/operations/operators', [OperationsController::class, 'createOperator']);
+    Route::put('/operations/operators/{operator}/station', [OperationsController::class, 'assignOperator']);
+    Route::put('/operations/operators/{operator}/status', [OperationsController::class, 'updateOperatorStatus']);
+    Route::get('/operations/audit-logs', [OperationsController::class, 'auditLogs']);
+    Route::get('/operations/config', [OperationsController::class, 'getSystemConfig']);
+    Route::put('/operations/config', [OperationsController::class, 'updateSystemConfig']);
     Route::get('/charging-sessions/history', [ChargingSessionController::class, 'history']);
     Route::get('/charging-sessions/active', [ChargingSessionController::class, 'active']);
     Route::post('/charging-sessions/validate', [ChargingSessionController::class, 'validateCharger']);
+    Route::post('/charging-sessions/prepare', [ChargingSessionController::class, 'prepare']);
+    Route::post('/charging-sessions/estimate', [ChargingSessionController::class, 'estimate']);
     Route::post('/charging-sessions/start', [ChargingSessionController::class, 'start']);
     Route::get('/charging-sessions/{session}/invoice', [ChargingSessionController::class, 'invoice']);
-    Route::post('/charging-sessions/{session}/interrupt', [ChargingSessionController::class, 'interrupt']);
     Route::post('/charging-sessions/{session}/finish', [ChargingSessionController::class, 'finish']);
+    Route::post('/charging-sessions/{session}/stop', [ChargingSessionController::class, 'stop']); // alias finish
+    Route::post('/charging-sessions/{session}/interrupt', [ChargingSessionController::class, 'interrupt']);
+
+    // Top up checkout (QR / Virtual Account)
+    Route::get('/topup/methods', [TopupController::class, 'methods']);
+    Route::post('/topup', [TopupController::class, 'store']);
+    Route::get('/topup/{reference}', [TopupController::class, 'show']);
+    Route::post('/topup/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
+});
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/operator/dashboard', [OperatorController::class, 'getDashboard']);
+    Route::get('/operator/chargers', [OperatorController::class, 'getChargers']);
+    Route::post('/operator/storechargers', [OperatorController::class, 'storeCharger']);
+    Route::put('/operator/chargers/{id}', [OperatorController::class, 'updateCharger']);
+    Route::get('/operator/chargers/{id}', [OperatorController::class, 'getChargerDetail']); // <-- SUDAH DITAMBAHKAN /operator
+    Route::post('/operator/charger/{id}/start', [OperatorController::class, 'startCharger']);
+    Route::post('/operator/charger/{id}/stop', [OperatorController::class, 'stopCharger']);
+    Route::post('/operator/charger/{id}/reboot', [OperatorController::class, 'rebootCharger']);
+    Route::delete('/operator/delchargers/{id}', [OperatorController::class, 'destroyCharger']);
+    
+    Route::get('/operator/ports', [OperatorController::class, 'getPorts']);
+    Route::post('/operator/storeports', [OperatorController::class, 'storePort']);
+    Route::put('/operator/ports/{id}', [OperatorController::class, 'updatePort']);
+    Route::post('/operator/port/{id}/start', [OperatorController::class, 'startport']);
+    Route::post('/operator/port/{id}/stop', [OperatorController::class, 'stoport']);
+    Route::post('/operator/port/{id}/reboot', [OperatorController::class, 'rebootport']);
+    Route::delete('/operator/delports/{id}', [OperatorController::class, 'destroyPort']);
+    Route::get('/operator/reports', [OperatorController::class, 'getOperationalReports']);
+    Route::get('/operator/profile', [OperatorController::class, 'getProfile']);
+
+    Route::get('/operator/notifications', [OperatorController::class, 'getNotifications']);
+    Route::post('/operator/malfunction/{idCharger}/{idLog}/accept', [OperatorController::class, 'handleMalfunctionAction']);
 });

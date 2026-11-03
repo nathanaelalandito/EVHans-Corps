@@ -22,7 +22,7 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
             $table->integer('nominal');
-            $table->enum('status_topup', ['pending', 'sukses', 'gagal'])->default('pending');
+            $table->enum('status_topup', ['Pending', 'Sukses', 'Gagal'])->default('Pending');
             $table->datetime('waktu_topup');
             $table->timestamps();
         });

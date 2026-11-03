@@ -4,7 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Charger;
+use App\Models\StationOperator;
+use App\Models\Tarif;
 
 class Location extends Model
 {
@@ -14,28 +16,38 @@ class Location extends Model
 
     protected $primaryKey = 'id_location';
 
-    protected $fillable = [
-        'nama_lokasi',
-        'alamat',
-        'latitude',
-        'longitude',
-        'jam_buka',
-        'jam_tutup',
-        'status',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
-        'latitude' => 'decimal:7',
-        'longitude' => 'decimal:7',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
-    public function chargers(): HasMany
-    {
-        return $this->hasMany(Charger::class, 'id_location', 'id_location');
-    }
 
-    public function tarifs(): HasMany
+    public function tarifs()
     {
         return $this->hasMany(Tarif::class, 'id_location', 'id_location');
+    }
+
+    public function chargers(){
+        return $this->hasMany(Charger::class, 'id_location', 'id_location');
+    }
+    public function stationoperator(){
+        return $this->hasMany(StationOperator::class, 'id_location', 'id_location');
+    }
+    public function transliterator_create_from_rules(){
+        return $this->hasMany(Tarif::class, 'id_location', 'id_location');
+    }
+
+    /**
+     * Tarif yang periodenya mencakup saat ini (yang terbaru jika ada beberapa).
+     * Dipakai alur charging driver untuk menghitung estimasi & biaya aktual.
+     */
+    public function activeTarif(): ?Tarif
+    {
+        return $this->tarifs()
+            ->aktif()
+            ->latest('periode_mulai')
+            ->first();
     }
 }

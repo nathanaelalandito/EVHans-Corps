@@ -14,14 +14,21 @@ class Topup extends Model
     protected $fillable = [
         'id_wallet',
         'id_payment',
+        'id_metode',
+        'referensi',
+        'kode_pembayaran',
         'nominal',
+        'biaya_layanan',
         'status_topup',
         'waktu_topup',
+        'kedaluwarsa_pada',
     ];
 
     protected $casts = [
         'nominal' => 'integer',
+        'biaya_layanan' => 'integer',
         'waktu_topup' => 'datetime',
+        'kedaluwarsa_pada' => 'datetime',
     ];
 
     public function wallet(): BelongsTo
@@ -32,5 +39,10 @@ class Topup extends Model
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'id_payment', 'id_payment');
+    }
+
+    public function method(): BelongsTo
+    {
+        return $this->belongsTo(MetodePembayaran::class, 'id_metode', 'id_metode');
     }
 }

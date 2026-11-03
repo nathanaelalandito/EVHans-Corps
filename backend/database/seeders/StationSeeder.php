@@ -24,13 +24,45 @@ class StationSeeder extends Seeder
                 'longitude' => 110.3655000,
                 'jam_buka' => '08:00:00',
                 'jam_tutup' => '22:00:00',
-                'status' => 'aktif',
+                'status_loc' => 'Aktif',
                 'tarif' => ['harga_per_kwh' => 2500, 'biaya_minimum' => 10000, 'biaya_parkir_pjam' => 5000],
                 'chargers' => [
-                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 50, 'tipe_charging' => 'DC', 'status' => 'tersedia'],
-                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status' => 'sedang digunakan'],
-                    ['kode_perangkat' => 'CHG-03', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 50, 'tipe_charging' => 'DC', 'status' => 'tersedia'],
-                    ['kode_perangkat' => 'CHG-04', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status' => 'maintenance'],
+                    [
+                        'kode_perangkat' => 'CHG-01',
+                        'merek_model' => 'ABB Terra 54',
+                        'kap_tot_kw' => 50,
+                        'status_mesin' => 'Active',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 50, 'status_port' => 'Available']
+                        ]
+                    ],
+                    [
+                        'kode_perangkat' => 'CHG-02',
+                        'merek_model' => 'Schneider EVlink',
+                        'kap_tot_kw' => 22,
+                        'status_mesin' => 'Active',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Charging']
+                        ]
+                    ],
+                    [
+                        'kode_perangkat' => 'CHG-03',
+                        'merek_model' => 'ABB Terra 54',
+                        'kap_tot_kw' => 50,
+                        'status_mesin' => 'Active',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 50, 'status_port' => 'Available']
+                        ]
+                    ],
+                    [
+                        'kode_perangkat' => 'CHG-04',
+                        'merek_model' => 'Schneider EVlink',
+                        'kap_tot_kw' => 22,
+                        'status_mesin' => 'Maintenance',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Out of Order']
+                        ]
+                    ],
                 ],
             ],
             [
@@ -41,11 +73,27 @@ class StationSeeder extends Seeder
                 'longitude' => 110.3945000,
                 'jam_buka' => '09:00:00',
                 'jam_tutup' => '21:00:00',
-                'status' => 'aktif',
+                'status_loc' => 'Aktif',
                 'tarif' => ['harga_per_kwh' => 2200, 'biaya_minimum' => 10000, 'biaya_parkir_pjam' => 4000],
                 'chargers' => [
-                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 22, 'tipe_charging' => 'DC', 'status' => 'sedang digunakan'],
-                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'ccs2', 'daya_kwh' => 22, 'tipe_charging' => 'DC', 'status' => 'sedang digunakan'],
+                    [
+                        'kode_perangkat' => 'CHG-01',
+                        'merek_model' => 'ABB Terra 54',
+                        'kap_tot_kw' => 22,
+                        'status_mesin' => 'Active',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 22, 'status_port' => 'Charging']
+                        ]
+                    ],
+                    [
+                        'kode_perangkat' => 'CHG-02',
+                        'merek_model' => 'ABB Terra 54',
+                        'kap_tot_kw' => 22,
+                        'status_mesin' => 'Active',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 22, 'status_port' => 'Charging']
+                        ]
+                    ],
                 ],
             ],
             [
@@ -56,11 +104,27 @@ class StationSeeder extends Seeder
                 'longitude' => 110.3746000,
                 'jam_buka' => '07:00:00',
                 'jam_tutup' => '23:00:00',
-                'status' => 'maintenance',
+                'status_loc' => 'Maintenance',
                 'tarif' => ['harga_per_kwh' => 2700, 'biaya_minimum' => 12000, 'biaya_parkir_pjam' => 6000],
                 'chargers' => [
-                    ['kode_perangkat' => 'CHG-01', 'tipe_konektor' => 'type_2', 'daya_kwh' => 22, 'tipe_charging' => 'AC', 'status' => 'maintenance'],
-                    ['kode_perangkat' => 'CHG-02', 'tipe_konektor' => 'chademo', 'daya_kwh' => 60, 'tipe_charging' => 'DC', 'status' => 'rusak'],
+                    [
+                        'kode_perangkat' => 'CHG-01',
+                        'merek_model' => 'Schneider EVlink',
+                        'kap_tot_kw' => 22,
+                        'status_mesin' => 'Maintenance',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Out of Order']
+                        ]
+                    ],
+                    [
+                        'kode_perangkat' => 'CHG-02',
+                        'merek_model' => 'Siemens Sicharge',
+                        'kap_tot_kw' => 60,
+                        'status_mesin' => 'Offline',
+                        'ports' => [
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'chademo', 'tipe_charging' => 'DC', 'daya_maks_kw' => 60, 'status_port' => 'Out of Order']
+                        ]
+                    ],
                 ],
             ],
         ];
@@ -72,7 +136,7 @@ class StationSeeder extends Seeder
 
             DB::table('location')->updateOrInsert(
                 ['id_location' => $station['id_location']],
-                [...$station, 'created_at' => $now, 'updated_at' => $now],
+                [...$station, 'created_at' => $now, 'updated_at' => $now]
             );
 
             DB::table('tarif')->updateOrInsert(
@@ -84,17 +148,47 @@ class StationSeeder extends Seeder
                     'periode_berakhir' => $now->copy()->addYear(),
                     'created_at' => $now,
                     'updated_at' => $now,
-                ],
+                ]
             );
 
-            foreach ($chargers as $charger) {
-                DB::table('charger')->updateOrInsert(
+            foreach ($chargers as $chargerData) {
+                $ports = $chargerData['ports'];
+                unset($chargerData['ports']);
+
+                // Masukkan data mesin charger fisik
+                $chargerId = DB::table('charger')->updateOrInsert(
                     [
                         'id_location' => $station['id_location'],
-                        'kode_perangkat' => $charger['kode_perangkat'],
+                        'kode_perangkat' => $chargerData['kode_perangkat'],
                     ],
-                    [...$charger, 'created_at' => $now, 'updated_at' => $now],
+                    [
+                        ...$chargerData,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
                 );
+
+                // Ambil id_charger yang baru saja di-insert / di-update
+                $chargerRecord = DB::table('charger')
+                    ->where('id_location', $station['id_location'])
+                    ->where('kode_perangkat', $chargerData['kode_perangkat'])
+                    ->first();
+
+                if ($chargerRecord) {
+                    foreach ($ports as $port) {
+                        DB::table('ports')->updateOrInsert(
+                            [
+                                'id_charger' => $chargerRecord->id_charger,
+                                'nomor_port' => $port['nomor_port'],
+                            ],
+                            [
+                                ...$port,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ]
+                        );
+                    }
+                }
             }
         }
     }
