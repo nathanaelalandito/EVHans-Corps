@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { FiArrowLeft, FiArrowRight, FiBattery, FiBell, FiCalendar, FiChevronRight, FiCreditCard, FiCrosshair, FiEdit2, FiEye, FiEyeOff, FiFileText, FiHelpCircle, FiLock, FiLogOut, FiMap, FiMapPin, FiNavigation, FiPhone, FiSettings, FiTruck, FiUser, FiX, FiZap } from 'react-icons/fi';
 import './driverDashboard.css';
+import './driverDashboardEV.css';
 import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi, topUpWallet } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
@@ -13,6 +15,7 @@ import { getPaymentDetail, getPaymentHistory } from './api/payments';
 import StationDetail from './StationDetail';
 import StartCharging from './StartCharging';
 
+/** Memilih pesan error API yang bisa langsung ditampilkan kepada pengemudi. */
 function extractErrorMessage(error, fallback) {
     const data = error?.response?.data;
     if (!data) return fallback;
@@ -31,22 +34,18 @@ const DUMMY_USER = {
 
 const ACTIVE_VEHICLE_KEY = 'ev_active_vehicle';
 
-const DUMMY_STATS = {
-    sesi_bulan_ini: 8,
-    energi_kwh_bulan_ini: 142.5,
-    pengeluaran_bulan_ini: 356000,
-};
-
 const FALLBACK_DRIVER_POSITION = { lat: -7.8014, lng: 110.3644 };
 const DUMMY_ACTIVE_SESSION = null;
 const CONNECTOR_FILTERS = ['Semua', 'CCS2', 'Type 2', 'CHAdeMO'];
 const TOP_UP_METHODS = ['Mandiri', 'OVO', 'BCA', 'BRI', 'BNI'];
 
+/** Menampilkan nominal sebagai rupiah dengan pemisah angka lokal. */
 function formatRupiah(value) {
     if (value == null) return '-';
     return 'Rp' + value.toLocaleString('id-ID');
 }
 
+/** Mengubah durasi milidetik menjadi teks jam/menit untuk sesi aktif. */
 function formatDuration(ms) {
     const totalMinutes = Math.floor(ms / 60000);
     const h = Math.floor(totalMinutes / 60);
@@ -54,6 +53,7 @@ function formatDuration(ms) {
     return h > 0 ? `${h} jam ${m} menit` : `${m} menit`;
 }
 
+/** Memilih sapaan dashboard pengemudi berdasarkan jam lokal. */
 function getGreeting() {
     const h = new Date().getHours();
     if (h >= 4 && h < 10) return 'Selamat pagi';
@@ -62,6 +62,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
+/** Membentuk label ketersediaan station dari status dan jumlah port bebas. */
 function stationStatusLabel(status, tersedia) {
     if (status === 'Dalam Perawatan') return { text: 'Perawatan', tone: 'warn' };
     if (status === 'Nonaktif') return { text: 'Nonaktif', tone: 'danger' };
@@ -69,6 +70,7 @@ function stationStatusLabel(status, tersedia) {
     return { text: 'Tersedia', tone: 'ok' };
 }
 
+/** Membuat ikon peta station dengan warna sesuai keadaan ketersediaannya. */
 function buildStationIcon(tone) {
     const color = tone === 'ok' ? '#2e7d32' : tone === 'warn' ? '#a5730c' : '#c23a3a';
     return L.divIcon({
@@ -89,6 +91,7 @@ const DRIVER_ICON = L.divIcon({
 
 const BULAN_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
+/** Memformat tanggal lahir akun menjadi format tanggal Indonesia. */
 function formatTanggalLahir(value) {
     if (!value) return '-';
     const [y, m, d] = String(value).slice(0, 10).split('-').map(Number);
@@ -96,16 +99,19 @@ function formatTanggalLahir(value) {
     return `${d} ${BULAN_ID[m - 1]} ${y}`;
 }
 
+/** Mengambil inisial nama untuk avatar tanpa foto. */
 function getInitial(name) {
     return (name || '?').trim().charAt(0).toUpperCase() || '?';
 }
 
+/** Membesarkan huruf pertama label yang ditampilkan. */
 function capitalize(str) {
     const s = String(str ?? '');
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp }) {
+/** Mengelola peta station, dompet, profil, transaksi, dan sesi aktif pengemudi. */
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp, onNavigateToWallet }) {
     const user = {
         nama: authUser?.profile?.nama_lengkap || authUser?.email || DUMMY_USER.nama,
     };
@@ -120,6 +126,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     const [rawStations, setRawStations] = useState([]);
     const [stationsError, setStationsError] = useState('');
+    const [stationsLoading, setStationsLoading] = useState(true);
     const [detailStationId, setDetailStationId] = useState(null);
     const [showStartCharging, setShowStartCharging] = useState(false);
     const [sessionError, setSessionError] = useState('');
@@ -147,6 +154,14 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     const [wallet, setWallet] = useState(null);
     const [walletLoading, setWalletLoading] = useState(true);
+    const [hideWalletBalance, setHideWalletBalance] = useState(() => localStorage.getItem('ev_hide_saldo') === '1');
+    /** Menyamakan preferensi tampil/sembunyi saldo dengan halaman Dompet Digital. */
+    const toggleWalletBalance = () => setHideWalletBalance((hidden) => {
+        const nextHidden = !hidden;
+        localStorage.setItem('ev_hide_saldo', nextHidden ? '1' : '0');
+        return nextHidden;
+    });
+    /** Memuat saldo dompet dan status perlindungan PIN. */
     const fetchWallet = async () => {
         try {
             const data = await getWallet();
@@ -165,6 +180,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [profile, setProfile] = useState(null);
     const [profileLoading, setProfileLoading] = useState(true);
     const [profileError, setProfileError] = useState('');
+    /** Memuat profil akun yang dipakai dashboard dan formulir edit. */
     const fetchProfile = async () => {
         setProfileLoading(true);
         setProfileError('');
@@ -188,6 +204,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [editError, setEditError] = useState('');
     const [editSubmitting, setEditSubmitting] = useState(false);
 
+    /** Menyalin data profil saat ini ke mode formulir edit. */
     const startEditProfile = () => {
         setEditForm({
             nama_lengkap: profile?.nama_lengkap ?? '',
@@ -200,15 +217,18 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setIsEditingProfile(true);
     };
 
+    /** Menutup mode edit dan membuang perubahan yang belum disimpan. */
     const cancelEditProfile = () => {
         setIsEditingProfile(false);
         setEditError('');
     };
 
+    /** Membuat handler input untuk memperbarui satu field profil. */
     const handleEditFieldChange = (field) => (e) => {
         setEditForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
+    /** Mengirim perubahan profil lalu memperbarui data dashboard. */
     const handleSubmitEditProfile = async (e) => {
         e.preventDefault();
         setEditError('');
@@ -224,15 +244,29 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Membuka detail profil dari panel pengaturan. */
     const openProfileScreen = () => {
-        setShowSettings(false);
-        setSettingsScreen('menu');
+        setSettingsScreen('profile');
         setIsEditingProfile(false);
-        setView('profile');
     };
 
+    /** Menutup tampilan profil dan kembali ke dashboard peta. */
     const closeProfileScreen = () => {
         setSettingsScreen('menu');
+    };
+
+    /** Membuka panel pengaturan selalu dari menu utama. */
+    const openSettings = () => {
+        setSettingsScreen('menu');
+        setShowSettings(true);
+    };
+
+    /** Membuka formulir edit profil dari panel pengaturan. */
+    const openProfileEditor = () => {
+        startEditProfile();
+        setShowSettings(false);
+        setSettingsScreen('menu');
+        setView('profile');
     };
 
     const [settingsScreen, setSettingsScreen] = useState('menu');
@@ -248,6 +282,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [locationStatus, setLocationStatus] = useState('locating');
     const [view, setView] = useState('home');
 
+    /** Memuat kendaraan pengemudi dan memilih kendaraan aktif bila perlu. */
     const fetchVehicles = async (silent = false) => {
         if (!silent) setVehiclesLoading(true);
         setVehiclesError('');
@@ -264,6 +299,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     useEffect(() => {
         fetchVehicles();
+        /** Menyegarkan daftar kendaraan saat tab aplikasi kembali aktif. */
         const onFocus = () => fetchVehicles(true);
         window.addEventListener('focus', onFocus);
         return () => window.removeEventListener('focus', onFocus);
@@ -321,14 +357,27 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
             })
             .catch((err) => {
                 if (!cancelled) setStationsError(extractErrorMessage(err, 'Daftar station tidak dapat dimuat.'));
+            })
+            .finally(() => {
+                if (!cancelled) setStationsLoading(false);
             });
         return () => {
             cancelled = true;
         };
     }, []);
 
-    const reloadStations = () => {
-        getStations().then(setRawStations).catch(() => {});
+    /** Memuat ulang daftar station berdasarkan posisi dan kendaraan terpilih. */
+    const reloadStations = async () => {
+        setStationsLoading(true);
+        setStationsError('');
+        try {
+            const list = await getStations();
+            setRawStations(list);
+        } catch (err) {
+            setStationsError(extractErrorMessage(err, 'Daftar station tidak dapat dimuat.'));
+        } finally {
+            setStationsLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -455,6 +504,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     useEffect(() => {
         if (!activeSession) return;
+        /** Memperbarui penghitung durasi sesi aktif setiap interval. */
         const tick = () => setElapsed(Date.now() - activeSession.waktu_mulai);
         tick();
         const interval = setInterval(tick, 1000 * 30);
@@ -478,6 +528,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     useEffect(() => {
         if (!activeSessionId || activeSessionFull) return;
         let cancelled = false;
+        /** Memeriksa progres sesi dari backend secara berkala. */
         const poll = () => {
             getActiveSession()
                 .then((session) => {
@@ -505,6 +556,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
           Math.round(activeSession.energi_kwh * activeSession.tarif_per_kwh + activeSession.biaya_parkir)
         : 0;
 
+    /** Mengambil riwayat transaksi untuk daftar dan panel invoice. */
     const fetchTransactionHistory = async () => {
         setHistoryLoading(true);
         setHistoryError('');
@@ -524,6 +576,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     }, []);
 
     // Sesi selesai / dibatalkan: tampilkan invoice, segarkan saldo, port, dan riwayat.
+    /** Memperbarui saldo, histori, dan tampilan setelah sesi selesai. */
     const afterSessionSettled = async (settledInvoice) => {
         setInvoice(settledInvoice);
         setActiveSession(null);
@@ -533,6 +586,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         await fetchTransactionHistory();
     };
 
+    /** Meminta penghentian sesi normal dan memproses ringkasan transaksinya. */
     const handleStopSession = async () => {
         if (!activeSession || stoppingSession) return;
         setStoppingSession(true);
@@ -547,6 +601,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Melaporkan sesi terhenti/gagal lalu menyegarkan status sesi dan dompet. */
     const handleInterruptSession = async () => {
         if (!activeSession || stoppingSession) return;
         setStoppingSession(true);
@@ -564,6 +619,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Menyimpan sesi baru ke state dan membuka pemantauan progresnya. */
     const handleSessionStarted = (session) => {
         setShowStartCharging(false);
         setStartPortId(null);
@@ -578,12 +634,14 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     };
 
     // Mulai charging langsung dari port yang dipilih di daftar station.
+    /** Membuka alur persiapan charging untuk station dan port terpilih. */
     const openStartCharging = (station, port) => {
         setSelectedStationId(station.id_location);
         setStartPortId(port?.id_port ?? null);
         setShowStartCharging(true);
     };
 
+    /** Mengambil rincian pembayaran dan membuka invoice transaksi. */
     const handleOpenInvoice = async (idPayment) => {
         setSelectedInvoice(null);
         setInvoiceLoading(true);
@@ -604,6 +662,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Membuka formulir penambahan saldo dompet. */
     const openTopUpModal = () => {
         setTopUpAmount(100000);
         setTopUpMethod('Mandiri');
@@ -612,6 +671,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setShowTopUp(true);
     };
 
+    /** Mengirim top up dari dashboard lalu memperbarui saldo. */
     const handleTopUpSubmit = async (e) => {
         e.preventDefault();
         setTopUpError('');
@@ -634,6 +694,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Mengosongkan field PIN dan pesan validasi pada pengelola PIN. */
     const resetPinInputs = () => {
         setPinOldInput('');
         setPinNewInput('');
@@ -641,6 +702,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setPinError('');
     };
 
+    /** Membuka pengaturan PIN dompet digital. */
     const openPinManager = () => {
         resetPinInputs();
         setPinSuccess('');
@@ -648,6 +710,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setSettingsScreen('pin');
     };
 
+    /** Menutup pengaturan PIN dan membersihkan state formulirnya. */
     const closePinManager = () => {
         resetPinInputs();
         setPinSuccess('');
@@ -655,11 +718,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setSettingsScreen('menu');
     };
 
+    /** Membatasi input kode PIN menjadi angka dengan panjang yang diizinkan. */
     const handlePinDigitsChange = (setter) => (e) => {
         const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
         setter(digitsOnly);
     };
 
+    /** Membuat PIN transaksi baru dan memperbarui status keamanan dompet. */
     const handleCreatePin = async (e) => {
         e.preventDefault();
         setPinError('');
@@ -685,6 +750,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Mengganti PIN dompet setelah memasukkan PIN lama dan PIN baru. */
     const handleChangePin = async (e) => {
         e.preventDefault();
         setPinError('');
@@ -718,6 +784,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Menonaktifkan PIN setelah pengguna mengonfirmasi kredensialnya. */
     const handleDisablePin = async (e) => {
         e.preventDefault();
         setPinError('');
@@ -739,11 +806,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Meminta lokasi perangkat lalu memusatkan peta ke posisi pengemudi. */
     const handleLocateMe = () => {
         const map = mapRef.current;
         if (map) map.flyTo([driverPosition.lat, driverPosition.lng], 15);
     };
 
+    /** Memusatkan peta dan membuka detail station yang dipilih. */
     const handleFocusStation = (s) => {
         const map = mapRef.current;
         if (map) map.flyTo([s.lat, s.lng], 16);
@@ -751,11 +820,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         markersRef.current[s.id_location]?.openPopup();
     };
 
+    /** Menutup detail station dan meminta tampilan rute menuju station. */
     const handleRouteFromDetail = (station) => {
         setDetailStationId(null);
         handleShowRoute(station);
     };
 
+    /** Menghapus rute aktif dan menutup panel navigasi peta. */
     const clearRoute = () => {
         routeAbortRef.current?.abort();
         routeAbortRef.current = null;
@@ -768,6 +839,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setRouteError('');
     };
 
+    /** Mengambil rute berkendara dan menampilkannya pada peta dashboard. */
     const handleShowRoute = async (station) => {
         const map = mapRef.current;
         if (!map || !station) return;
@@ -809,6 +881,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
+    /** Berpindah ke kendaraan berikutnya untuk menyesuaikan hasil station. */
     const cycleVehicle = () => {
         if (vehicles.length === 0) {
             onNavigateToVehicles();
@@ -819,6 +892,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setActiveVehicleId(next.id_vehicle);
     };
 
+    /** Memilih station sebagai fokus peta dan kembali ke area peta. */
     const goToMap = (station) => {
         pendingFocusStationRef.current = station || null;
         setView('map');
@@ -826,6 +900,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         if (station) setSelectedStationId(station.id_location);
     };
 
+    /** Memusatkan peta ke lokasi station tempat sesi aktif berjalan. */
     const goToActiveSessionOnMap = () => {
         if (!activeSession) return;
         const station = stations.find((s) => s.id_location === activeSession.id_location);
@@ -836,11 +911,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const suggestedStations = activeVehicleConnector
         ? stations.filter(s => s.tipe_konektor_list?.some(t => sameConnector(t, activeVehicle.tipe_konektor)))
         : stations;
+    /** Meratakan port semua charger station agar dapat ditampilkan sebagai pilihan. */
     const stationPorts = (station) => (station.chargers ?? []).flatMap(charger =>
         (charger.ports ?? []).map(port => ({ ...port, kode_perangkat: charger.kode_perangkat,
             daya_kw: port.daya_kw ?? charger.daya_kw,
             status: port.status_port === 'available' || port.status_port === 'tersedia' ? 'tersedia' : port.status_port }))
     );
+    /** Mengubah status teknis charger menjadi keterangan untuk pengemudi. */
     const chargerStatusLabel = (status) => {
         const s = String(status ?? '').toLowerCase();
         if (s === 'tersedia' || s === 'available') return { text: 'Tersedia', tone: 'ok' };
@@ -859,7 +936,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 <header className="home-header">
                     <div className="home-header-top">
                         <div className="home-greeting-block">
-                            <p className="home-greeting-text">{getGreeting()}, {firstName} 👋</p>
+                            <p className="home-greeting-text">{getGreeting()}, {firstName}</p>
                             <p className="home-greeting-sub">Siap cari charger terdekat hari ini.</p>
                         </div>
                         <div className="home-header-actions">
@@ -868,15 +945,16 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 aria-label="Notifikasi"
                                 onClick={() => setShowNotif((v) => !v)}
                             >
-                                🔔
+                                <FiBell aria-hidden="true" />
                                 {activeSession && <span className="mapdash-badge-dot" />}
                             </button>
                             <button
+                                type="button"
                                 className="home-icon-btn"
                                 aria-label="Pengaturan"
-                                onClick={() => setShowSettings(true)}
+                                onClick={openSettings}
                             >
-                                ⚙️
+                                <FiSettings aria-hidden="true" />
                             </button>
                         </div>
                     </div>
@@ -884,32 +962,51 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     <div className="home-header-summary">
                         <div className="home-balance-panel">
                             <div>
-                                <p className="home-wallet-label">Saldo Dompet</p>
+                                <div className="home-wallet-label-row">
+                                    <p className="home-wallet-label">Saldo Dompet</p>
+                                    <button
+                                        type="button"
+                                        className="home-wallet-visibility"
+                                        onClick={toggleWalletBalance}
+                                        aria-label={hideWalletBalance ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                                        title={hideWalletBalance ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                                    >
+                                        {hideWalletBalance ? <FiEye aria-hidden="true" /> : <FiEyeOff aria-hidden="true" />}
+                                    </button>
+                                </div>
                                 <p className="home-wallet-value">
-                                    {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
+                                    {hideWalletBalance ? 'Rp ••••••' : walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
                                 </p>
                             </div>
-                            <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
+                            <div className="home-wallet-actions">
+                                <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
+                                <button className="home-wallet-open" onClick={onNavigateToWallet}>Buka Dompet</button>
+                            </div>
                         </div>
 
                         <div className="home-vehicle-panel">
                             <div className="home-vehicle-panel-head">
-                                <span className="home-vehicle-pill-icon">🚗</span>
+                                <span className="home-vehicle-pill-icon"><FiZap aria-hidden="true" /></span>
                                 <span>Kendaraan Aktif</span>
                             </div>
                             {vehicles.length > 0 ? (
-                                <select
-                                    className="home-vehicle-select"
-                                    value={activeVehicleId ?? ''}
-                                    onChange={(e) => setActiveVehicleId(Number(e.target.value))}
-                                    disabled={vehiclesLoading}
-                                >
-                                    {vehicles.map((v) => (
-                                        <option key={v.id_vehicle} value={v.id_vehicle}>
-                                            {v.model} · {v.nomor_polisi}
-                                        </option>
-                                    ))}
-                                </select>
+                                <>
+                                    <select
+                                        className="home-vehicle-select"
+                                        value={activeVehicleId ?? ''}
+                                        onChange={(e) => setActiveVehicleId(Number(e.target.value))}
+                                        disabled={vehiclesLoading}
+                                    >
+                                        {vehicles.map((v) => (
+                                            <option key={v.id_vehicle} value={v.id_vehicle}>
+                                                {v.merek} {v.model} · {v.nomor_polisi}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="home-vehicle-connector">
+                                        {activeVehicleConnector ? `Konektor ${activeVehicleConnector}` : 'Pilih kendaraan untuk mencocokkan konektor'}
+                                    </span>
+                                </>
                             ) : (
                                 <button className="home-vehicle-add-btn" onClick={onNavigateToVehicles}>
                                     {vehiclesLoading ? 'Memuat kendaraan...' : '+ Tambah kendaraan'}
@@ -922,19 +1019,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 <main className="home-content">
                     {showNotif && activeSession && (
                         <div className="mapdash-notif home-notif">
-                            <span>⚡ Sesi charging Anda di <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.</span>
-                            <button className="mapdash-notif-close" onClick={() => setShowNotif(false)}>✕</button>
+                            <span><FiZap aria-hidden="true" /> Sesi charging Anda di <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.</span>
+                            <button className="mapdash-notif-close" onClick={() => setShowNotif(false)} aria-label="Tutup notifikasi"><FiX aria-hidden="true" /></button>
                         </div>
-                    )}
-
-                    {false && !activeSession && (
-                        <section className="home-session-card">
-                            <div className="mapdash-sheet-title-row">
-                                <span className="mapdash-sheet-title home-session-title">Mengecek Sesi Charging</span>
-                                <span className="dash-status-badge warn">Memuat</span>
-                            </div>
-                            <p className="mapdash-session-location">Sistem sedang mencari sesi charging yang masih berjalan.</p>
-                        </section>
                     )}
 
                     {activeSession && (
@@ -943,7 +1030,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 <span className="mapdash-sheet-title home-session-title">Sesi Charging Berlangsung</span>
                                 <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
                             </div>
-                            <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}{activeSession.soc_sekarang != null ? ` · 🔋 ${activeSession.soc_sekarang}%` : ''}</p>
+                            <p className="mapdash-session-location"><FiMapPin aria-hidden="true" /> {activeSession.nama_lokasi} · {activeSession.kode_charger}{activeSession.soc_sekarang != null ? <><span> · </span><FiBattery aria-hidden="true" /> {activeSession.soc_sekarang}%</> : ''}</p>
 
                             <div className="dash-progress-track">
                                 <div className="dash-progress-fill" style={{ width: `${sessionProgressPct}%` }} />
@@ -975,7 +1062,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
                     <section className="home-search-card">
                         <button className="home-cta-map" onClick={() => goToMap()}>
-                            <span className="home-cta-icon">🗺️</span>
+                            <span className="home-cta-icon"><FiMap aria-hidden="true" /></span>
                             <span className="home-cta-text">
                                 <span className="home-cta-title">Cari Charging Station</span>
                                 <span className="home-cta-sub">
@@ -984,21 +1071,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         : `${filteredStations.length} station di sekitar Anda`}
                                 </span>
                             </span>
-                            <span className="home-cta-arrow">→</span>
+                            <span className="home-cta-arrow"><FiArrowRight aria-hidden="true" /></span>
                         </button>
 
-                        <div className="home-search-filters" aria-label="Filter konektor charging station">
-                            {CONNECTOR_FILTERS.map((f) => (
-                                <button
-                                    key={f}
-                                    type="button"
-                                    className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
-                                    onClick={() => setConnectorFilter(f)}
-                                >
-                                    {f}
-                                </button>
-                            ))}
-                        </div>
                     </section>
 
                     {invoice && (
@@ -1007,7 +1082,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 <span className="mapdash-sheet-title">Invoice Digital Terakhir</span>
                                 <span className="dash-status-badge ok">{invoice.status}</span>
                             </div>
-                            <p className="mapdash-session-location">📍 {invoice.nama_lokasi} · {invoice.kode_charger}</p>
+                            <p className="mapdash-session-location"><FiMapPin aria-hidden="true" /> {invoice.nama_lokasi} · {invoice.kode_charger}</p>
                             <div className="invoice-grid">
                                 <div>
                                     <span className="invoice-label">Energi Aktual</span>
@@ -1029,34 +1104,30 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         </section>
                     )}
 
-                    <section className="home-stats-row">
-                        <div className="home-stat-card">
-                            <p className="home-stat-value">{DUMMY_STATS.sesi_bulan_ini}</p>
-                            <p className="home-stat-label">Sesi Bulan Ini</p>
+                    <section className="home-section home-stations-section">
+                        <div className="home-section-title-row">
+                            <div>
+                                <h2 className="home-section-title">Station sekitar</h2>
+                                <p className="home-section-caption">
+                                    {stationsLoading ? 'Mencari lokasi terdekat...' : `${filteredStations.length} station ditemukan`}
+                                </p>
+                            </div>
+                            <button className="home-map-link" onClick={() => goToMap()}>
+                                Lihat peta <FiArrowRight aria-hidden="true" />
+                            </button>
                         </div>
-                        <div className="home-stat-card">
-                            <p className="home-stat-value">{DUMMY_STATS.energi_kwh_bulan_ini} kWh</p>
-                            <p className="home-stat-label">Energi Terisi</p>
-                        </div>
-                        <div className="home-stat-card">
-                            <p className="home-stat-value home-stat-value-sm">{formatRupiah(DUMMY_STATS.pengeluaran_bulan_ini)}</p>
-                            <p className="home-stat-label">Pengeluaran</p>
-                        </div>
-                    </section>
-
-                    <section className="home-section">
-                        <div className="home-station-summary">
-                            <span>{false ? 'Memuat station...' : `${filteredStations.length} station terdekat`}</span>
-                            {stationsError && (
-                                <button className="dash-link-btn" onClick={() => reloadStations()}>
-                                    Coba lagi
-                                </button>
-                            )}
-                        </div>
-                        {stationsError && <p className="dash-empty">{stationsError} Menampilkan data contoh.</p>}
+                        {stationsError && (
+                            <div className="home-inline-error" role="alert">
+                                <span>{stationsError}</span>
+                                <button className="dash-link-btn" onClick={reloadStations}>Coba lagi</button>
+                            </div>
+                        )}
+                        {!stationsLoading && !stationsError && filteredStations.length === 0 && (
+                            <p className="dash-empty">Belum ada station yang cocok dengan konektor pilihan.</p>
+                        )}
 
                         <div className="mapdash-station-scroll home-station-scroll">
-                            {filteredStations.map((s) => {
+                            {filteredStations.slice(0, 3).map((s) => {
                                 const badge = stationStatusLabel(s.status, s.charger_tersedia);
                                 return (
                                     <button
@@ -1066,7 +1137,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     >
                                         <div className="mapdash-station-mini-top">
                                             <span className={`dash-status-badge ${badge.tone}`}>{badge.text}</span>
-                                            <span className="mapdash-station-mini-dist">{s.jarak_km} km</span>
+                                            <span className="mapdash-station-mini-dist"><FiMapPin aria-hidden="true" /> {s.jarak_km} km</span>
                                         </div>
                                         <p className="mapdash-station-mini-name">{s.nama_lokasi}</p>
                                         <p className="mapdash-station-mini-meta">
@@ -1075,13 +1146,10 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     </button>
                                 );
                             })}
-                            {filteredStations.length === 0 && (
-                                <p className="dash-empty">Tidak ada station dengan konektor ini di sekitar Anda.</p>
-                            )}
                         </div>
                     </section>
 
-                    <section className="home-section">
+                    <section className="home-section home-history-section">
                         <div className="home-section-title-row">
                             <h3 className="home-section-title">Riwayat Transaksi</h3>
                             <span className="home-section-caption">
@@ -1107,7 +1175,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     onClick={() => handleOpenInvoice(trx.id_payment)}
                                 >
                                     <div className="transaction-main">
-                                        <span className="transaction-icon">🧾</span>
+                                        <span className="transaction-icon"><FiFileText aria-hidden="true" /></span>
                                         <div>
                                             <p className="transaction-location">{trx.nama_lokasi}</p>
                                             <p className="transaction-meta">
@@ -1139,38 +1207,47 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 <div className="mapdash-topbar">
                     <div className="mapdash-topbar-left">
                         <button className="mapdash-round-btn" onClick={() => setView('home')} aria-label="Kembali ke dashboard">
-                            ←
+                            <FiArrowLeft aria-hidden="true" />
                         </button>
                         <span className="mapdash-map-title">Cari Charging Station</span>
                     </div>
                     <div className="mapdash-topbar-right">
                         <button className="mapdash-round-btn" aria-label="Notifikasi" onClick={() => setShowNotif((v) => !v)}>
-                            🔔
+                            <FiBell aria-hidden="true" />
                             {activeSession && <span className="mapdash-badge-dot" />}
+                        </button>
+                        <button type="button" className="mapdash-round-btn" aria-label="Pengaturan driver" onClick={openSettings}>
+                            <FiSettings aria-hidden="true" />
                         </button>
                     </div>
                 </div>
 
                 {showNotif && activeSession && (
                     <div className="mapdash-notif">
-                        <span>⚡ Sesi charging Anda di <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.</span>
-                        <button className="mapdash-notif-close" onClick={() => setShowNotif(false)}>✕</button>
+                    <span><FiZap aria-hidden="true" /> Sesi charging Anda di <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.</span>
+                        <button className="mapdash-notif-close" onClick={() => setShowNotif(false)} aria-label="Tutup notifikasi"><FiX aria-hidden="true" /></button>
                     </div>
                 )}
 
-                {/* Filter konektor mengambang di atas peta */}
+                {/* Filter port charger berlaku untuk seluruh station pada peta. */}
                 {!activeSession && (
-                    <div className="mapdash-filters">
-                        {CONNECTOR_FILTERS.map((f) => (
-                            <button
-                                key={f}
-                                className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
-                                onClick={() => setConnectorFilter(f)}
-                            >
-                                {f}
-                            </button>
-                        ))}
-                    </div>
+                    <section
+                        className={`mapdash-filter-panel ${sheetExpanded ? 'is-sheet-expanded' : ''}`}
+                        aria-label="Filter port charger"
+                    >
+                        <p className="mapdash-filter-label">Filter port charger</p>
+                        <div className="mapdash-filters">
+                            {CONNECTOR_FILTERS.map((f) => (
+                                <button
+                                    key={f}
+                                    className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
+                                    onClick={() => setConnectorFilter(f)}
+                                >
+                                    {f}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
                 )}
 
                 {/* Kartu rute ke station terpilih */}
@@ -1189,7 +1266,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 }}
                                 aria-label="Tutup kartu rute"
                             >
-                                ✕
+                                <FiX aria-hidden="true" />
                             </button>
                         </div>
 
@@ -1226,7 +1303,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 onClick={() => openStartCharging(selectedStation, null)}
                                 disabled={!hasArrived}
                             >
-                                ⚡ Mulai Charging
+                                <FiZap aria-hidden="true" /> Mulai Charging
                             </button>
                         </div>
 
@@ -1240,7 +1317,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     ? '↻ Perbarui rute'
                                     : routeStatus === 'error'
                                     ? '↻ Coba lagi'
-                                    : '🧭 Tampilkan Rute'}
+                                    : <><FiNavigation aria-hidden="true" /> Tampilkan Rute</>}
                             </button>
                             <button
                                 className="route-card-secondary"
@@ -1280,7 +1357,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             : 'Lokasi Anda (live)'
                     }
                 >
-                    🎯
+                    <FiCrosshair aria-hidden="true" />
                     {locationStatus === 'live' && <span className="mapdash-locate-live-dot" />}
                 </button>
 
@@ -1298,7 +1375,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 <span className="mapdash-sheet-title">Sesi Charging Berlangsung</span>
                                 <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
                             </div>
-                            <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}{activeSession.soc_sekarang != null ? ` · 🔋 ${activeSession.soc_sekarang}%` : ''}</p>
+                            <p className="mapdash-session-location"><FiMapPin aria-hidden="true" /> {activeSession.nama_lokasi} · {activeSession.kode_charger}{activeSession.soc_sekarang != null ? <><span> · </span><FiBattery aria-hidden="true" /> {activeSession.soc_sekarang}%</> : ''}</p>
 
                             <div className="dash-progress-track">
                                 <div className="dash-progress-fill" style={{ width: `${sessionProgressPct}%` }} />
@@ -1373,9 +1450,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                                     <p className="dash-station-name">{s.nama_lokasi}</p>
                                                     <p className="dash-station-address">{s.alamat}</p>
                                                     <div className="dash-station-meta">
-                                                        <span>📍 {s.jarak_km} km</span>
-                                                        <span>⚡ {(s.tipe_konektor_list ?? []).map(konektorLabel).join(' / ')}</span>
-                                                        <span>💰 {formatRupiah(s.tarif_per_kwh)}/kWh</span>
+                                                        <span><FiMapPin aria-hidden="true" /> {s.jarak_km} km</span>
+                                                        <span><FiZap aria-hidden="true" /> {(s.tipe_konektor_list ?? []).map(konektorLabel).join(' / ')}</span>
+                                                        <span>{formatRupiah(s.tarif_per_kwh)}/kWh</span>
                                                         <span>⭐ {s.rating}</span>
                                                     </div>
                                                 </div>
@@ -1442,7 +1519,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         <div className="settings-panel-header">
                             <span className="settings-panel-title">Top Up Dompet Digital</span>
                             <button type="button" className="mapdash-notif-close" onClick={() => setShowTopUp(false)} aria-label="Tutup top up">
-                                ✕
+                                <FiX aria-hidden="true" />
                             </button>
                         </div>
 
@@ -1525,7 +1602,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 onClick={() => setSelectedInvoice(null)}
                                 aria-label="Tutup invoice"
                             >
-                                ✕
+                                <FiX aria-hidden="true" />
                             </button>
                         </div>
 
@@ -1534,7 +1611,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         ) : (
                             <>
                                 <div className="charge-flow-station">
-                                    <span className="charge-flow-icon">🧾</span>
+                                    <span className="charge-flow-icon"><FiFileText aria-hidden="true" /></span>
                                     <div>
                                         <strong>{selectedInvoice.nama_lokasi}</strong>
                                         <p>{selectedInvoice.alamat || selectedInvoice.kode_charger}</p>
@@ -1699,21 +1776,21 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                     </span>
                                 </div>
                                 <div className="profile-row">
-                                    <span className="profile-row-icon">📞</span>
+                                    <span className="profile-row-icon"><FiPhone aria-hidden="true" /></span>
                                     <div className="profile-row-body">
                                         <span className="profile-row-label">Nomor Telepon</span>
                                         <span className="profile-row-value">{profile.nomor_telepon || '-'}</span>
                                     </div>
                                 </div>
                                 <div className="profile-row">
-                                    <span className="profile-row-icon">🎂</span>
+                                    <span className="profile-row-icon"><FiCalendar aria-hidden="true" /></span>
                                     <div className="profile-row-body">
                                         <span className="profile-row-label">Tanggal Lahir</span>
                                         <span className="profile-row-value">{formatTanggalLahir(profile.tanggal_lahir)}</span>
                                     </div>
                                 </div>
                                 <div className="profile-row">
-                                    <span className="profile-row-icon">📍</span>
+                                    <span className="profile-row-icon"><FiMapPin aria-hidden="true" /></span>
                                     <div className="profile-row-body">
                                         <span className="profile-row-label">Alamat</span>
                                         <span className="profile-row-value">{profile.alamat || '-'}</span>
@@ -1828,57 +1905,57 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         onClick={() => setShowSettings(false)}
                                         aria-label="Tutup pengaturan"
                                     >
-                                        ✕
+                                        <FiX aria-hidden="true" />
                                     </button>
                                 </div>
 
                                 <button className="settings-profile" onClick={openProfileScreen}>
-                                        <span className="settings-profile-avatar">👤</span>
+                                        <span className="settings-profile-avatar"><FiUser aria-hidden="true" /></span>
                                         <div className="settings-profile-info">
                                             <p className="settings-profile-name">
                                                 {profile?.nama_lengkap ?? user.nama}
                                             </p>
                                             <p className="settings-profile-sub">Lihat & edit profil</p>
                                         </div>
-                                        <span className="settings-menu-arrow">›</span>
+                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
 
                                 <div className="settings-menu">
                                     <button className="settings-menu-item" onClick={onNavigateToVehicles}>
-                                        <span className="settings-menu-icon">🚗</span>
+                                        <span className="settings-menu-icon"><FiTruck aria-hidden="true" /></span>
                                         <span className="settings-menu-label">Kendaraan Saya</span>
-                                        <span className="settings-menu-arrow">›</span>
+                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
                                     <button className="settings-menu-item">
-                                        <span className="settings-menu-icon">💳</span>
+                                        <span className="settings-menu-icon"><FiCreditCard aria-hidden="true" /></span>
                                         <span className="settings-menu-label">Metode Pembayaran</span>
-                                        <span className="settings-menu-arrow">›</span>
+                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
                                     <button className="settings-menu-item" onClick={openPinManager}>
-                                        <span className="settings-menu-icon">🔒</span>
+                                        <span className="settings-menu-icon"><FiLock aria-hidden="true" /></span>
                                         <span className="settings-menu-label">
                                             Kelola PIN Dompet
                                             <span className="settings-menu-sublabel">
                                                 {hasPin ? 'PIN aktif' : 'Belum diatur'}
                                             </span>
                                         </span>
-                                        <span className="settings-menu-arrow">›</span>
+                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
                                     <button className="settings-menu-item">
-                                        <span className="settings-menu-icon">🔔</span>
+                                        <span className="settings-menu-icon"><FiBell aria-hidden="true" /></span>
                                         <span className="settings-menu-label">Notifikasi</span>
-                                        <span className="settings-menu-arrow">›</span>
+                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
                                     <button className="settings-menu-item" onClick={onNavigateToHelp}>
-                                        <span className="settings-menu-icon">❓</span>
+                                        <span className="settings-menu-icon"><FiHelpCircle aria-hidden="true" /></span>
                                         <span className="settings-menu-label">Bantuan</span>
-                                        <span className="settings-menu-arrow">›</span>
+                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
                                 </div>
 
                                 {onLogout && (
                                     <button className="settings-logout-btn" onClick={onLogout}>
-                                        🚪 Keluar
+                                        <FiLogOut aria-hidden="true" /> Keluar
                                     </button>
                                 )}
                             </>
@@ -1895,7 +1972,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         onClick={closePinManager}
                                         aria-label="Kembali ke pengaturan"
                                     >
-                                        ←
+                                        <FiArrowLeft aria-hidden="true" />
                                     </button>
                                     <span className="settings-panel-title">Kelola PIN Dompet</span>
                                     <button
@@ -1906,7 +1983,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         }}
                                         aria-label="Tutup pengaturan"
                                     >
-                                        ✕
+                                        <FiX aria-hidden="true" />
                                     </button>
                                 </div>
 
@@ -1958,7 +2035,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 {hasPin && pinFormMode === null && (
                                     <div className="settings-pin-status">
                                         <div className="settings-pin-status-row">
-                                            <span className="settings-pin-status-icon">🔒</span>
+                                            <span className="settings-pin-status-icon"><FiLock aria-hidden="true" /></span>
                                             <div>
                                                 <p className="settings-pin-status-title">PIN Dompet Aktif</p>
                                                 <p className="settings-pin-status-sub">•• •• ••</p>
@@ -1973,7 +2050,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                                 setPinFormMode('change');
                                             }}
                                         >
-                                            <span className="settings-menu-icon">✏️</span>
+                                            <span className="settings-menu-icon"><FiEdit2 aria-hidden="true" /></span>
                                             <span className="settings-menu-label">Ubah PIN</span>
                                             <span className="settings-menu-arrow">›</span>
                                         </button>
@@ -2105,7 +2182,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         onClick={closeProfileScreen}
                                         aria-label="Kembali ke pengaturan"
                                     >
-                                        ←
+                                        <FiArrowLeft aria-hidden="true" />
                                     </button>
                                     <span className="settings-panel-title">Profil Saya</span>
                                     <button
@@ -2116,7 +2193,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         }}
                                         aria-label="Tutup pengaturan"
                                     >
-                                        ✕
+                                        <FiX aria-hidden="true" />
                                     </button>
                                 </div>
 
@@ -2129,7 +2206,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 {!profileLoading && !profileError && profile && (
                                     <div className="settings-profile-detail">
                                         <div className="settings-profile-detail-avatar-row">
-                                            <span className="settings-profile-avatar settings-profile-avatar-lg">👤</span>
+                                            <span className="settings-profile-avatar settings-profile-avatar-lg"><FiUser aria-hidden="true" /></span>
                                             <p className="settings-profile-detail-name">{profile.nama_lengkap}</p>
                                             <span className={`dash-status-badge ${profile.status_akun === 'aktif' ? 'ok' : 'danger'}`}>
                                                 {profile.status_akun}
@@ -2174,7 +2251,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                             </div>
                                         </div>
 
-                                        <button className="settings-pin-submit">
+                                        <button type="button" className="settings-pin-submit" onClick={openProfileEditor}>
                                             Edit Profil
                                         </button>
                                     </div>

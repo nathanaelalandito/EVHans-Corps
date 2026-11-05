@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { FiArrowLeft, FiCheck, FiEdit2, FiPlus, FiTrash2, FiTruck, FiZap } from 'react-icons/fi';
 import './kelolaKendaraan.css';
+import './kelolaKendaraanEV.css';
 import { getVehicles, createVehicle, updateVehicle, deleteVehicle } from './api/vehicle';
 
 // Pilihan tipe konektor — value harus sama persis dengan enum di backend
@@ -11,12 +13,14 @@ const KONEKTOR_OPTIONS = [
     { value: 'gbt', label: 'GB/T', hint: 'AC · DC' },
 ];
 
+/** Mengubah kode konektor menjadi nama yang dipakai pada formulir. */
 const konektorLabel = (value) =>
     KONEKTOR_OPTIONS.find((o) => o.value === value)?.label ?? value;
 
 const EMPTY_FORM = { merek: '', model: '', nomor_polisi: '', tipe_konektor: 'type_2' };
 
 // Plat ditampilkan dengan spasi & huruf besar: "b1234ev" -> "B 1234 EV".
+/** Membersihkan dan memformat nomor polisi kendaraan saat diketik. */
 function formatPlat(raw) {
     const p = String(raw || '').replace(/\s+/g, '').toUpperCase();
     const m = p.match(/^([A-Z]{1,2})(\d{1,4})([A-Z]{0,3})$/);
@@ -25,6 +29,7 @@ function formatPlat(raw) {
 
 // Ambil pesan error yang enak dibaca dari response axios (baik {message}
 // maupun {errors: {field: [..]}} ala Laravel) — sama seperti di DriverDashboard.
+/** Mengambil pesan kesalahan API agar validasi bisa ditampilkan di form. */
 function extractErrorMessage(error, fallback) {
     const data = error?.response?.data;
     if (!data) return fallback;
@@ -36,6 +41,7 @@ function extractErrorMessage(error, fallback) {
     return fallback;
 }
 
+/** Layar pengemudi untuk menambah, mengubah, dan menghapus kendaraan. */
 export default function KelolaKendaraan({ onBack }) {
     const [vehicles, setVehicles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -53,6 +59,7 @@ export default function KelolaKendaraan({ onBack }) {
 
     const [toast, setToast] = useState('');
 
+    /** Memuat daftar kendaraan dari backend dan mengatur status loading. */
     const loadVehicles = () => {
         setLoading(true);
         setLoadError('');
@@ -75,6 +82,7 @@ export default function KelolaKendaraan({ onBack }) {
 
     // Tombol Esc menutup form / dialog yang sedang terbuka.
     useEffect(() => {
+        /** Menutup dialog formulir kendaraan saat Escape ditekan. */
         const onKey = (e) => {
             if (e.key !== 'Escape') return;
             if (deleting || submitting) return;
@@ -91,6 +99,7 @@ export default function KelolaKendaraan({ onBack }) {
         return { count: vehicles.length, types };
     }, [vehicles]);
 
+    /** Membuka formulir dalam mode tambah dengan nilai awal kosong. */
     const openAddForm = () => {
         setEditingId(null);
         setForm(EMPTY_FORM);
@@ -98,6 +107,7 @@ export default function KelolaKendaraan({ onBack }) {
         setFormOpen(true);
     };
 
+    /** Mengisi formulir dengan data kendaraan yang dipilih untuk diedit. */
     const openEditForm = (vehicle) => {
         setEditingId(vehicle.id_vehicle);
         setForm({
@@ -110,16 +120,19 @@ export default function KelolaKendaraan({ onBack }) {
         setFormOpen(true);
     };
 
+    /** Menutup form kendaraan dan mereset validasi serta konfirmasi hapus. */
     const closeForm = () => {
         if (submitting) return;
         setFormOpen(false);
         setFormError('');
     };
 
+    /** Membuat handler perubahan input untuk field kendaraan tertentu. */
     const handleFormChange = (field) => (e) => {
         setForm((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
+    /** Memvalidasi lalu membuat atau memperbarui kendaraan pada backend. */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
@@ -142,6 +155,7 @@ export default function KelolaKendaraan({ onBack }) {
         }
     };
 
+    /** Menghapus kendaraan setelah tindakan dikonfirmasi pengemudi. */
     const handleDelete = async () => {
         if (!confirmDelete) return;
         setDeleting(true);
@@ -163,10 +177,10 @@ export default function KelolaKendaraan({ onBack }) {
 
     return (
         <div className="kk-page">
-            {/* ---------------- Header hijau melengkung ---------------- */}
+            {/* Header halaman kendaraan */}
             <header className="kk-header">
                 <div className="kk-header-top">
-                    <button className="kk-back-btn" onClick={onBack} aria-label="Kembali">←</button>
+                    <button className="kk-back-btn" onClick={onBack} aria-label="Kembali"><FiArrowLeft aria-hidden="true" /></button>
                     <h1 className="kk-title">Kelola Kendaraan</h1>
                     <span className="kk-header-spacer" />
                 </div>
@@ -185,7 +199,7 @@ export default function KelolaKendaraan({ onBack }) {
                             <span className="kk-summary-none">Belum ada konektor</span>
                         ) : (
                             summary.types.map((t) => (
-                                <span key={t} className="kk-chip">⚡ {konektorLabel(t)}</span>
+                                <span key={t} className="kk-chip"><FiZap aria-hidden="true" /> {konektorLabel(t)}</span>
                             ))
                         )}
                     </div>
@@ -217,13 +231,13 @@ export default function KelolaKendaraan({ onBack }) {
 
                 {!loading && !loadError && vehicles.length === 0 && (
                     <div className="kk-empty">
-                        <span className="kk-empty-icon">🚗</span>
+                        <span className="kk-empty-icon"><FiTruck aria-hidden="true" /></span>
                         <p className="kk-empty-title">Belum ada kendaraan</p>
                         <p className="kk-empty-sub">
                             Tambahkan kendaraan listrikmu supaya lebih cepat memilih station
                             dengan konektor yang cocok.
                         </p>
-                        <button className="kk-empty-cta" onClick={openAddForm}>+ Tambah Kendaraan</button>
+                        <button className="kk-empty-cta" onClick={openAddForm}><FiPlus aria-hidden="true" /> Tambah Kendaraan</button>
                     </div>
                 )}
 
@@ -237,12 +251,12 @@ export default function KelolaKendaraan({ onBack }) {
                                     key={v.id_vehicle}
                                     style={{ animationDelay: `${Math.min(i, 6) * 0.05}s` }}
                                 >
-                                    <div className="kk-card-icon">🚗</div>
+                                    <div className="kk-card-icon"><FiTruck aria-hidden="true" /></div>
                                     <div className="kk-card-info">
                                         <p className="kk-card-name">{v.merek} {v.model}</p>
                                         <div className="kk-card-meta">
                                             <span className="kk-plate">{formatPlat(v.nomor_polisi)}</span>
-                                            <span className="kk-card-badge">⚡ {konektorLabel(v.tipe_konektor)}</span>
+                                            <span className="kk-card-badge"><FiZap aria-hidden="true" /> {konektorLabel(v.tipe_konektor)}</span>
                                         </div>
                                     </div>
                                     <div className="kk-card-actions">
@@ -251,14 +265,14 @@ export default function KelolaKendaraan({ onBack }) {
                                             onClick={() => openEditForm(v)}
                                             aria-label={`Edit ${v.merek} ${v.model}`}
                                         >
-                                            ✎
+                                            <FiEdit2 aria-hidden="true" />
                                         </button>
                                         <button
                                             className="kk-icon-btn kk-icon-btn-danger"
                                             onClick={() => { setConfirmDelete(v); setDeleteError(''); }}
                                             aria-label={`Hapus ${v.merek} ${v.model}`}
                                         >
-                                            🗑
+                                            <FiTrash2 aria-hidden="true" />
                                         </button>
                                     </div>
                                 </article>
@@ -270,18 +284,18 @@ export default function KelolaKendaraan({ onBack }) {
 
             {hasList && (
                 <button className="kk-fab" onClick={openAddForm}>
-                    <span className="kk-fab-plus">+</span> Tambah Kendaraan
+                    <span className="kk-fab-plus"><FiPlus aria-hidden="true" /></span> Tambah Kendaraan
                 </button>
             )}
 
-            {/* ---------------- Toast ---------------- */}
+            {/* Notifikasi singkat setelah tindakan berhasil */}
             {toast && (
                 <div className="kk-toast" role="status">
-                    <span className="kk-toast-check">✓</span> {toast}
+                    <span className="kk-toast-check"><FiCheck aria-hidden="true" /></span> {toast}
                 </div>
             )}
 
-            {/* ---------------- Form tambah / edit kendaraan ---------------- */}
+            {/* Formulir tambah atau edit kendaraan */}
             {formOpen && (
                 <div className="kk-overlay" onClick={closeForm}>
                     <form
@@ -375,11 +389,11 @@ export default function KelolaKendaraan({ onBack }) {
                 </div>
             )}
 
-            {/* ---------------- Konfirmasi hapus ---------------- */}
+            {/* Dialog konfirmasi hapus */}
             {confirmDelete && (
                 <div className="kk-overlay kk-overlay-center" onClick={() => !deleting && setConfirmDelete(null)}>
                     <div className="kk-confirm" onClick={(e) => e.stopPropagation()} role="alertdialog">
-                        <span className="kk-confirm-icon">🗑</span>
+                        <span className="kk-confirm-icon"><FiTrash2 aria-hidden="true" /></span>
                         <p className="kk-confirm-title">Hapus kendaraan ini?</p>
                         <p className="kk-confirm-sub">
                             {confirmDelete.merek} {confirmDelete.model} · {formatPlat(confirmDelete.nomor_polisi)}

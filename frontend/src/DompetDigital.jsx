@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import TopUp from './Topup'; // sesuaikan nama file: Topup.jsx / TopUp.jsx
+import { FiArrowLeft, FiEdit2, FiEye, FiEyeOff, FiKey, FiLock, FiPlus, FiSearch, FiShield, FiSlash, FiCreditCard } from 'react-icons/fi';
+import TopUp from './Topup';
 import './dompetDigital.css';
 import {
     getWallet,
-    getTransactions,
-    getCachedWallet,
-    getCachedTransactions,
     createPin,
     changePin as changePinApi,
     disablePin as disablePinApi,
     verifyPin,
     resetPin,
 } from './api/wallet';
+import { getPaymentHistory } from './api/payments';
 
+/** Memilih pesan backend yang sesuai untuk ditampilkan di halaman dompet. */
 function extractErrorMessage(error, fallback) {
     const data = error?.response?.data;
     if (!data) return fallback;
@@ -24,13 +24,16 @@ function extractErrorMessage(error, fallback) {
     return fallback;
 }
 
+/** Memformat saldo atau nominal transaksi ke format rupiah. */
 function formatRupiah(value) {
     return 'Rp' + Number(value || 0).toLocaleString('id-ID');
 }
 
+/** Memformat waktu transaksi agar sesuai lokal Indonesia. */
 function formatWaktu(value) {
     if (!value) return '-';
     const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
     return d.toLocaleString('id-ID', {
         day: '2-digit',
         month: 'short',
@@ -40,6 +43,26 @@ function formatWaktu(value) {
     });
 }
 
+/** Mengubah tanggal ringkasan pembayaran Indonesia menjadi objek Date yang dapat difilter. */
+function parseWaktuPembayaran(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+
+    const match = String(value).match(/^(\d{1,2})\s+([\p{L}.]+)\s+(\d{4})(?:,\s*(\d{1,2}):(\d{2}))?$/u);
+    if (!match) return null;
+
+    const bulan = {
+        jan: 0, januari: 0, feb: 1, februari: 1, mar: 2, maret: 2,
+        apr: 3, april: 3, mei: 4, jun: 5, juni: 5, jul: 6, juli: 6,
+        agu: 7, agustus: 7, sep: 8, september: 8, okt: 9, oktober: 9,
+        nov: 10, november: 10, des: 11, desember: 11,
+    };
+    const monthIndex = bulan[match[2].toLowerCase().replace('.', '')];
+    if (monthIndex === undefined) return null;
+    return new Date(Number(match[3]), monthIndex, Number(match[1]), Number(match[4] || 0), Number(match[5] || 0));
+}
+
 const STATUS_LABEL = {
     sukses: 'Berhasil',
     pending: 'Menunggu',
@@ -47,20 +70,29 @@ const STATUS_LABEL = {
     aktif: 'Aktif',
 };
 
+/** Menerjemahkan status transaksi dompet ke label antarmuka. */
 function statusLabel(status) {
     return STATUS_LABEL[status] ?? status;
 }
 
-export default function DompetDigital({ onBack, onNavigateToTopUp }) {
-    // Inisialisasi langsung dari cache modul supaya layar PIN/buat-PIN
-    // tampil seketika; data fresh tetap di-refresh di latar belakang.
-    const [status, setStatus] = useState(() => {
-        const w = getCachedWallet();
-        if (!w) return 'loading'; // cache kosong: tetap tunjukkan loading dulu
-        return w.pin_sudah_diset ? 'unlock' : 'createPin';
-    });
-    const [wallet, setWallet] = useState(() => getCachedWallet() || null);
-    const [transactions, setTransactions] = useState(() => getCachedTransactions() || []);
+/** Mengubah ringkasan pembayaran menjadi format baris mutasi dompet. */
+function mapPaymentToWalletTransaction(payment) {
+    const isTopup = payment.jenis_pembayaran === 'topup';
+    return {
+        id: payment.id_payment,
+        jenis: payment.judul || (isTopup ? 'Top Up Dompet Digital' : 'Pembayaran Charging'),
+        tipe: isTopup ? 'masuk' : 'keluar',
+        waktu: parseWaktuPembayaran(payment.tanggal) || payment.tanggal,
+        nominal: payment.total,
+        status: payment.status_pembayaran || payment.status,
+    };
+}
+
+/** Halaman saldo, riwayat top up, dan pengaturan keamanan PIN dompet. */
+export default function DompetDigital({ onBack }) {
+    const [status, setStatus] = useState('loading');
+    const [wallet, setWallet] = useState(null);
+    const [transactions, setTransactions] = useState([]);
 
     const [pinInput, setPinInput] = useState('');
     const [pinSubmitting, setPinSubmitting] = useState(false);
@@ -76,6 +108,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
     const [hideBalance, setHideBalance] = useState(
         () => localStorage.getItem('ev_hide_saldo') === '1'
     );
+    /** Menyembunyikan atau menampilkan nominal saldo pada layar. */
     const toggleHideBalance = () =>
         setHideBalance((v) => {
             const next = !v;
@@ -94,15 +127,8 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         getWallet()
             .then((data) => {
                 if (cancelled) return;
-                setWallet((prev) => ({ ...(prev || {}), ...data }));
-                // Jangan menimpa status 'wallet'/'managePin' bila user sudah
-                // berada di dalam dompet saat refresh selesai.
-                setStatus((current) => {
-                    if (current === 'loading' || current === 'unlock' || current === 'createPin') {
-                        return data.pin_sudah_diset ? 'unlock' : 'createPin';
-                    }
-                    return current;
-                });
+                setWallet(data);
+                setStatus(data.pin_sudah_diset ? 'unlock' : 'createPin');
             })
             .catch(() => onBack());
         return () => {
@@ -111,25 +137,28 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    /** Membuat handler field PIN yang hanya menerima digit. */
     const handleDigits = (setter) => (e) => {
         setter(e.target.value.replace(/\D/g, '').slice(0, 6));
     };
     // Dipanggil TopUp saat user menekan "Kembali ke Beranda"
+    /** Memperbarui saldo dan histori setelah alur top up selesai. */
     const handleTopupDone = async (saldoBaru) => {
         if (typeof saldoBaru === 'number') {
             setWallet((prev) => ({ ...(prev || {}), saldo: saldoBaru }));
         }
         try {
             // Ambil ulang saldo + riwayat supaya top up baru langsung muncul
-            const data = await getTransactions();
-            setTransactions(data.transactions || []);
-            setWallet((prev) => ({ ...(prev || {}), saldo: data.saldo }));
+            const [walletData, paymentHistory] = await Promise.all([getWallet(), getPaymentHistory()]);
+            setWallet(walletData);
+            setTransactions(paymentHistory.map(mapPaymentToWalletTransaction));
         } catch {
             /* abaikan, data lama tetap tampil */
         }
         setStatus('wallet');
     };
 
+    /** Memverifikasi PIN sebelum membuka aksi dompet yang dilindungi. */
     const handleVerifyPin = async (e) => {
         e.preventDefault();
         setPinSubmitting(true);
@@ -145,12 +174,9 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
             await verifyPin(pinInput);
             // Satu request saja: /wallet/transactions juga membawa saldo terbaru
             // (dev server single-threaded — menghemat 1 round-trip ~500ms).
-            const data = await getTransactions();
-            setTransactions(data.transactions || []);
-            setWallet((prev) => ({
-                ...(prev || getCachedWallet() || {}),
-                saldo: data.saldo,
-            }));
+            const [walletData, paymentHistory] = await Promise.all([getWallet(), getPaymentHistory()]);
+            setWallet(walletData);
+            setTransactions(paymentHistory.map(mapPaymentToWalletTransaction));
             setStatus('wallet');
         } catch (err) {
             setPinError(extractErrorMessage(err, 'PIN salah. Coba lagi.'));
@@ -159,6 +185,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         }
     };
 
+    /** Membuat PIN pertama dan memuat ulang status dompet. */
     const handleCreatePin = async (e) => {
         e.preventDefault();
         setPinSubmitting(true);
@@ -187,6 +214,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         }
     };
 
+    /** Mengganti PIN dompet setelah memeriksa nilai lama dan konfirmasi. */
     const handleChangePin = async (e) => {
         e.preventDefault();
         setPinSubmitting(true);
@@ -226,6 +254,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         }
     };
 
+    /** Menonaktifkan PIN setelah backend memverifikasi permintaan. */
     const handleDisablePin = async (e) => {
         e.preventDefault();
         setPinSubmitting(true);
@@ -249,6 +278,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         }
     };
 
+    /** Mengatur ulang PIN dengan password akun dan PIN baru. */
     const handleResetPin = async (e) => {
         e.preventDefault();
         setPinSubmitting(true);
@@ -289,10 +319,11 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
         }
     };
 
+    /** Merender header halaman dompet dengan navigasi kembali. */
     const renderHeader = (title, showBrand = false) => (
         <div className="dmp-header">
             <button className="dmp-back-btn" onClick={onBack} aria-label="Kembali">
-                ←
+                <FiArrowLeft aria-hidden="true" />
             </button>
             <div className="dmp-title">
                 <span className="dmp-title-main">{title}</span>
@@ -316,7 +347,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
             <div className="dmp-container">
                 {renderHeader('Dompet Digital', true)}
                 <div className="dmp-lock-card">
-                    <div className="dmp-lock-icon">🔒</div>
+                    <div className="dmp-lock-icon"><FiShield aria-hidden="true" /></div>
                     <h2 className="dmp-lock-title">Buat PIN Dompet</h2>
                     <p className="dmp-lock-desc">
                         Sebelum membuka dompet digital, kamu perlu membuat PIN 6 digit untuk
@@ -368,7 +399,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
             <div className="dmp-container">
                 {renderHeader('Dompet Digital', true)}
                 <div className="dmp-lock-card">
-                    <div className="dmp-lock-icon">🔐</div>
+                    <div className="dmp-lock-icon"><FiLock aria-hidden="true" /></div>
                     <h2 className="dmp-lock-title">Masukkan PIN Dompet</h2>
                     <p className="dmp-lock-desc">
                         Masukkan PIN 6 digit untuk membuka dompet digitalmu.
@@ -428,7 +459,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
             <div className="dmp-container">
                 {renderHeader('Dompet Digital', true)}
                 <div className="dmp-lock-card">
-                    <div className="dmp-lock-icon">🔑</div>
+                    <div className="dmp-lock-icon"><FiKey aria-hidden="true" /></div>
                     <h2 className="dmp-lock-title">Reset PIN Dompet</h2>
                     <p className="dmp-lock-desc">
                         Verifikasi identitasmu dengan password akun, lalu tentukan PIN baru.
@@ -488,6 +519,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
     }
 
     if (status === 'managePin') {
+        /** Menutup alur top up dan mengembalikan pengguna ke halaman dompet. */
         const backToWallet = () => {
             setPinError('');
             setPinManagerMode(null);
@@ -510,7 +542,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
                     {pinManagerMode === null && (
                         <>
                             <div className="dmp-pin-status">
-                                <span className="dmp-pin-status-icon">🔒</span>
+                                <span className="dmp-pin-status-icon"><FiLock aria-hidden="true" /></span>
                                 <div>
                                     <p className="dmp-pin-status-title">PIN Dompet Aktif</p>
                                     <p className="dmp-pin-status-sub">•• •• ••</p>
@@ -525,7 +557,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
                                     setPinManagerMode('change');
                                 }}
                             >
-                                <span className="dmp-menu-icon">✏️</span>
+                                <span className="dmp-menu-icon"><FiEdit2 aria-hidden="true" /></span>
                                 <span className="dmp-menu-label">Ubah PIN</span>
                                 <span className="dmp-menu-arrow">›</span>
                             </button>
@@ -537,7 +569,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
                                     setPinManagerMode('disable');
                                 }}
                             >
-                                <span className="dmp-menu-icon">🚫</span>
+                                <span className="dmp-menu-icon"><FiSlash aria-hidden="true" /></span>
                                 <span className="dmp-menu-label">Nonaktifkan PIN</span>
                                 <span className="dmp-menu-arrow">›</span>
                             </button>
@@ -549,7 +581,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
                                     setPinManagerMode('reset');
                                 }}
                             >
-                                <span className="dmp-menu-icon">🔑</span>
+                                <span className="dmp-menu-icon"><FiKey aria-hidden="true" /></span>
                                 <span className="dmp-menu-label">Lupa PIN (Reset)</span>
                                 <span className="dmp-menu-arrow">›</span>
                             </button>
@@ -689,7 +721,8 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
 
     // Filter riwayat transaksi (sisi klien).
     const filteredTransactions = transactions.filter((trx) => {
-        const t = new Date(trx.waktu);
+        const t = parseWaktuPembayaran(trx.waktu);
+        if (!t) return false;
 
         if (filterPeriod === '7' || filterPeriod === '30') {
             const cutoff = new Date();
@@ -731,7 +764,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
                         aria-label={hideBalance ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
                         title={hideBalance ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
                     >
-                        {hideBalance ? '🙈' : '👁️'}
+                        {hideBalance ? <FiEye aria-hidden="true" /> : <FiEyeOff aria-hidden="true" />}
                     </button>
                 </div>
                 <p className="dmp-balance-value">{hideBalance ? 'Rp ••••••' : formatRupiah(wallet?.saldo ?? 0)}</p>
@@ -745,11 +778,11 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
 
             <div className="dmp-actions">
                    <button className="dmp-action"   onClick={() => setStatus('topup')}disabled={locked || wallet?.status_dompet !== 'aktif'}title="Top Up saldo">
-                         <span className="dmp-action-icon">➕</span>
+                         <span className="dmp-action-icon"><FiPlus aria-hidden="true" /></span>
                         <span className="dmp-action-label">Top Up</span>
                     </button>
                 <button className="dmp-action" onClick={() => setStatus('managePin')}>
-                    <span className="dmp-action-icon">🔒</span>
+                    <span className="dmp-action-icon"><FiLock aria-hidden="true" /></span>
                     <span className="dmp-action-label">Kelola PIN</span>
                 </button>
             </div>
@@ -761,7 +794,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
 
                 {transactions.length === 0 ? (
                     <div className="dmp-empty">
-                        <span className="dmp-empty-icon">💸</span>
+                                <span className="dmp-empty-icon"><FiCreditCard aria-hidden="true" /></span>
                         <p>Belum ada transaksi. Aktivitas top up dan pembayaran akan muncul di sini.</p>
                     </div>
                 ) : (
@@ -812,7 +845,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
 
                         {filteredTransactions.length === 0 ? (
                             <div className="dmp-empty">
-                                <span className="dmp-empty-icon">🔍</span>
+                                <span className="dmp-empty-icon"><FiSearch aria-hidden="true" /></span>
                                 <p>Tidak ada transaksi yang cocok dengan filter.</p>
                             </div>
                         ) : (

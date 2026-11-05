@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
+/** Mengelola saldo dompet digital serta pembuatan dan verifikasi PIN transaksi. */
 class DompetPinController extends Controller
 {
     use ChecksWalletPin;
@@ -31,6 +32,7 @@ class DompetPinController extends Controller
     /**
      * Ambil (atau buat otomatis jika belum ada) dompet milik user yang login.
      */
+    /** Memuat dompet pengemudi dan membuat record awal jika belum tersedia. */
     protected function getOrCreateWallet(Request $request): Dompet
     {
         return Dompet::firstOrCreate(
@@ -43,6 +45,7 @@ class DompetPinController extends Controller
      * GET /api/wallet
      * Info ringkas dompet: saldo, status, apakah PIN sudah diset, status kunci.
      */
+    /** Mengirim ringkasan dompet tanpa membocorkan PIN transaksi. */
     public function show(Request $request)
     {
         $wallet = $this->getOrCreateWallet($request);
@@ -62,6 +65,7 @@ class DompetPinController extends Controller
      * POST /api/wallet/pin
      * Set PIN transaksi pertama kali (hanya jika belum pernah diset).
      */
+    /** Menyimpan PIN pertama dalam bentuk hash setelah validasi format. */
     public function setPin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -92,6 +96,7 @@ class DompetPinController extends Controller
      * PUT /api/wallet/pin
      * Ubah PIN transaksi (butuh PIN lama).
      */
+    /** Mengganti PIN setelah PIN lama diverifikasi. */
     public function changePin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -134,6 +139,7 @@ class DompetPinController extends Controller
      * POST /api/wallet/pin/verify
      * Verifikasi PIN, dipakai modul lain.
      */
+    /** Memeriksa PIN transaksi dan menerapkan batas percobaan yang gagal. */
     public function verifyPin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -173,6 +179,7 @@ class DompetPinController extends Controller
      * POST /api/wallet/topup
      * Prototype top up instant untuk driver.
      */
+    /** Menambah saldo dompet melalui transaksi internal yang tervalidasi. */
     public function topUp(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -266,6 +273,7 @@ class DompetPinController extends Controller
      * POST /api/wallet/pin/reset
      * Reset PIN saat lupa menggunakan password akun.
      */
+    /** Mengatur ulang PIN melalui mekanisme verifikasi yang disediakan endpoint. */
     public function resetPin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -296,6 +304,7 @@ class DompetPinController extends Controller
      * DELETE /api/wallet/pin
      * Nonaktifkan PIN transaksi.
      */
+    /** Menonaktifkan PIN setelah identitas transaksi diverifikasi. */
     public function disablePin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -331,6 +340,7 @@ class DompetPinController extends Controller
         return response()->json(['message' => 'PIN dompet berhasil dinonaktifkan.']);
     }
 
+    /** Menambah hitungan PIN salah dan mengunci dompet jika batas tercapai. */
     protected function handleFailedAttempt(Dompet $wallet, string $message)
     {
         $wallet->percobaan_pin_gagal += 1;
@@ -355,6 +365,7 @@ class DompetPinController extends Controller
         ], 422);
     }
 
+    /** Mengambil atau membuat metode pembayaran internal yang dinamai. */
     protected function paymentMethod(string $name): MetodePembayaran
     {
         return MetodePembayaran::firstOrCreate(

@@ -19,8 +19,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
+/** Menyediakan operasi station/tarif serta pengelolaan admin dan operator. */
 class OperationsController extends Controller
 {
+    /** Menggabungkan data station, charger, operator, dan ringkasan untuk dashboard staff. */
     public function dashboard(Request $request): JsonResponse
     {
         $this->ensureStaff($request);
@@ -66,6 +68,7 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Memvalidasi lalu memperbarui informasi dan status sebuah lokasi station. */
     public function updateStation(Request $request, Location $station): JsonResponse
     {
         $this->ensureStaff($request);
@@ -88,6 +91,7 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Membuat lokasi station baru beserta data awal yang diperlukan. */
     public function createStation(Request $request): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -110,6 +114,7 @@ class OperationsController extends Controller
         ], 201);
     }
 
+    /** Memperbarui unit charger dengan pemeriksaan sesi aktif sebelum perubahan status. */
     public function updateCharger(Request $request, Charger $charger): JsonResponse
     {
         $this->ensureStaff($request);
@@ -139,6 +144,7 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Menjadwalkan tarif baru untuk lokasi tanpa mengubah tarif sesi yang sudah berjalan. */
     public function updateTarif(Request $request, Location $station): JsonResponse
     {
         $this->ensureStaff($request);
@@ -164,6 +170,7 @@ class OperationsController extends Controller
         ], 201);
     }
 
+    /** Membuat akun operator dan data penugasannya dalam transaksi database. */
     public function createOperator(Request $request): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -210,6 +217,7 @@ class OperationsController extends Controller
         ], 201);
     }
 
+    /** Mengubah lokasi kerja yang ditugaskan kepada operator. */
     public function assignOperator(Request $request, string $operator): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -239,6 +247,7 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Mengaktifkan atau menonaktifkan akun operator dari panel admin. */
     public function updateOperatorStatus(Request $request, string $operator): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -257,6 +266,7 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Mengumpulkan aktivitas transaksi, charging, dan gangguan untuk audit admin. */
     public function auditLogs(Request $request): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -268,7 +278,7 @@ class OperationsController extends Controller
             ->get()
             ->map(function ($s) {
                 return [
-                    'id' => 'TRX-' . $s->id_session,
+                    'id' => 'TRX-'.$s->id_session,
                     'kategori' => 'Transaksi Charging',
                     'aktor' => $s->user?->profile?->nama_lengkap ?? $s->id_user,
                     'stasiun' => $s->charger?->location?->nama_lokasi ?? 'Stasiun SPKLU',
@@ -286,11 +296,11 @@ class OperationsController extends Controller
             ->get()
             ->map(function ($t) {
                 return [
-                    'id' => 'TRF-' . $t->id_tarif,
+                    'id' => 'TRF-'.$t->id_tarif,
                     'kategori' => 'Perubahan Tarif',
                     'aktor' => 'Admin / Operator',
                     'stasiun' => $t->location?->nama_lokasi ?? 'Stasiun SPKLU',
-                    'detail' => "Tarif baru: Rp " . number_format($t->harga_per_kwh, 0, ',', '.') . "/kWh, Minimum: Rp " . number_format($t->biaya_minimum, 0, ',', '.') . ", Parkir: Rp " . number_format($t->biaya_parkir_pjam, 0, ',', '.') . "/jam",
+                    'detail' => 'Tarif baru: Rp '.number_format($t->harga_per_kwh, 0, ',', '.').'/kWh, Minimum: Rp '.number_format($t->biaya_minimum, 0, ',', '.').', Parkir: Rp '.number_format($t->biaya_parkir_pjam, 0, ',', '.').'/jam',
                     'nominal' => $t->harga_per_kwh,
                     'status' => 'Berlaku',
                     'timestamp' => $t->created_at ? $t->created_at->format('Y-m-d H:i:s') : '-',
@@ -309,11 +319,11 @@ class OperationsController extends Controller
             ->get()
             ->map(function ($g) {
                 return [
-                    'id' => 'ERR-' . $g->id_log,
+                    'id' => 'ERR-'.$g->id_log,
                     'kategori' => 'Gangguan Perangkat',
                     'aktor' => $g->nama_pelapor ?? 'Sistem / Sensor',
                     'stasiun' => $g->nama_lokasi ?? 'Stasiun SPKLU',
-                    'detail' => "{$g->kode_perangkat}: {$g->jenis_error} - " . ($g->desk_mslh ?? '-'),
+                    'detail' => "{$g->kode_perangkat}: {$g->jenis_error} - ".($g->desk_mslh ?? '-'),
                     'nominal' => 0,
                     'status' => $g->status_tanganan,
                     'timestamp' => Carbon::parse($g->created_at)->format('Y-m-d H:i:s'),
@@ -326,10 +336,11 @@ class OperationsController extends Controller
                 'transaksi' => $transaksiLogs,
                 'tarif' => $tarifLogs,
                 'gangguan' => $gangguanLogs,
-            ]
+            ],
         ]);
     }
 
+    /** Membaca konfigurasi sistem yang berlaku. */
     public function getSystemConfig(Request $request): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -342,10 +353,11 @@ class OperationsController extends Controller
                 'default_battery_kwh' => (float) config('charging.default_battery_kwh', 50),
                 'simulation_speed' => (float) config('charging.simulation_speed', 60),
                 'app_name' => config('app.name', 'EVChargeHub'),
-            ]
+            ],
         ]);
     }
 
+    /** Memvalidasi dan menyimpan perubahan konfigurasi sistem oleh admin. */
     public function updateSystemConfig(Request $request): JsonResponse
     {
         $this->ensureAdmin($request);
@@ -371,9 +383,9 @@ class OperationsController extends Controller
                 $env .= "\nCHARGING_ARRIVAL_RADIUS_M={$data['arrival_radius_m']}";
             }
             if (str_contains($env, 'CHARGING_REQUIRE_ARRIVAL=')) {
-                $env = preg_replace('/^CHARGING_REQUIRE_ARRIVAL=.*/m', "CHARGING_REQUIRE_ARRIVAL=" . ($data['require_arrival'] ? 'true' : 'false'), $env);
+                $env = preg_replace('/^CHARGING_REQUIRE_ARRIVAL=.*/m', 'CHARGING_REQUIRE_ARRIVAL='.($data['require_arrival'] ? 'true' : 'false'), $env);
             } else {
-                $env .= "\nCHARGING_REQUIRE_ARRIVAL=" . ($data['require_arrival'] ? 'true' : 'false');
+                $env .= "\nCHARGING_REQUIRE_ARRIVAL=".($data['require_arrival'] ? 'true' : 'false');
             }
             if (str_contains($env, 'CHARGING_DEFAULT_BATTERY_KWH=')) {
                 $env = preg_replace('/^CHARGING_DEFAULT_BATTERY_KWH=.*/m', "CHARGING_DEFAULT_BATTERY_KWH={$data['default_battery_kwh']}", $env);
@@ -395,6 +407,7 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Menolak akses jika pemanggil bukan admin atau operator aktif. */
     private function ensureStaff(Request $request): void
     {
         if (! in_array($request->user()->peran, ['operator', 'admin'], true)) {
@@ -402,6 +415,7 @@ class OperationsController extends Controller
         }
     }
 
+    /** Menolak akses ke operasi khusus jika pemanggil bukan admin. */
     private function ensureAdmin(Request $request): void
     {
         if ($request->user()->peran !== 'admin') {
@@ -409,6 +423,7 @@ class OperationsController extends Controller
         }
     }
 
+    /** Mengubah model lokasi beserta charger menjadi format dashboard. */
     private function presentStation(Location $location): array
     {
         $chargers = $location->chargers;
@@ -436,6 +451,7 @@ class OperationsController extends Controller
         ];
     }
 
+    /** Menyusun data unit charger, port, sesi aktif, dan gangguannya. */
     private function presentCharger(Charger $charger): array
     {
         return [
@@ -453,9 +469,10 @@ class OperationsController extends Controller
                 'daya_maks_kw' => $port->daya_maks_kw,
                 'status_port' => $port->status_port,
             ])->values() : [],
-            ];
+        ];
     }
 
+    /** Menghasilkan daftar operator beserta station penugasannya. */
     private function operators(): array
     {
         $assignments = DB::table('station_operators')
@@ -481,6 +498,7 @@ class OperationsController extends Controller
             ->all();
     }
 
+    /** Membuat ID akun berikutnya dengan prefix peran yang diberikan. */
     private function nextUserId(string $prefix): string
     {
         $year = date('Y');

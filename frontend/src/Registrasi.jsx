@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './registrasi.css';
 import { register } from './api/auth';
 
+/** Form pembuatan akun pengemudi dan data kendaraan awal. */
 export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
     const [formData, setFormData] = useState({
         name: '',
@@ -16,6 +17,7 @@ export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
     const [loading, setLoading] = useState(false);
     const [serverMessage, setServerMessage] = useState('');
 
+    /** Memperbarui nilai field registrasi berdasarkan input pengguna. */
     const handleChange = (e) => {
         setFormData({
             ...formData,
@@ -23,6 +25,7 @@ export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
         });
     };
 
+    /** Memvalidasi form lalu mengirim permintaan registrasi ke backend. */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);

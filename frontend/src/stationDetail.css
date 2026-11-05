@@ -187,3 +187,12 @@
     outline: 2px solid #2e7d32;
     outline-offset: 2px;
 }
+
+/* Ikon aksi mengikuti teks tombol agar tetap rapi pada semua ukuran layar. */
+.sd-close,
+.sd-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}

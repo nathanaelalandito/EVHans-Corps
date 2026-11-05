@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
+/** Menyediakan pencarian station dan detail ketersediaan charger bagi pengemudi. */
 class StationController extends Controller
 {
     /** Daftar semua station (mendukung filter konektor & perhitungan jarak GPS). */
@@ -57,6 +58,7 @@ class StationController extends Controller
         ]);
     }
 
+    /** Membentuk data lokasi untuk respons daftar maupun detail station. */
     private function presentStation(Location $location, float $driverLat, float $driverLng, bool $detail = false): array
     {
         $chargers = $location->chargers;
@@ -68,6 +70,7 @@ class StationController extends Controller
         // Hitung port yang tersedia secara case-insensitive
         $availableCount = $allPorts->filter(function ($port) {
             $status = strtolower(trim($port->status_port ?? ''));
+
             return $status === 'available' || $status === 'tersedia';
         })->count();
 
@@ -109,6 +112,7 @@ class StationController extends Controller
         return $data;
     }
 
+    /** Membentuk ringkasan unit charger dan daftar port untuk API driver. */
     private function presentCharger(Charger $charger): array
     {
         return [
@@ -128,6 +132,7 @@ class StationController extends Controller
         ];
     }
 
+    /** Menghasilkan daftar unik label konektor yang tersedia di station. */
     private function connectorLabels(Collection $ports): array
     {
         return $ports
@@ -138,6 +143,7 @@ class StationController extends Controller
             ->all();
     }
 
+    /** Menentukan status station dari status lokasi dan jumlah port yang tersedia. */
     private function stationStatus(Location $location, int $availableCount): string
     {
         if ($location->status_loc === 'Maintenance') {
@@ -151,6 +157,7 @@ class StationController extends Controller
         return $availableCount > 0 ? 'Aktif' : 'Penuh';
     }
 
+    /** Menghitung jarak garis lurus antara koordinat pengemudi dan station. */
     private function distanceKm(float $fromLat, float $fromLng, float $toLat, float $toLng): float
     {
         $earthRadiusKm = 6371;

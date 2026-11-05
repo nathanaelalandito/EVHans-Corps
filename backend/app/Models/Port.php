@@ -5,11 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/** Model konektor fisik pada charger beserta tipe, daya, dan status penggunaannya. */
 class Port extends Model
 {
     use HasFactory;
 
     protected $table = 'ports';
+
     protected $primaryKey = 'id_port';
 
     protected $fillable = [
@@ -34,14 +36,17 @@ class Port extends Model
 
     /** Nilai enum `status_port`. */
     public const AVAILABLE = 'Available';
+
     public const CHARGING = 'Charging';
 
     // Relasi: Banyak Port milik 1 Charger
+    /** Unit charger induk tempat port ini terpasang. */
     public function charger()
     {
         return $this->belongsTo(Charger::class, 'id_charger', 'id_charger');
     }
 
+    /** Sesi charging yang pernah memakai port ini. */
     public function sessions()
     {
         return $this->hasMany(ChargingSession::class, 'id_port', 'id_port');
@@ -57,6 +62,7 @@ class Port extends Model
         return preg_replace('/[^a-z0-9]/', '', strtolower((string) $connector));
     }
 
+    /** Mengubah kode konektor tersimpan menjadi label yang mudah dibaca. */
     public function connectorLabel(): string
     {
         return self::CONNECTOR_LABELS[$this->tipe_konektor] ?? (string) $this->tipe_konektor;
@@ -68,6 +74,7 @@ class Port extends Model
         return self::connectorKey($this->tipe_konektor) === self::connectorKey($vehicleConnector);
     }
 
+    /** Memeriksa apakah port dapat dipilih untuk sesi baru. */
     public function isAvailable(): bool
     {
         return strtolower((string) $this->status_port) === 'available';

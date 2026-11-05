@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/** Model permintaan pengisian saldo dompet melalui metode pembayaran tertentu. */
 class Topup extends Model
 {
     protected $table = 'topup';
@@ -31,16 +32,19 @@ class Topup extends Model
         'kedaluwarsa_pada' => 'datetime',
     ];
 
+    /** Dompet yang menerima dana top up ini. */
     public function wallet(): BelongsTo
     {
         return $this->belongsTo(Dompet::class, 'id_wallet', 'id_wallet');
     }
 
+    /** Transaksi eksternal yang mencatat pembayaran top up. */
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'id_payment', 'id_payment');
     }
 
+    /** Metode yang dipilih untuk membayar top up. */
     public function method(): BelongsTo
     {
         return $this->belongsTo(MetodePembayaran::class, 'id_metode', 'id_metode');

@@ -3,6 +3,7 @@ import Welcome from './Welcome';
 import Registrasi from './Registrasi';
 import Login from './Login';
 import DriverDashboard from './DriverDashboard';
+import DompetDigital from './DompetDigital';
 import OperatorAdminDashboard from './OperatorAdminDashboard';
 import KelolaKendaraan from './KelolaKendaraan';
 import Bantuan from './Bantuan';
@@ -13,6 +14,7 @@ import OpsReport from './OpsReport';
 import ProfilOps from './ProfilOps';
 import ChargerDetail from './ChargerDetail';
 
+/** Menentukan layar aktif serta membagikan status autentikasi antar halaman. */
 export default function App() {
     const [user, setUser] = useState(getStoredUser);
     
@@ -35,6 +37,7 @@ export default function App() {
         }
     });
 
+    /** Menyimpan akun hasil login dan mengarahkan pengguna ke dashboard perannya. */
     const handleLoginSuccess = (userData) => {
         setUser(userData);
     
@@ -52,6 +55,13 @@ export default function App() {
 
     const isStaff = ['operator', 'admin'].includes(user?.peran);
 
+    /** Membuka halaman Dompet Digital untuk akun Driver. */
+    const handleNavigateToWallet = () => setCurrentPage('wallet');
+
+    /** Mengembalikan Driver dari halaman dompet ke dashboard. */
+    const handleWalletBack = () => setCurrentPage('dashboard');
+
+    /** Mengakhiri sesi API lalu mengembalikan aplikasi ke layar awal. */
     const handleLogout = async () => {
         await logout().catch(() => {});
         setUser(null);
@@ -87,8 +97,12 @@ export default function App() {
                         onLogout={handleLogout}
                         onNavigateToVehicles={() => setCurrentPage('vehicles')}
                         onNavigateToHelp={() => setCurrentPage('help')}
+                        onNavigateToWallet={handleNavigateToWallet}
                     />
                 )
+            )}
+            {currentPage === 'wallet' && !isStaff && (
+                <DompetDigital onBack={handleWalletBack} />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />

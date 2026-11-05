@@ -2,16 +2,19 @@ import React, { useState } from 'react';
 import './registrasi.css';
 import { login } from './api/auth';
 
+/** Form login yang meneruskan akun terautentikasi ke pengelola navigasi aplikasi. */
 export default function Login({ onBackToWelcome, onLoginSuccess }) {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [serverMessage, setServerMessage] = useState('');
 
+    /** Menyimpan nilai input login yang sedang diubah. */
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    /** Mengirim kredensial dan menampilkan hasil autentikasi pada form. */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);

@@ -3,6 +3,7 @@ import { FaTimes, FaExclamationTriangle, FaReceipt, FaCheck, FaInfoCircle, FaWre
 import axios from 'axios';
 import { getStoredToken } from './api/auth';
 
+/** Panel notifikasi operator dengan aksi tindak lanjut laporan gangguan. */
 export default function NotificationOverlay({ isOpen, onClose, notifications, onRefreshData }) {
     const [activeTab, setActiveTab] = useState('malfunction'); // 'malfunction' | 'transaction'
     const [processingId, setProcessingId] = useState(null);
@@ -12,6 +13,7 @@ export default function NotificationOverlay({ isOpen, onClose, notifications, on
     const { malfunctions = [], transactions = [] } = notifications || {};
 
     // Aksi: Terima Malfungsi -> Ubah Status Charger ke Maintenance
+    /** Menerima laporan gangguan lalu menyegarkan data notifikasi operator. */
     const handleAcceptMalfunction = async (idCharger, idLog, kodePerangkat) => {
         if (!window.confirm(`Konfirmasi penanganan: Unit ${kodePerangkat} akan otomatis dialihkan ke status MAINTENANCE?`)) return;
 

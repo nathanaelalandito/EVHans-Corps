@@ -3,12 +3,14 @@ import axios from 'axios';
 // Ganti sesuai alamat backend Laravel kamu kalau berbeda.
 export const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
+/** Instance HTTP bersama untuk API Laravel, termasuk format respons JSON. */
 const api = axios.create({
     baseURL: API_BASE_URL,
     headers: { Accept: 'application/json' },
 });
 
 // Selipkan token Sanctum (kalau ada) ke setiap request.
+/** Menambahkan token lokal ke header setiap request yang memerlukan autentikasi. */
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('ev_token');
     if (token) {
@@ -19,6 +21,7 @@ api.interceptors.request.use((config) => {
 
 // Kalau token sudah tidak valid/kedaluwarsa, backend balas 401 —
 // bersihkan sesi lokal supaya user diarahkan balik ke layar login.
+/** Membersihkan sesi browser jika backend menyatakan token tidak lagi sah. */
 api.interceptors.response.use(
     (response) => response,
     (error) => {

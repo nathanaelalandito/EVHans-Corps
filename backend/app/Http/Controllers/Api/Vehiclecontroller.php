@@ -10,10 +10,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
+/** Menyediakan CRUD kendaraan dengan pembatasan kepemilikan per pengemudi. */
 class VehicleController extends Controller
 {
     private const KONEKTOR = ['type_2', 'ccs2', 'chademo', 'gbt'];
 
+    /** Menampilkan daftar kendaraan milik pengemudi yang sedang login. */
     public function index(Request $request): JsonResponse
     {
         $vehicles = $request->user()->vehicles()->orderBy('id_vehicle')->get();
@@ -23,6 +25,7 @@ class VehicleController extends Controller
         ]);
     }
 
+    /** Memvalidasi dan menyimpan kendaraan baru milik pengemudi. */
     public function store(Request $request): JsonResponse
     {
         $data = $this->validated($request);
@@ -35,6 +38,7 @@ class VehicleController extends Controller
         ], 201);
     }
 
+    /** Memperbarui kendaraan setelah memastikan kendaraan dimiliki pengguna. */
     public function update(Request $request, string $id): JsonResponse
     {
         $vehicle = $request->user()->vehicles()->findOrFail($id);
@@ -48,6 +52,7 @@ class VehicleController extends Controller
         ]);
     }
 
+    /** Menghapus kendaraan milik pengguna jika tidak sedang dipakai sesi aktif. */
     public function destroy(Request $request, string $id): JsonResponse
     {
         $vehicle = $request->user()->vehicles()->findOrFail($id);

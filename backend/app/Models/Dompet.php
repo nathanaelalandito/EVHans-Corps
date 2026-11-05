@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\User;
 
+/** Model saldo digital pengemudi, termasuk dana tertahan dan pengamanan PIN. */
 class Dompet extends Model
 {
     use HasFactory;
@@ -36,26 +36,31 @@ class Dompet extends Model
         'locked_until' => 'datetime',
     ];
 
+    /** Pengguna pemilik dompet digital. */
     public function user()
     {
         return $this->belongsTo(User::class, 'id_user', 'id_user');
     }
 
+    /** Saldo yang dapat dipakai setelah dikurangi dana yang sedang di-hold. */
     public function saldoTersedia(): int
     {
         return max(0, (int) $this->saldo - (int) $this->saldo_hold);
     }
 
+    /** Riwayat permintaan top up yang masuk ke dompet ini. */
     public function topups()
     {
         return $this->hasMany(Topup::class, 'id_wallet', 'id_wallet');
     }
 
+    /** Menentukan apakah pengguna sudah mengatur PIN transaksi. */
     public function hasPin(): bool
     {
         return ! is_null($this->pin_transaksi);
     }
 
+    /** Menentukan apakah dompet masih berada dalam masa penguncian PIN. */
     public function isLocked(): bool
     {
         return $this->locked_until !== null && $this->locked_until->isFuture();

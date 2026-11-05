@@ -1,11 +1,13 @@
 import api from './client';
 
 const KONEKTOR_LABEL = { type_2: 'Type 2', ccs2: 'CCS2', chademo: 'CHAdeMO', gbt: 'GB/T' };
+/** Mengubah kode konektor backend menjadi label yang ditampilkan di UI. */
 export const konektorLabel = (v) => KONEKTOR_LABEL[v] ?? v;
 
 const STATUS_LOKASI = { Aktif: 'Aktif', Maintenance: 'Dalam Perawatan', Nonaktif: 'Nonaktif' };
 
 // Bentuk respons API -> bentuk yang dipakai peta/daftar di DriverDashboard.
+/** Menyesuaikan nama field station API dengan struktur dashboard driver. */
 function toDashboardStation(s) {
     return {
         id_location: s.id_location,
@@ -29,12 +31,14 @@ function toDashboardStation(s) {
     };
 }
 
+/** Mengambil station dan menormalkan tiap record untuk peta/daftar driver. */
 export async function getStations() {
     const { data } = await api.get('/stations');
     return (data.data ?? data).map(toDashboardStation);
 }
 
 // Detail lengkap: info lokasi, tarif, dan daftar port (chargers).
+/** Mengambil informasi lengkap station, tarif, charger, dan port. */
 export async function getStationDetail(id) {
     const { data } = await api.get(`/stations/${id}`);
     return data.data ?? data;
@@ -42,10 +46,13 @@ export async function getStationDetail(id) {
 
 // Kendaraan menyimpan 'type_2'/'ccs2', form operator menyimpan 'Type 2'/'CCS2'.
 // Samakan keduanya sebelum membandingkan (sama dengan Port::connectorKey di backend).
+/** Menyeragamkan format konektor agar kode dan label dapat dibandingkan. */
 const connectorKey = (v) => String(v ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+/** Memeriksa kesesuaian konektor kendaraan dengan konektor port. */
 export const sameConnector = (a, b) => connectorKey(a) === connectorKey(b);
 
 // Jarak garis lurus (haversine) dalam km, dibulatkan 1 desimal.
+/** Menghitung jarak garis lurus dua koordinat dengan rumus haversine. */
 export function distanceKm(a, b) {
     const rad = (d) => (d * Math.PI) / 180;
     const dLat = rad(b.lat - a.lat);
@@ -62,6 +69,7 @@ export function distanceKm(a, b) {
 export const ARRIVAL_RADIUS_M = 200;
 
 // Jarak garis lurus (haversine) dalam meter.
+/** Menghitung jarak haversine dalam meter untuk validasi tiba di station. */
 export function distanceMeters(a, b) {
     const rad = (d) => (d * Math.PI) / 180;
     const dLat = rad(b.lat - a.lat);

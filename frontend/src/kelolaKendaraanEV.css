@@ -1,0 +1,248 @@
+/* Lapisan visual halaman kendaraan yang mengikuti Design DNA EVHUB. */
+.kk-page {
+  background: var(--ev-bg);
+  color: var(--ev-text);
+  font-family: var(--ev-font-sans);
+}
+
+/* Header dibuat netral agar informasi kendaraan menjadi fokus utama. */
+.kk-header {
+  background: var(--ev-surface);
+  border-bottom: 1px solid var(--ev-border);
+  border-radius: 0;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px var(--ev-space-6);
+}
+
+.kk-header-top,
+.kk-header-sub,
+.kk-content,
+.kk-summary {
+  width: min(100%, 760px);
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.kk-header-top { gap: var(--ev-space-3); }
+
+.kk-back-btn {
+  width: var(--ev-touch-target);
+  height: var(--ev-touch-target);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-md);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+  font-size: 18px;
+}
+
+.kk-back-btn:hover {
+  border-color: var(--ev-border-strong);
+  background: var(--ev-surface-subtle);
+  color: var(--ev-primary);
+}
+
+.kk-title,
+.kk-section-title,
+.kk-empty-title,
+.kk-confirm-title {
+  color: var(--ev-ink);
+  font-family: var(--ev-font-display);
+  letter-spacing: -0.015em;
+}
+
+.kk-title { font-size: var(--ev-text-xl); font-weight: 600; }
+
+.kk-header-sub {
+  margin-top: var(--ev-space-2);
+  color: var(--ev-text-muted);
+  text-align: left;
+}
+
+/* Ringkasan tidak lagi menimpa header; ia menjadi kartu informasi biasa. */
+.kk-summary {
+  margin-top: var(--ev-space-5);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface);
+  box-shadow: var(--ev-shadow-sm);
+  padding: var(--ev-space-4) var(--ev-space-5);
+}
+
+.kk-summary-count { color: var(--ev-ink); font-family: var(--ev-font-display); }
+.kk-summary-label,
+.kk-summary-none,
+.kk-empty-sub,
+.kk-confirm-sub { color: var(--ev-text-muted); }
+
+.kk-chip,
+.kk-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--ev-primary-soft);
+  color: var(--ev-primary);
+}
+
+.kk-chip svg,
+.kk-card-badge svg,
+.kk-toast-check svg { vertical-align: middle; }
+
+.kk-content {
+  padding: var(--ev-space-8) 20px calc(108px + env(safe-area-inset-bottom, 0px));
+}
+
+.kk-section-title { font-size: var(--ev-text-lg); font-weight: 600; }
+.kk-list { gap: var(--ev-space-3); }
+
+.kk-card {
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  box-shadow: var(--ev-shadow-sm);
+  padding: var(--ev-space-4);
+}
+
+.kk-card:hover {
+  border-color: var(--ev-border-strong);
+  box-shadow: var(--ev-shadow-card);
+}
+
+.kk-card-icon,
+.kk-empty-icon {
+  background: var(--ev-primary-soft);
+  color: var(--ev-primary);
+}
+
+.kk-card-icon { border-radius: var(--ev-radius-md); }
+.kk-empty-icon { border-radius: var(--ev-radius-lg); }
+
+.kk-card-name { color: var(--ev-ink); }
+
+.kk-plate {
+  border-color: var(--ev-ink);
+  background: var(--ev-surface);
+  color: var(--ev-ink);
+}
+
+.kk-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+}
+
+.kk-icon-btn:hover { background: var(--ev-primary-soft); color: var(--ev-primary); }
+.kk-icon-btn-danger { color: var(--ev-danger); }
+.kk-icon-btn-danger:hover { background: var(--ev-danger-soft); color: var(--ev-danger); }
+
+.kk-empty {
+  border: 1px dashed var(--ev-border-strong);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface);
+}
+
+.kk-empty-cta,
+.kk-retry-btn,
+.kk-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ev-space-2);
+  min-height: var(--ev-touch-target);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-primary);
+  box-shadow: none;
+}
+
+.kk-empty-cta:hover,
+.kk-retry-btn:hover,
+.kk-btn-primary:hover { background: var(--ev-primary-hover); }
+
+/* Tombol tambah tetap mudah dijangkau pada perangkat kecil. */
+.kk-fab {
+  min-height: var(--ev-touch-target);
+  border: 1px solid var(--ev-primary);
+  border-radius: var(--ev-radius-md);
+  background: var(--ev-primary);
+  box-shadow: var(--ev-shadow-float);
+}
+
+.kk-fab-plus { display: inline-flex; font-size: 18px; }
+
+/* Dialog formulir dan konfirmasi menggunakan surface yang sama. */
+.kk-overlay { background: rgb(24 39 33 / 32%); backdrop-filter: blur(3px); }
+
+.kk-sheet,
+.kk-confirm {
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-xl);
+  background: var(--ev-surface);
+  box-shadow: var(--ev-shadow-float);
+}
+
+.kk-sheet-handle { background: var(--ev-border-strong); }
+.kk-sheet-title { color: var(--ev-ink); font-family: var(--ev-font-display); }
+
+.kk-plate-preview {
+  border: 1px solid var(--ev-border);
+  background: var(--ev-surface-subtle);
+}
+
+.kk-field > span,
+.kk-fieldset legend { color: var(--ev-text); }
+
+.kk-field input[type='text'] {
+  min-height: var(--ev-touch-target);
+  border-color: var(--ev-border-strong);
+  border-radius: var(--ev-radius-sm);
+  color: var(--ev-ink);
+}
+
+.kk-field input[type='text']:focus {
+  border-color: var(--ev-primary);
+  box-shadow: var(--ev-focus-ring);
+}
+
+.kk-konektor {
+  border-color: var(--ev-border);
+  border-radius: var(--ev-radius-md);
+}
+
+.kk-konektor.is-selected {
+  border-color: var(--ev-primary);
+  background: var(--ev-primary-soft);
+}
+
+.kk-konektor-name { color: var(--ev-ink); }
+.kk-konektor-hint { color: var(--ev-text-muted); }
+
+.kk-btn-secondary {
+  min-height: var(--ev-touch-target);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+}
+
+.kk-btn-primary,
+.kk-btn-danger { border-radius: var(--ev-radius-sm); }
+.kk-btn-danger { background: var(--ev-danger); }
+.kk-btn-danger:hover { background: #a62f38; }
+
+.kk-confirm-icon {
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-danger-soft);
+  color: var(--ev-danger);
+}
+
+.kk-form-error {
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-danger-soft);
+  color: var(--ev-danger);
+}
+
+@media (max-width: 700px) {
+  .kk-header { padding: calc(20px + env(safe-area-inset-top, 0px)) 16px var(--ev-space-5); }
+  .kk-summary { margin-inline: 16px; width: auto; }
+  .kk-content { padding: var(--ev-space-6) 16px calc(108px + env(safe-area-inset-bottom, 0px)); }
+}

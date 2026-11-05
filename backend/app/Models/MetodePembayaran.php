@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Payment;
 
+/** Model daftar metode pembayaran yang tersedia pada transaksi dan top up. */
 class MetodePembayaran extends Model
 {
     use HasFactory;
 
     protected $table = 'metode_pembayaran';
+
     protected $primaryKey = 'id_metode';
 
     protected $fillable = [
@@ -22,8 +23,10 @@ class MetodePembayaran extends Model
     protected $casts = [
         'biaya_layanan' => 'integer',
     ];
-    public function payment(){
+
+    /** Transaksi yang menggunakan metode pembayaran ini. */
+    public function payment()
+    {
         return $this->hasMany(Payment::class, 'id_metode', 'id_metode');
     }
-
 }

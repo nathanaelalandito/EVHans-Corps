@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Charger;
 
+/** Model pencatatan satu proses pengisian kendaraan, dari mulai hingga settlement. */
 class ChargingSession extends Model
 {
     use HasFactory;
@@ -14,7 +14,9 @@ class ChargingSession extends Model
     public const AKTIF = ['Pending', 'Berlangsung'];
 
     protected $table = 'charging_session';
+
     protected $primaryKey = 'id_session';
+
     protected $guarded = [];
 
     protected $casts = [
@@ -29,11 +31,13 @@ class ChargingSession extends Model
         'soc_akhir' => 'integer',
     ];
 
+    /** Pengemudi yang memiliki sesi charging ini. */
     public function user()
     {
         return $this->belongsTo(User::class, 'id_user', 'id_user');
     }
 
+    /** Unit charger yang menjalankan sesi ini. */
     public function charger()
     {
         return $this->belongsTo(Charger::class, 'id_charger', 'id_charger');
@@ -45,16 +49,19 @@ class ChargingSession extends Model
         return $this->belongsTo(Port::class, 'id_port', 'id_port');
     }
 
+    /** Tarif yang dibekukan sebagai dasar biaya pada sesi ini. */
     public function tarif()
     {
         return $this->belongsTo(Tarif::class, 'id_tarif', 'id_tarif');
     }
 
+    /** Kendaraan yang diisi pada sesi ini. */
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class, 'id_vehicle', 'id_vehicle');
     }
 
+    /** Transaksi pembayaran hasil penyelesaian sesi ini. */
     public function payment()
     {
         return $this->hasOne(Payment::class, 'id_session', 'id_session');

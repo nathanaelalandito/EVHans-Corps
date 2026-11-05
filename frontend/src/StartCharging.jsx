@@ -5,17 +5,22 @@ import { prepareCharging, estimateCharging, startCharging } from './api/charging
 
 const TARGET_PERCENT_SHORTCUTS = [80, 100];
 
+/** Membulatkan energi ke bawah dalam kelipatan 0,5 kWh. */
 const roundDownHalf = (x) => Math.floor(x * 2) / 2;
 
+/** Menghitung energi yang dibutuhkan untuk mencapai persentase baterai target. */
 function kwhToReach(percent, p) {
     const need = (p.kapasitas_baterai_kwh * (percent - p.soc_awal)) / 100;
     return Math.min(p.max_target_kwh, Math.max(p.min_target_kwh, roundDownHalf(need)));
 }
 
+/** Memperkirakan SOC akhir berdasarkan energi yang akan masuk ke baterai. */
 const socAfter = (kwh, p) => Math.min(100, Math.round(p.soc_awal + (kwh / p.kapasitas_baterai_kwh) * 100));
 
+/** Memformat nominal biaya charging sebagai rupiah. */
 const rupiah = (v) => (v == null ? '-' : 'Rp' + Number(v).toLocaleString('id-ID'));
 
+/** Menyajikan durasi menit dalam format jam/menit yang ringkas. */
 function durasiLabel(menit) {
     if (menit < 1) return '< 1 mnt';
     const jam = Math.floor(menit / 60);
@@ -24,6 +29,7 @@ function durasiLabel(menit) {
     return sisa === 0 ? `${jam} jam` : `${jam} jam ${sisa} mnt`;
 }
 
+/** Memilih pesan validasi backend atau teks fallback untuk modal. */
 function errorMessage(err, fallback) {
     const data = err?.response?.data;
     if (data?.message) {
@@ -41,6 +47,7 @@ const STEP_NUMBER = { port: 1, plug: 2, battery: 3, amount: 4, estimate: 5, pin:
 
 // initialPortId: port yang sudah dipilih dari daftar station -> langsung ke langkah colok kabel.
 // onTopUp: dipanggil saat saldo tidak cukup (membuka modal Top Up di dashboard).
+/** Wizard driver untuk memilih port, mengestimasi biaya, dan memulai sesi charging. */
 export default function StartCharging({ station, vehicle, position, initialPortId = null, onClose, onStarted, onTopUp }) {
     const [step, setStep] = useState(initialPortId != null ? 'plug' : 'port');
     const [detail, setDetail] = useState(null);
@@ -70,6 +77,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
         };
     }, [station.id_location]);
 
+    /** Menutup wizard dan melepas efek antarmuka yang sedang aktif. */
     const handleClose = () => {
         if (busy) return;
         if (session) onStarted(session);
@@ -77,6 +85,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     };
 
     useEffect(() => {
+        /** Menutup wizard saat tombol Escape ditekan. */
         const onKey = (e) => e.key === 'Escape' && handleClose();
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -122,6 +131,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     const kwhValid = targetKwh !== '' && Number.isFinite(kwhNum) && kwhNum >= minKwh && kwhNum <= maxKwh;
     const sliderValue = Number.isFinite(kwhNum) && targetKwh !== '' ? Math.min(maxKwh, Math.max(minKwh, kwhNum)) : minKwh;
 
+    /** Menjaga target kWh tetap di dalam kapasitas baterai yang tersedia. */
     const clampTarget = () => {
         if (targetKwh === '' || !Number.isFinite(kwhNum)) return;
         if (kwhNum > maxKwh) setTargetKwh(String(maxKwh));
@@ -129,12 +139,14 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     };
     const pinValid = /^\d{6}$/.test(pin);
 
+    /** Berpindah tahap wizard sambil memperbarui state layar. */
     const goTo = (next) => {
         setError('');
         setStep(next);
     };
 
     // Langkah 2 -> 3: Kirim id_port ke backend untuk validasi & ambil SOC awal
+    /** Memastikan port/kendaraan valid sebelum menghitung estimasi. */
     const handlePlugged = async () => {
         if (!vehicle || selectedPortId == null || busy) return;
         setBusy(true);
@@ -158,6 +170,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     };
 
     // Langkah 4 -> 5: Hitung estimasi biaya
+    /** Mengirim target energi ke backend dan menampilkan biaya serta saldo. */
     const handleCalculate = async () => {
         if (!kwhValid || busy) return;
         setBusy(true);
@@ -179,6 +192,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     };
 
     // Langkah 6: Otorisasi PIN & Mulai Sesi
+    /** Memverifikasi PIN lalu meminta backend membuat sesi charging. */
     const handleStart = async () => {
         if (!pinValid || busy) return;
         setBusy(true);
@@ -217,6 +231,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
         }
     };
 
+    /** Kembali ke pemilihan port dan membersihkan estimasi sebelumnya. */
     const backToPortStep = () => {
         setSelectedPortId(null);
         setPrep(null);

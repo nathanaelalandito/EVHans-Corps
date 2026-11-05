@@ -96,8 +96,10 @@ const FAQ = [
     },
 ];
 
+/** Menyeragamkan teks agar pencarian bantuan tidak peka huruf besar/kecil. */
 const normalisasi = (s) => String(s || '').toLowerCase();
 
+/** Menampilkan topik bantuan dan jawaban yang dapat dibuka/tutup. */
 export default function Bantuan({ onBack }) {
     const [query, setQuery] = useState('');
     const [kategori, setKategori] = useState('Semua');
@@ -112,6 +114,7 @@ export default function Bantuan({ onBack }) {
         });
     }, [query, kategori]);
 
+    /** Membuka satu jawaban atau menutupnya jika sedang terbuka. */
     const toggle = (id) => setOpenId((cur) => (cur === id ? null : id));
 
     const { whatsapp, email, telepon, jamLayanan } = KONTAK_BANTUAN;

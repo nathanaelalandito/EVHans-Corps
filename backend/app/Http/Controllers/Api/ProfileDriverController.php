@@ -7,31 +7,36 @@ use App\Http\Requests\UpdateProfileDriverRequest;
 use App\Http\Resources\ProfileDriverResource;
 use Illuminate\Http\Request;
 
+/** Mengambil dan memperbarui profil pengemudi yang sedang terautentikasi. */
 class ProfileDriverController extends Controller
 {
+    /** Mengembalikan profil pengemudi yang sedang terautentikasi. */
     public function show(Request $request)
     {
         $user = $request->user()->load('profile');
+
         return new ProfileDriverResource($user);
     }
 
+    /** Memperbarui data akun dan profil setelah lolos validasi request. */
     public function update(UpdateProfileDriverRequest $request)
     {
-    $user = $request->user();
-    $profile = $user->profile;
-    $validated = $request->validated();
+        $user = $request->user();
+        $profile = $user->profile;
+        $validated = $request->validated();
 
-    // Pisahkan email (kolom di tabel users) dari field profil lainnya
-    if (array_key_exists('email', $validated)) {
-        $newEmail = $validated['email'];
-        if ($newEmail !== $user->email) {
-            $user->email = $newEmail;
-             $user->email_verified_at = now(); // ✅ langsung dianggap terverifikasi
-            $user->save();
+        // Pisahkan email (kolom di tabel users) dari field profil lainnya
+        if (array_key_exists('email', $validated)) {
+            $newEmail = $validated['email'];
+            if ($newEmail !== $user->email) {
+                $user->email = $newEmail;
+                $user->email_verified_at = now(); // ✅ langsung dianggap terverifikasi
+                $user->save();
+            }
+            unset($validated['email']);
         }
-        unset($validated['email']);
-    }
-    $profile->update($validated);   // ⬅️ diganti dari $request->validated()
-    return new ProfileDriverResource($user->fresh('profile'));
+        $profile->update($validated);   // ⬅️ diganti dari $request->validated()
+
+        return new ProfileDriverResource($user->fresh('profile'));
     }
 }

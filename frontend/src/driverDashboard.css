@@ -37,6 +37,367 @@
 }
 
 /* ==================================================================
+   EVHUB DRIVER UI — Design DNA implementation
+   Keep these rules at the end of this file while legacy screens are
+   migrated incrementally. They define the current driver experience.
+   ================================================================== */
+.app-shell,
+.home-screen,
+.mapdash-container {
+    background: var(--ev-bg);
+    color: var(--ev-text);
+}
+
+.home-header {
+    background: var(--ev-surface);
+    border-bottom: 1px solid var(--ev-border);
+    border-radius: 0;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 20px 20px;
+    box-shadow: none;
+}
+
+.home-header-top,
+.home-header-summary,
+.home-content {
+    width: min(100%, 1120px);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.home-header-top {
+    align-items: center;
+    margin-bottom: var(--ev-space-6);
+}
+
+.home-greeting-text {
+    margin: 0 0 var(--ev-space-1);
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-2xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.home-greeting-sub,
+.home-section-caption,
+.home-vehicle-connector {
+    color: var(--ev-text-muted);
+}
+
+.home-icon-btn {
+    width: var(--ev-touch-target);
+    height: var(--ev-touch-target);
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-md);
+    background: var(--ev-surface);
+    color: var(--ev-text);
+    font-size: 18px;
+    transition: background-color var(--ev-transition-fast), border-color var(--ev-transition-fast), color var(--ev-transition-fast);
+}
+
+.home-icon-btn:hover {
+    border-color: var(--ev-border-strong);
+    background: var(--ev-surface-subtle);
+    color: var(--ev-primary);
+}
+
+.home-header-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: var(--ev-space-3);
+}
+
+.home-balance-panel,
+.home-vehicle-panel {
+    min-height: 104px;
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-lg);
+    background: var(--ev-surface-subtle);
+    padding: var(--ev-space-4);
+    box-shadow: none;
+}
+
+.home-balance-panel {
+    align-items: flex-end;
+}
+
+.home-wallet-label,
+.home-vehicle-panel-head {
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.home-wallet-value {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-2xl);
+    letter-spacing: -0.025em;
+}
+
+.home-wallet-topup {
+    min-height: 40px;
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-surface);
+    color: var(--ev-primary);
+    font-size: var(--ev-text-sm);
+    font-weight: 700;
+}
+
+.home-wallet-topup:hover {
+    border-color: var(--ev-primary);
+    background: var(--ev-primary-soft);
+}
+
+.home-vehicle-panel {
+    gap: var(--ev-space-2);
+}
+
+.home-vehicle-pill-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-primary-soft);
+    color: var(--ev-primary);
+    font-size: 13px;
+}
+
+.home-vehicle-select,
+.home-vehicle-add-btn {
+    min-height: 42px;
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-surface);
+    color: var(--ev-ink);
+}
+
+.home-content {
+    padding: var(--ev-space-8) 20px calc(var(--ev-space-12) + env(safe-area-inset-bottom, 0px));
+    gap: var(--ev-space-8) var(--ev-space-10);
+}
+
+.home-search-card {
+    grid-column: 1 / -1;
+}
+
+.home-cta-map {
+    min-height: 96px;
+    border: 1px solid var(--ev-primary);
+    border-radius: var(--ev-radius-lg);
+    background: var(--ev-primary);
+    box-shadow: none;
+    padding: var(--ev-space-5) var(--ev-space-6);
+    transition: background-color var(--ev-transition-fast), transform var(--ev-transition-fast);
+}
+
+.home-cta-map:hover {
+    background: var(--ev-primary-hover);
+}
+
+.home-cta-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--ev-radius-md);
+    background: rgb(255 255 255 / 15%);
+    font-size: 22px;
+}
+
+.home-cta-title {
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-lg);
+    letter-spacing: -0.01em;
+}
+
+.home-cta-sub {
+    color: rgb(255 255 255 / 76%);
+}
+
+.home-cta-arrow,
+.home-map-link svg,
+.mapdash-station-mini-dist svg {
+    display: inline-flex;
+    vertical-align: middle;
+}
+
+.home-section-title-row {
+    margin-bottom: var(--ev-space-4);
+}
+
+.home-section-title,
+.home-session-title {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-xl);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+}
+
+.home-map-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ev-space-1);
+    border-color: var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    color: var(--ev-primary);
+}
+
+.home-station-scroll {
+    gap: var(--ev-space-3);
+}
+
+.home-station-scroll .mapdash-station-mini,
+.home-session-card,
+.home-invoice-card {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-lg);
+    background: var(--ev-surface);
+    box-shadow: var(--ev-shadow-sm);
+}
+
+.home-station-scroll .mapdash-station-mini {
+    min-height: 118px;
+    padding: var(--ev-space-4);
+}
+
+.home-station-scroll .mapdash-station-mini:hover,
+.home-station-scroll .mapdash-station-mini:focus-visible {
+    border-color: var(--ev-primary);
+    background: var(--ev-surface);
+}
+
+.mapdash-station-mini-name,
+.home-station-scroll .mapdash-station-mini-name {
+    color: var(--ev-ink);
+    font-size: var(--ev-text-sm);
+}
+
+.mapdash-station-mini-meta,
+.home-station-scroll .mapdash-station-mini-meta,
+.mapdash-station-mini-dist {
+    color: var(--ev-text-muted);
+}
+
+.dash-status-badge.ok {
+    background: var(--ev-success-soft);
+    color: var(--ev-success);
+}
+
+.dash-status-badge.warn {
+    background: var(--ev-warning-soft);
+    color: var(--ev-warning);
+}
+
+.dash-status-badge.danger {
+    background: var(--ev-danger-soft);
+    color: var(--ev-danger);
+}
+
+.home-session-card,
+.home-invoice-card {
+    padding: var(--ev-space-6);
+}
+
+.invoice-grid div {
+    background: var(--ev-surface-subtle);
+    border-radius: var(--ev-radius-sm);
+}
+
+.invoice-label,
+.dash-empty,
+.transaction-meta {
+    color: var(--ev-text-muted);
+}
+
+.invoice-grid strong,
+.transaction-side strong,
+.transaction-location {
+    color: var(--ev-ink);
+}
+
+.home-history-section .transaction-list {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-lg);
+    background: var(--ev-surface);
+}
+
+.home-history-section .transaction-item {
+    padding: var(--ev-space-4);
+    border-bottom-color: var(--ev-border);
+}
+
+.transaction-item:hover {
+    background: var(--ev-surface-subtle);
+}
+
+/* Peta: controls dan panel tetap sederhana serta selaras dengan dashboard. */
+.mapdash-map-title,
+.mapdash-round-btn,
+.mapdash-sheet,
+.route-card {
+    border: 1px solid var(--ev-border);
+    box-shadow: var(--ev-shadow-card);
+}
+
+.mapdash-map-title,
+.mapdash-round-btn {
+    color: var(--ev-ink);
+    background: var(--ev-surface);
+}
+
+.mapdash-sheet,
+.route-card {
+    background: var(--ev-surface);
+}
+
+.mapdash-filter-chip {
+    border-color: var(--ev-border);
+    background: var(--ev-surface);
+    color: var(--ev-text);
+}
+
+.mapdash-filter-chip.active,
+.route-card-primary,
+.dash-btn-navigate {
+    background: var(--ev-primary);
+    border-color: var(--ev-primary);
+}
+
+.mapdash-filter-chip.active {
+    color: #fff;
+}
+
+@media (max-width: 700px) {
+    .home-header {
+        padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 16px;
+    }
+
+    .home-header-summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .home-content {
+        gap: var(--ev-space-6);
+        padding: var(--ev-space-6) 16px calc(var(--ev-space-10) + env(safe-area-inset-bottom, 0px));
+    }
+
+    .home-cta-map {
+        min-height: 84px;
+        padding: var(--ev-space-4);
+    }
+}
+
+@media (min-width: 1024px) {
+    .home-content {
+        grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+    }
+
+    .home-header {
+        max-width: none;
+    }
+}
+
+/* ==================================================================
    Layout dasar layar peta: peta full-screen sebagai background,
    semua elemen lain (topbar, filter, bottom sheet) mengambang di
    atasnya. Layar ini ditumpuk di dalam .app-shell (lihat di atas).
@@ -3801,154 +4162,430 @@
     }
 }
 
-/* ==================================================================
-   FINAL DASHBOARD COMPACT OVERRIDES
-   Diletakkan paling akhir agar tidak tertimpa blok lama/duplikat.
-   ================================================================== */
+/* Beranda memakai satu ritme layout yang sama pada mobile dan desktop. */
+.home-screen {
+    background: #f3f6f4;
+    color: #18251e;
+}
+
 .home-header {
-    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 18px;
-    border-radius: 0 0 24px 24px;
+    background: #ffffff;
+    border-bottom: 1px solid #e1e8e3;
+    border-radius: 0;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 20px;
+    animation: none;
+}
+
+.home-header-top,
+.home-header-summary {
+    width: min(100%, 1040px);
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .home-header-top {
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 14px;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
 }
 
 .home-greeting-text {
-    font-size: 17px;
-    margin-bottom: 3px;
+    color: #17241c;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    margin-bottom: 4px;
 }
 
 .home-greeting-sub {
-    color: rgba(255, 255, 255, 0.76);
-    font-size: 12px;
+    color: #66746b;
+    font-size: 13px;
+}
+
+.home-header-actions {
+    gap: 8px;
+}
+
+.home-icon-btn {
+    width: 42px;
+    height: 42px;
+    background: #f0f4f1;
+    color: #26382d;
+    font-size: 17px;
 }
 
 .home-header-summary {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 12px;
 }
 
 .home-balance-panel,
 .home-vehicle-panel {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 16px;
-    padding: 12px;
-    backdrop-filter: blur(8px);
+    min-width: 0;
+    border: 1px solid #e1e8e3;
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: #ffffff;
+    backdrop-filter: none;
 }
 
 .home-balance-panel {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
 }
 
-.home-wallet-card {
-    display: none;
-}
-
 .home-wallet-label {
-    color: rgba(255, 255, 255, 0.72);
+    color: #65746a;
+    font-size: 12px;
 }
 
 .home-wallet-value {
-    color: #ffffff;
-    font-size: 20px;
+    color: #17241c;
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+}
+
+.home-wallet-topup {
+    min-height: 40px;
+    border: 1px solid #cfe2d4;
+    border-radius: 6px;
+    padding: 0 14px;
+    background: #eaf4ed;
+    color: #1f6b3d;
+    font-size: 13px;
 }
 
 .home-vehicle-panel {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+    background: #f7faf8;
 }
 
 .home-vehicle-panel-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 11.5px;
-    font-weight: 700;
+    color: #65746a;
+    font-size: 12px;
 }
 
 .home-vehicle-select,
 .home-vehicle-add-btn {
     width: 100%;
-    min-height: 38px;
-    border: 1px solid rgba(255, 255, 255, 0.26);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.16);
-    color: #ffffff;
+    min-height: 40px;
+    border: 1px solid #d8e1da;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #17241c;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 0 12px;
 }
 
-.home-vehicle-select {
-    cursor: pointer;
-}
-
 .home-vehicle-select option {
-    color: #1b4d2e;
     background: #ffffff;
+    color: #17241c;
 }
 
-.home-vehicle-add-btn {
-    cursor: pointer;
-    text-align: left;
+.home-vehicle-connector {
+    color: #66746b;
+    font-size: 12px;
 }
 
 .home-content {
-    padding: 14px 16px calc(28px + env(safe-area-inset-bottom, 0px));
-    gap: 14px;
+    width: min(100%, 1040px);
+    margin: 0 auto;
+    padding: 24px 20px calc(40px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+    align-items: start;
+    gap: 24px 32px;
+}
+
+.home-content > .home-notif,
+.home-content > .home-session-card,
+.home-content > .home-search-card,
+.home-content > .home-invoice-card {
+    grid-column: 1 / -1;
+}
+
+.home-notif {
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.home-session-card,
+.home-invoice-card {
+    border-radius: 8px;
+    border-color: #dce6df;
+    box-shadow: none;
+}
+
+.home-session-title,
+.home-section-title {
+    color: #17241c;
+}
+
+.home-section-title-row {
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.home-section-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 17px;
+}
+
+.home-section-caption {
+    display: block;
+    margin-top: 4px;
+    color: #69766d;
+    font-size: 12px;
+}
+
+.home-map-link {
+    min-height: 40px;
+    flex-shrink: 0;
+    padding: 0 12px;
+    border: 1px solid #d6e4da;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #22653c;
+    font: 600 13px 'Plus Jakarta Sans', sans-serif;
+    cursor: pointer;
+}
+
+.home-search-card {
+    animation: none;
 }
 
 .home-cta-map {
-    border-radius: 18px;
-    padding: 14px;
+    min-height: 74px;
+    border-radius: 8px;
+    padding: 14px 18px;
+    background: #1d7042;
+    box-shadow: none;
+    animation: none;
+}
+
+.home-cta-map:hover {
+    background: #185d37;
+}
+
+.home-cta-map:focus-visible,
+.home-icon-btn:focus-visible,
+.home-wallet-topup:focus-visible,
+.home-vehicle-select:focus-visible,
+.home-map-link:focus-visible,
+.mapdash-station-mini:focus-visible,
+.transaction-item:focus-visible {
+    outline: 3px solid #57a878;
+    outline-offset: 2px;
 }
 
 .home-cta-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    font-size: 19px;
+    width: 42px;
+    height: 42px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.16);
 }
 
-.home-stats-row {
-    gap: 8px;
+.home-cta-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 15px;
 }
 
-.home-stat-card {
-    border-radius: 12px;
-    padding: 10px 8px;
+.home-cta-sub {
+    color: #e0f0e5;
+    line-height: 1.4;
 }
 
-.home-stat-value {
+.home-cta-arrow {
+    font-size: 18px;
+}
+
+.home-stations-section,
+.home-history-section {
+    min-width: 0;
+    animation: none;
+}
+
+.home-station-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    overflow: visible;
+}
+
+.home-station-scroll .mapdash-station-mini {
+    width: 100%;
+    min-height: 110px;
+    border: 1px solid #dfe7e1;
+    border-radius: 8px;
+    padding: 12px;
+    background: #ffffff;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.home-station-scroll .mapdash-station-mini:hover {
+    border-color: #8bb99a;
+    background: #fbfdfb;
+}
+
+.home-station-scroll .mapdash-station-mini-name {
+    margin: 8px 0 4px;
+    color: #17241c;
     font-size: 14px;
 }
 
-.home-stat-label {
-    font-size: 10px;
+.home-station-scroll .mapdash-station-mini-meta {
+    color: #66746b;
+    font-size: 12px;
+    line-height: 1.45;
 }
 
-@media (min-width: 700px) {
+.home-inline-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #efd2ce;
+    border-radius: 6px;
+    background: #fff8f7;
+    color: #7c302a;
+    font-size: 13px;
+}
+
+.home-history-section .transaction-list {
+    overflow: hidden;
+    border-top: 1px solid #e1e8e3;
+}
+
+.home-history-section .transaction-item {
+    border-bottom-color: #e1e8e3;
+    border-radius: 0;
+}
+
+.home-session-actions {
+    flex-wrap: wrap;
+}
+
+.home-session-actions button {
+    min-height: 44px;
+}
+
+@media (max-width: 700px) {
+    .home-header {
+        padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 16px;
+    }
+
     .home-header-summary {
-        grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .home-content {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        padding: 20px 16px calc(36px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .home-content > * {
+        width: 100%;
+    }
+
+    .home-station-scroll {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
-@media (min-width: 1024px) {
-    .home-header,
-    .home-content {
-        max-width: 720px;
-        margin-left: auto;
-        margin-right: auto;
+@media (max-width: 380px) {
+    .home-greeting-text {
+        font-size: 19px;
+    }
+
+    .home-wallet-value {
+        font-size: 21px;
+    }
+
+    .home-balance-panel {
+        padding: 12px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-session-card,
+    .home-cta-map,
+    .home-station-scroll .mapdash-station-mini {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* Pertahankan gaya aksi saldo di atas aturan layar lama yang masih tersisa. */
+.app-shell .home-balance-panel {
+    align-items: center;
+    justify-content: space-between;
+}
+
+.app-shell .home-wallet-visibility {
+    display: inline-grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-surface);
+    color: var(--ev-text-muted);
+    cursor: pointer;
+}
+
+.app-shell .home-wallet-visibility:hover {
+    border-color: var(--ev-primary);
+    color: var(--ev-primary);
+}
+
+.app-shell .home-wallet-label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-shell .home-wallet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.app-shell .home-wallet-open {
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-surface);
+    color: var(--ev-text);
+    font-size: var(--ev-text-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.app-shell .home-wallet-open:hover {
+    border-color: var(--ev-border-strong);
+    background: var(--ev-surface-subtle);
+}
+
+@media (max-width: 420px) {
+    .app-shell .home-balance-panel {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .app-shell .home-wallet-actions {
+        width: 100%;
+        justify-content: flex-start;
     }
 }

@@ -4,6 +4,7 @@
 import api from './client';
 
 // Bentuk respons API -> bentuk `activeSession` yang dipakai DriverDashboard.
+/** Menormalkan respons sesi backend ke bentuk yang dipakai dashboard driver. */
 export function toDashboardSession(s) {
     return {
         id_session: s.id_session,
@@ -30,6 +31,7 @@ export function toDashboardSession(s) {
 
 // payload: { id_port, id_vehicle, latitude, longitude }
 // -> { soc_awal (acak sementara), kapasitas_baterai_kwh, min_target_kwh, max_target_kwh (= kWh sampai 100%), kode_charger, ... }
+/** Meminta backend memvalidasi kendaraan/port dan mengembalikan batas energi. */
 export async function prepareCharging(payload) {
     const { data } = await api.post('/charging-sessions/prepare', payload);
     return data.data ?? data;
@@ -37,23 +39,27 @@ export async function prepareCharging(payload) {
 
 // payload: { id_port, id_vehicle, soc_awal, target_kwh }
 // -> { target_kwh, soc_estimasi, durasi_menit, biaya_charging, biaya_parkir, total, saldo_tersedia, saldo_cukup, kekurangan, ... }
+/** Meminta estimasi biaya dan kecukupan saldo sebelum transaksi dimulai. */
 export async function estimateCharging(payload) {
     const { data } = await api.post('/charging-sessions/estimate', payload);
     return data.data ?? data;
 }
 
 // payload: { id_port, id_vehicle, soc_awal, target_kwh, pin, latitude, longitude }
+/** Memulai sesi charging lalu menormalkan responsnya untuk dashboard. */
 export async function startCharging(payload) {
     const { data } = await api.post('/charging-sessions/start', payload);
     return toDashboardSession(data.data ?? data);
 }
 
 // null kalau tidak ada sesi berjalan.
+/** Memulihkan sesi berjalan pengguna, atau null jika sesi tidak ada. */
 export async function getActiveSession() {
     const { data } = await api.get('/charging-sessions/active');
     return data.data ? toDashboardSession(data.data) : null;
 }
 
+/** Meminta backend menghentikan sesi dan menyelesaikan transaksinya. */
 export async function stopCharging(idSession) {
     const { data } = await api.post(`/charging-sessions/${idSession}/stop`);
     return data;

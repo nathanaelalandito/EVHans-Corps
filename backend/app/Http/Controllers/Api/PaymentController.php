@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\Port;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/** Menyediakan riwayat dan rincian pembayaran milik pengemudi. */
 class PaymentController extends Controller
 {
+    /** Mengambil riwayat pembayaran milik pengguna yang sedang login. */
     public function history(Request $request): JsonResponse
     {
         $payments = Payment::with([
@@ -32,6 +35,7 @@ class PaymentController extends Controller
         return response()->json(['data' => $payments]);
     }
 
+    /** Menampilkan detail transaksi setelah memastikan transaksi milik pengguna. */
     public function show(Request $request, Payment $payment): JsonResponse
     {
         $payment = Payment::with([
@@ -54,6 +58,7 @@ class PaymentController extends Controller
         return response()->json(['data' => $this->presentDetail($payment)]);
     }
 
+    /** Membatasi query pembayaran ke sesi yang dimiliki pengemudi tertentu. */
     private function ownedBy(string $idUser): \Closure
     {
         return function (Builder $query) use ($idUser): void {
@@ -63,6 +68,7 @@ class PaymentController extends Controller
         };
     }
 
+    /** Menyusun data singkat transaksi untuk daftar riwayat. */
     private function presentSummary(Payment $payment): array
     {
         if ($payment->jenis_pembayaran === 'topup') {
@@ -98,6 +104,7 @@ class PaymentController extends Controller
         ];
     }
 
+    /** Menyusun rincian pembayaran dan sesi untuk tampilan invoice. */
     private function presentDetail(Payment $payment): array
     {
         if ($payment->jenis_pembayaran === 'topup') {
@@ -134,7 +141,7 @@ class PaymentController extends Controller
             'kendaraan' => $session ? [
                 'nama' => "{$session->vehicle->merek} {$session->vehicle->model}",
                 'nomor_polisi' => $session->vehicle->nomor_polisi,
-                'tipe_konektor' => \App\Models\Port::CONNECTOR_LABELS[$session->vehicle->tipe_konektor] ?? $session->vehicle->tipe_konektor,
+                'tipe_konektor' => Port::CONNECTOR_LABELS[$session->vehicle->tipe_konektor] ?? $session->vehicle->tipe_konektor,
             ] : null,
             'energi_kwh' => $session ? (float) $session->total_energi_kwh : 0,
             'tarif_per_kwh' => $session?->tarif?->harga_per_kwh ?? 0,
@@ -159,6 +166,7 @@ class PaymentController extends Controller
         ];
     }
 
+    /** Mengubah kode status transaksi menjadi label yang ditampilkan ke pengguna. */
     private function paymentStatusLabel(string $status): string
     {
         return match (strtolower($status)) {

@@ -20,14 +20,17 @@ const STATION_STATUS = ['Aktif', 'Nonaktif', 'Maintenance'];
 const CHARGER_STATUS = ['Active', 'Maintenance', 'Offline'];
 const DEFAULT_MAP_POINT = { latitude: -7.8014, longitude: 110.3644 };
 
+/** Memformat nominal rupiah untuk tampilan panel admin. */
 function rupiah(value) {
     return 'Rp' + Number(value || 0).toLocaleString('id-ID');
 }
 
+/** Mengubah kode status teknis menjadi label yang mudah dibaca. */
 function readableStatus(value) {
     return String(value || '-').replaceAll('_', ' ');
 }
 
+/** Mengambil pesan validasi backend atau memakai pesan cadangan. */
 function errorMessage(error, fallback) {
     const data = error?.response?.data;
     if (data?.message) return data.message;
@@ -38,6 +41,7 @@ function errorMessage(error, fallback) {
     return fallback;
 }
 
+/** Pemilih koordinat station berbasis peta yang mengirim posisi terpilih ke form. */
 function StationMapPicker({ value, onChange }) {
     const nodeRef = useRef(null);
     const mapRef = useRef(null);
@@ -92,6 +96,7 @@ function StationMapPicker({ value, onChange }) {
     );
 }
 
+/** Panel admin untuk station, charger, tarif, operator, audit, dan konfigurasi. */
 export default function OperatorAdminDashboard({ user, onLogout }) {
     const role = user?.peran;
     const isAdmin = role === 'admin';
@@ -131,6 +136,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
     const [auditSubCategory, setAuditSubCategory] = useState('transaksi'); // 'transaksi' | 'tarif' | 'gangguan'
     const [auditLoading, setAuditLoading] = useState(false);
 
+    /** Memuat konfigurasi sistem untuk tab pengaturan admin. */
     const fetchConfig = async () => {
         setConfigLoading(true);
         try {
@@ -150,6 +156,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Memuat catatan audit transaksi, sesi charging, dan gangguan. */
     const fetchAudit = async () => {
         setAuditLoading(true);
         try {
@@ -167,6 +174,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         if (activeTab === 'audit') fetchAudit();
     }, [activeTab]);
 
+    /** Menyimpan nilai konfigurasi yang diubah pada panel admin. */
     const handleSaveConfig = async (e) => {
         e.preventDefault();
         setFeedback('');
@@ -178,6 +186,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Mengaktifkan atau menonaktifkan akun operator terpilih. */
     const toggleOperatorStatus = async (operator) => {
         const nextStatus = operator.status_akun === 'Aktif' ? 'Nonaktif' : 'Aktif';
         setFeedback('');
@@ -190,6 +199,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Memuat station, charger, dan operator untuk area administrasi. */
     const fetchDashboard = async () => {
         setLoading(true);
         setError('');
@@ -226,6 +236,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         });
     }, [selectedStation]);
 
+    /** Mengubah status operasional lokasi station. */
     const saveStationStatus = async (station, status) => {
         setFeedback('');
         try {
@@ -237,6 +248,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Membuat station baru dari data formulir dan koordinat peta. */
     const submitStation = async (e) => {
         e.preventDefault();
         setFeedback('');
@@ -265,6 +277,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Menyimpan perubahan informasi station yang sedang diedit. */
     const submitEditStation = async (e) => {
         e.preventDefault();
         if (!selectedStation || !editStationForm) return;
@@ -285,6 +298,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Memperbarui status unit charger setelah tindakan admin. */
     const saveChargerStatus = async (charger, status_mesin) => {
         setFeedback('');
         try {
@@ -296,6 +310,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Membuat periode tarif baru pada station yang dipilih. */
     const submitTarif = async (e) => {
         e.preventDefault();
         if (!selectedStation) return;
@@ -314,6 +329,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Menetapkan station kerja kepada akun operator. */
     const assignOperator = async (operator, idLocation) => {
         setFeedback('');
         try {
@@ -325,6 +341,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
+    /** Membuat akun operator dan menempatkannya pada station pilihan. */
     const submitOperator = async (e) => {
         e.preventDefault();
         setFeedback('');

@@ -34,6 +34,7 @@ class ChargingSessionController extends Controller
 
     /** Jumlah energi terkecil yang bisa dipilih dalam satu sesi (kWh). */
     private const MIN_TARGET_KWH = 0.5;
+
     private const MAX_TARGET_KWH = 100;
 
     private const RELATIONS = ['charger.location', 'port', 'vehicle', 'tarif', 'payment.method', 'payment.refund'];
@@ -42,6 +43,7 @@ class ChargingSessionController extends Controller
     // Endpoint baca
     // ------------------------------------------------------------------
 
+    /** Mengambil riwayat sesi charging milik pengemudi yang sedang login. */
     public function history(Request $request): JsonResponse
     {
         $sessions = ChargingSession::with(self::RELATIONS)
@@ -55,6 +57,7 @@ class ChargingSessionController extends Controller
         return response()->json(['data' => $sessions]);
     }
 
+    /** Menampilkan invoice sesi setelah memeriksa kepemilikan sesi. */
     public function invoice(Request $request, ChargingSession $session): JsonResponse
     {
         $session = ChargingSession::with(self::RELATIONS)
@@ -79,6 +82,7 @@ class ChargingSessionController extends Controller
     // Langkah memulai sesi
     // ------------------------------------------------------------------
 
+    /** Memeriksa port, konektor kendaraan, station, dan status sebelum charging. */
     public function validateCharger(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -115,6 +119,7 @@ class ChargingSessionController extends Controller
      * Langkah setelah kabel dicolokkan: validasi port & kedatangan, lalu
      * kembalikan persen baterai awal. Belum membuat sesi / mengunci port.
      */
+    /** Memvalidasi pilihan driver dan menyiapkan data estimasi sesi. */
     public function prepare(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -204,6 +209,7 @@ class ChargingSessionController extends Controller
         ]);
     }
 
+    /** Mengunci port, memvalidasi saldo/PIN, membuat sesi, dan menahan saldo. */
     public function start(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -339,6 +345,7 @@ class ChargingSessionController extends Controller
         ]);
     }
 
+    /** Menghentikan sesi atas permintaan pengemudi. */
     public function stop(Request $request, ChargingSession $session): JsonResponse
     {
         return $this->finish($request, $session);
@@ -370,6 +377,7 @@ class ChargingSessionController extends Controller
         ]);
     }
 
+    /** Menutup sesi, menghitung biaya aktual, melepas hold, dan mencatat pembayaran. */
     private function settleSession(Request $request, ChargingSession $session, array $data, string $finalStatus): ChargingSession|JsonResponse
     {
         return DB::transaction(function () use ($request, $session, $data, $finalStatus) {
@@ -464,6 +472,7 @@ class ChargingSessionController extends Controller
     // Validasi & aturan bisnis
     // ------------------------------------------------------------------
 
+    /** Mencari sesi pengguna yang statusnya masih berjalan. */
     private function activeSessionOf(User $user): ?ChargingSession
     {
         return ChargingSession::with(self::RELATIONS)
@@ -473,6 +482,7 @@ class ChargingSessionController extends Controller
             ->first();
     }
 
+    /** Memastikan kendaraan yang dipilih benar-benar milik pengguna. */
     private function driverVehicle(User $user, int $idVehicle): Vehicle|JsonResponse
     {
         $vehicle = $user->vehicles()->whereKey($idVehicle)->first();
@@ -496,6 +506,7 @@ class ChargingSessionController extends Controller
         ];
     }
 
+    /** Memilih tarif aktif di lokasi atau mengembalikan error bila belum tersedia. */
     private function activeTarif(Location $location): Tarif|JsonResponse
     {
         return $location->activeTarif()
@@ -520,6 +531,7 @@ class ChargingSessionController extends Controller
      * Pemeriksaan bersama prepare & start: sesi aktif, kendaraan, port,
      * station beroperasi (status + jam buka), kedatangan, konektor, tarif.
      */
+    /** Mengumpulkan konteks yang valid untuk memulai sesi charging. */
     private function checkStartable(User $user, array $data): array|JsonResponse
     {
         if ($this->activeSessionOf($user)) {
@@ -581,6 +593,7 @@ class ChargingSessionController extends Controller
         return null;
     }
 
+    /** Memuat dompet pengguna untuk pemeriksaan dan penyelesaian saldo. */
     private function walletOf(User $user): Dompet
     {
         return Dompet::firstOrCreate(
@@ -589,6 +602,7 @@ class ChargingSessionController extends Controller
         );
     }
 
+    /** Membentuk respons saldo tidak cukup beserta rincian saldo tersedia. */
     private function insufficient(Dompet $wallet, int $total): JsonResponse
     {
         return $this->fail(
@@ -598,11 +612,13 @@ class ChargingSessionController extends Controller
         );
     }
 
+    /** Membentuk respons konflik saat port sudah dipakai sesi lain. */
     private function portTaken(): JsonResponse
     {
         return $this->fail('Port ini sedang tidak tersedia atau baru saja digunakan. Pilih port lain.', 409, ['kode' => 'port_dipakai']);
     }
 
+    /** Menyeragamkan bentuk respons JSON untuk kegagalan proses charging. */
     private function fail(string $message, int $status, array $extra = []): JsonResponse
     {
         return response()->json(['message' => $message] + $extra, $status);
@@ -660,6 +676,7 @@ class ChargingSessionController extends Controller
      * Tidak disimpan ke DB; dihitung ulang tiap request, jadi tetap konsisten
      * setelah refresh. Ganti dengan data asli Perangkat Charger kalau sudah ada.
      */
+    /** Menghasilkan telemetri simulasi selama perangkat charger belum terintegrasi. */
     private function simulate(ChargingSession $session): array
     {
         $target = (float) ($session->target_energi_kwh ?? 0);
@@ -691,6 +708,7 @@ class ChargingSessionController extends Controller
     // Presenter
     // ------------------------------------------------------------------
 
+    /** Menyusun hasil validasi dan estimasi agar dapat ditampilkan frontend. */
     private function presentValidation(array $ctx, Vehicle $vehicle, Tarif $tarif, float $targetKwh): array
     {
         $location = $ctx['location'];
@@ -718,6 +736,7 @@ class ChargingSessionController extends Controller
         ];
     }
 
+    /** Menyajikan identitas, tipe konektor, daya, dan status port. */
     private function presentPort(Port $port): array
     {
         return [
@@ -732,6 +751,7 @@ class ChargingSessionController extends Controller
         ];
     }
 
+    /** Menyajikan status sesi dan progres yang diperlukan dashboard driver. */
     private function presentSession(ChargingSession $session): array
     {
         $sim = $this->simulate($session);
@@ -782,6 +802,7 @@ class ChargingSessionController extends Controller
         return (int) $session->saldo_hold;
     }
 
+    /** Membentuk rincian biaya dan identitas untuk invoice digital. */
     private function presentInvoice(ChargingSession $session): array
     {
         $actualKwh = (float) $session->total_energi_kwh;
@@ -823,6 +844,7 @@ class ChargingSessionController extends Controller
         ];
     }
 
+    /** Membuat ringkasan pembayaran untuk daftar transaksi pengemudi. */
     private function presentTransactionSummary(ChargingSession $session): array
     {
         return [
@@ -839,6 +861,7 @@ class ChargingSessionController extends Controller
         ];
     }
 
+    /** Memetakan kode status sesi menjadi teks yang mudah dipahami. */
     private function sessionStatusLabel(string $status): string
     {
         return match (strtolower($status)) {
@@ -851,6 +874,7 @@ class ChargingSessionController extends Controller
         };
     }
 
+    /** Mengambil atau membuat record metode pembayaran internal. */
     private function paymentMethod(string $name): MetodePembayaran
     {
         return MetodePembayaran::firstOrCreate(
@@ -859,6 +883,7 @@ class ChargingSessionController extends Controller
         );
     }
 
+    /** Membuat kode referensi transaksi yang dapat ditampilkan pada bukti bayar. */
     private function paymentReference(string $prefix, int $id): string
     {
         return $prefix.'-'.now()->format('YmdHis').'-'.$id;

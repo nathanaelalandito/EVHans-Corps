@@ -686,3 +686,122 @@
         margin-right: auto;
     }
 }
+
+/* Menyatukan halaman dompet dengan palet, jarak, dan bentuk komponen EVHUB. */
+.dmp-container {
+    background: var(--ev-bg);
+    color: var(--ev-text);
+    font-family: var(--ev-font-sans);
+}
+
+.dmp-header {
+    background: var(--ev-surface);
+    border-bottom: 1px solid var(--ev-border);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.dmp-back-btn {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-md);
+    background: var(--ev-surface);
+    color: var(--ev-text);
+}
+
+.dmp-back-btn:hover {
+    background: var(--ev-primary-soft);
+    color: var(--ev-primary);
+}
+
+.dmp-title-main,
+.dmp-lock-title,
+.dmp-action-label,
+.dmp-menu-label {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+}
+
+.dmp-title-sub {
+    color: var(--ev-text-muted);
+}
+
+.dmp-balance-card,
+.dmp-actions .dmp-action,
+.dmp-manage-card,
+.dmp-mutasi,
+.dmp-lock-card,
+.dmp-empty {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-lg);
+    background: var(--ev-surface);
+    box-shadow: var(--ev-shadow-card);
+}
+
+.dmp-balance-card {
+    margin-top: 20px;
+}
+
+.dmp-balance-label {
+    color: var(--ev-text-muted);
+    letter-spacing: 0.01em;
+}
+
+.dmp-eye-btn {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-surface);
+    color: var(--ev-text-muted);
+}
+
+.dmp-eye-btn:hover {
+    background: var(--ev-primary-soft);
+    color: var(--ev-primary);
+}
+
+.dmp-balance-value {
+    color: var(--ev-ink);
+}
+
+.dmp-action-icon,
+.dmp-lock-icon,
+.dmp-pin-status-icon,
+.dmp-menu-icon,
+.dmp-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ev-primary);
+}
+
+.dmp-action-icon {
+    font-size: 24px;
+}
+
+.dmp-menu-icon {
+    font-size: 19px;
+}
+
+.dmp-lock-icon,
+.dmp-empty-icon {
+    font-size: 36px;
+}
+
+.dmp-action-label {
+    color: var(--ev-primary);
+}
+
+.dmp-status-badge.ok {
+    background: var(--ev-success-soft);
+    color: var(--ev-success);
+}
+
+.dmp-status-badge.warn {
+    background: var(--ev-warning-soft);
+    color: var(--ev-warning);
+}
+
+@media (max-width: 480px) {
+    .dmp-balance-value {
+        font-size: clamp(26px, 8vw, 38px);
+    }
+}

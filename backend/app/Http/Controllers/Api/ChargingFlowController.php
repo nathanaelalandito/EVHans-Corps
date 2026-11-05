@@ -40,6 +40,7 @@ class ChargingFlowController extends Controller
      * Langkah setelah kabel dicolokkan: validasi port & kedatangan, lalu
      * kembalikan persen baterai awal. Belum membuat sesi / mengunci port.
      */
+    /** Memvalidasi pilihan port dan kendaraan sebelum menghitung estimasi. */
     public function prepare(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -65,6 +66,7 @@ class ChargingFlowController extends Controller
                 'kode' => 'baterai_penuh',
             ], 422);
         }
+
         return response()->json([
             'data' => [
                 'soc_awal' => $soc,
@@ -88,7 +90,7 @@ class ChargingFlowController extends Controller
             'id_charger' => ['required', 'integer'],
             'id_vehicle' => ['required', 'integer'],
             'soc_awal' => ['required', 'integer', 'between:0,100'],
-            'target_kwh' => ['required', 'numeric', 'min:' . self::MIN_TARGET_KWH],
+            'target_kwh' => ['required', 'numeric', 'min:'.self::MIN_TARGET_KWH],
         ]);
 
         $vehicle = $request->user()->vehicles()->find($data['id_vehicle']);
@@ -124,13 +126,14 @@ class ChargingFlowController extends Controller
      * Mulai sesi charging: cek saldo -> verifikasi PIN -> hold saldo ->
      * klaim port -> buat sesi. Kedatangan diverifikasi ulang di server.
      */
+    /** Memeriksa saldo dan memulai sesi sambil menahan dana estimasi. */
     public function start(Request $request): JsonResponse
     {
         $data = $request->validate([
             'id_charger' => ['required', 'integer'],
             'id_vehicle' => ['required', 'integer'],
             'soc_awal' => ['required', 'integer', 'between:0,100'],
-            'target_kwh' => ['required', 'numeric', 'min:' . self::MIN_TARGET_KWH],
+            'target_kwh' => ['required', 'numeric', 'min:'.self::MIN_TARGET_KWH],
             'pin' => ['required', 'digits:6'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
@@ -222,111 +225,112 @@ class ChargingFlowController extends Controller
      * payment) belum dibuat, jadi untuk sementara seluruh hold dilepas penuh.
      */
     /**
- * Akhiri sesi: hitung biaya aktual, lepas hold, potong saldo sebesar biaya
- * aktual, catat payment, tutup sesi, dan bebaskan port.
- */
-   public function stop(Request $request, string $id): JsonResponse
-{
-    $idUser = $request->user()->id_user;
+     * Akhiri sesi: hitung biaya aktual, lepas hold, potong saldo sebesar biaya
+     * aktual, catat payment, tutup sesi, dan bebaskan port.
+     */
+    /** Mengakhiri sesi dan menyelesaikan biaya dari energi yang tercatat. */
+    public function stop(Request $request, string $id): JsonResponse
+    {
+        $idUser = $request->user()->id_user;
 
-    $result = DB::transaction(function () use ($id, $idUser) {
-        // Kunci sesi supaya klik ganda tidak memotong saldo dua kali.
-        $session = ChargingSession::with(['charger', 'tarif', 'vehicle'])
-            ->where('id_user', $idUser)
-            ->where('id_session', $id)
-            ->lockForUpdate()
-            ->first();
+        $result = DB::transaction(function () use ($id, $idUser) {
+            // Kunci sesi supaya klik ganda tidak memotong saldo dua kali.
+            $session = ChargingSession::with(['charger', 'tarif', 'vehicle'])
+                ->where('id_user', $idUser)
+                ->where('id_session', $id)
+                ->lockForUpdate()
+                ->first();
 
-        if (! $session || ! in_array($session->status, ChargingSession::AKTIF, true)) {
-            return null;
-        }
+            if (! $session || ! in_array($session->status, ChargingSession::AKTIF, true)) {
+                return null;
+            }
 
-        $sim = $this->simulate($session);
-        $tarif = $session->tarif;
+            $sim = $this->simulate($session);
+            $tarif = $session->tarif;
 
-        // Rumus sama dengan calculateEstimate(), tapi memakai energi & durasi aktual.
-        $kwh = (float) $sim['energi_kwh'];
-        $biayaCharging = max((int) round($kwh * (int) $tarif->harga_per_kwh), (int) $tarif->biaya_minimum);
-        $jamParkir = max(1, (int) ceil($sim['durasi_detik'] / 3600));
-        $biayaParkir = $jamParkir * (int) $tarif->biaya_parkir_pjam;
+            // Rumus sama dengan calculateEstimate(), tapi memakai energi & durasi aktual.
+            $kwh = (float) $sim['energi_kwh'];
+            $biayaCharging = max((int) round($kwh * (int) $tarif->harga_per_kwh), (int) $tarif->biaya_minimum);
+            $jamParkir = max(1, (int) ceil($sim['durasi_detik'] / 3600));
+            $biayaParkir = $jamParkir * (int) $tarif->biaya_parkir_pjam;
 
-        $total = $biayaCharging + $biayaParkir;
-        // Tidak boleh melebihi dana yang di-hold (kalau ada hold).
-        if ((int) $session->saldo_hold > 0) {
-            $total = min($total, (int) $session->saldo_hold);
-        }
+            $total = $biayaCharging + $biayaParkir;
+            // Tidak boleh melebihi dana yang di-hold (kalau ada hold).
+            if ((int) $session->saldo_hold > 0) {
+                $total = min($total, (int) $session->saldo_hold);
+            }
 
-        $w = Dompet::where('id_user', $idUser)->lockForUpdate()->first();
-        $total = min($total, (int) ($w->saldo ?? 0)); // jaga-jaga agar saldo tidak minus
+            $w = Dompet::where('id_user', $idUser)->lockForUpdate()->first();
+            $total = min($total, (int) ($w->saldo ?? 0)); // jaga-jaga agar saldo tidak minus
 
-        $session->update([
-            'status' => 'selesai',
-            'waktu_selesai' => now(),
-            'total_energi_kwh' => $kwh,
-            'soc_akhir' => $sim['soc_sekarang'],
-        ]);
+            $session->update([
+                'status' => 'selesai',
+                'waktu_selesai' => now(),
+                'total_energi_kwh' => $kwh,
+                'soc_akhir' => $sim['soc_sekarang'],
+            ]);
 
-        Charger::where('id_charger', $session->id_charger)
-            ->where('status', 'sedang digunakan')
-            ->update(['status' => 'tersedia']);
+            Charger::where('id_charger', $session->id_charger)
+                ->where('status', 'sedang digunakan')
+                ->update(['status' => 'tersedia']);
 
-        if ($w) {
-            // Lepas hold, lalu potong biaya aktual dari saldo.
-            $w->saldo_hold = max(0, (int) $w->saldo_hold - (int) $session->saldo_hold);
-            $w->saldo = (int) $w->saldo - $total;
-            $w->save();
-        }
+            if ($w) {
+                // Lepas hold, lalu potong biaya aktual dari saldo.
+                $w->saldo_hold = max(0, (int) $w->saldo_hold - (int) $session->saldo_hold);
+                $w->saldo = (int) $w->saldo - $total;
+                $w->save();
+            }
 
-        if ($total > 0) {
-            // Ambil id metode "Saldo Dompet"; kalau belum ada di tabel, dibuat otomatis.
-            $idMetode = DB::table('metode_pembayaran')
-                ->where('nama_metode', 'Saldo Dompet')
-                ->value('id_metode');
+            if ($total > 0) {
+                // Ambil id metode "Saldo Dompet"; kalau belum ada di tabel, dibuat otomatis.
+                $idMetode = DB::table('metode_pembayaran')
+                    ->where('nama_metode', 'Saldo Dompet')
+                    ->value('id_metode');
 
-            if (! $idMetode) {
-                $idMetode = DB::table('metode_pembayaran')->insertGetId([
-                    'nama_metode' => 'Saldo Dompet',
-                    'biaya_layanan' => 0,
-                    'status_metode' => 'aktif',
+                if (! $idMetode) {
+                    $idMetode = DB::table('metode_pembayaran')->insertGetId([
+                        'nama_metode' => 'Saldo Dompet',
+                        'biaya_layanan' => 0,
+                        'status_metode' => 'aktif',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                DB::table('payment')->insert([
+                    'id_session' => $session->id_session,
+                    'id_metode' => $idMetode,
+                    'total_bayar' => $total,
+                    'status_pembayaran' => 'sukses',
+                    'waktu_pembayaran' => now(),
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
             }
 
-            DB::table('payment')->insert([
-                'id_session' => $session->id_session,
-                'id_metode' => $idMetode,
-                'total_bayar' => $total,
-                'status_pembayaran' => 'sukses',
-                'waktu_pembayaran' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            return [
+                'session' => $session,
+                'biaya_charging' => $biayaCharging,
+                'biaya_parkir' => $biayaParkir,
+                'total' => $total,
+                'saldo' => (int) ($w->saldo ?? 0),
+            ];
+        });
+
+        if ($result === null) {
+            return $this->fail('Sesi charging yang berlangsung tidak ditemukan.', 404);
         }
 
-        return [
-            'session' => $session,
-            'biaya_charging' => $biayaCharging,
-            'biaya_parkir' => $biayaParkir,
-            'total' => $total,
-            'saldo' => (int) ($w->saldo ?? 0),
-        ];
-    });
-
-    if ($result === null) {
-        return $this->fail('Sesi charging yang berlangsung tidak ditemukan.', 404);
+        return response()->json([
+            'message' => 'Sesi charging selesai dan pembayaran berhasil.',
+            'data' => $this->present($result['session']->fresh(['charger.location', 'tarif', 'vehicle'])) + [
+                'biaya_charging_aktual' => $result['biaya_charging'],
+                'biaya_parkir_aktual' => $result['biaya_parkir'],
+                'total_bayar' => $result['total'],
+                'saldo' => $result['saldo'],
+            ],
+        ]);
     }
-
-    return response()->json([
-        'message' => 'Sesi charging selesai dan pembayaran berhasil.',
-        'data' => $this->present($result['session']->fresh(['charger.location', 'tarif', 'vehicle'])) + [
-            'biaya_charging_aktual' => $result['biaya_charging'],
-            'biaya_parkir_aktual' => $result['biaya_parkir'],
-            'total_bayar' => $result['total'],
-            'saldo' => $result['saldo'],
-        ],
-    ]);
-}
 
     // ------------------------------------------------------------------
     // Helper
@@ -336,6 +340,7 @@ class ChargingFlowController extends Controller
      * Semua syarat agar sebuah sesi boleh dimulai di port ini.
      * Mengembalikan array konteks, atau JsonResponse (error) kalau tidak lolos.
      */
+    /** Memeriksa seluruh prasyarat kendaraan, lokasi, port, dan tarif sesi baru. */
     private function checkStartable(User $user, array $data): array|JsonResponse
     {
         if ($this->activeSessionOf($user->id_user)) {
@@ -401,6 +406,7 @@ class ChargingFlowController extends Controller
      *  - biaya parkir   = tarif parkir × jam berjalan (dibulatkan ke atas, min. 1 jam)
      *  - durasi         = kWh ÷ daya port (kW); durasi nyata tergantung mobil
      */
+    /** Menghitung biaya target memakai daya charger dan tarif lokasi. */
     private function calculateEstimate(Charger $charger, $tarif, float $kwh): array
     {
         $kwh = round($kwh, 2);
@@ -466,6 +472,7 @@ class ChargingFlowController extends Controller
         ], 422);
     }
 
+    /** Memastikan pengguna memiliki record dompet digital. */
     private function walletOf(User $user): Dompet
     {
         return Dompet::firstOrCreate(
@@ -474,6 +481,7 @@ class ChargingFlowController extends Controller
         );
     }
 
+    /** Menyusun saldo tersedia dan kebutuhan hold untuk respons estimasi. */
     private function walletSummary(Dompet $wallet, int $total): array
     {
         $tersedia = $wallet->saldoTersedia();
@@ -485,6 +493,7 @@ class ChargingFlowController extends Controller
         ];
     }
 
+    /** Membentuk respons ketika saldo bebas tidak mencukupi estimasi biaya. */
     private function insufficient(Dompet $wallet, int $total): JsonResponse
     {
         $summary = $this->walletSummary($wallet, $total);
@@ -496,6 +505,7 @@ class ChargingFlowController extends Controller
         ], 422);
     }
 
+    /** Membentuk respons konflik saat port tidak lagi tersedia. */
     private function portTaken(): JsonResponse
     {
         return response()->json([
@@ -504,6 +514,7 @@ class ChargingFlowController extends Controller
         ], 409);
     }
 
+    /** Mencari sesi berjalan milik pengguna berdasarkan ID akun. */
     private function activeSessionOf(string $idUser): ?ChargingSession
     {
         return ChargingSession::with(['charger.location', 'tarif', 'vehicle'])
@@ -513,6 +524,7 @@ class ChargingFlowController extends Controller
             ->first();
     }
 
+    /** Menyajikan status sesi dan nilai energi untuk aplikasi pengemudi. */
     private function present(ChargingSession $s): array
     {
         $charger = $s->charger;
@@ -555,6 +567,7 @@ class ChargingFlowController extends Controller
      * dihitung ulang tiap request, jadi tetap konsisten setelah refresh.
      * Ganti dengan data asli Perangkat Charger kalau sudah tersedia.
      */
+    /** Mensimulasikan perubahan energi dan status selama integrasi charger belum aktif. */
     private function simulate(ChargingSession $s): array
     {
         $target = (float) ($s->target_energi_kwh ?? 0);
@@ -593,6 +606,7 @@ class ChargingFlowController extends Controller
         ];
     }
 
+    /** Membuat format respons error standar untuk alur charging. */
     private function fail(string $message, int $status): JsonResponse
     {
         return response()->json(['message' => $message], $status);

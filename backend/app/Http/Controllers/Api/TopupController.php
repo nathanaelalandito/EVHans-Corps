@@ -14,10 +14,13 @@ use Illuminate\Validation\Rule;
  * dan user_profile (hanya untuk membaca nomor telepon driver).
  * Tabel payment (khusus pembayaran charging) tidak disentuh.
  */
+/** Mengelola instruksi pembayaran top up dan pembaruan saldo dompet. */
 class TopupController extends Controller
 {
-    private const MIN_AMOUNT   = 10000;
-    private const MAX_AMOUNT   = 5000000;
+    private const MIN_AMOUNT = 10000;
+
+    private const MAX_AMOUNT = 5000000;
+
     private const EXPIRY_HOURS = 24;
 
     /** GET /api/topup/methods */
@@ -31,21 +34,21 @@ class TopupController extends Controller
                 $type = $this->typeOf($m->nama_metode);
 
                 return [
-                    'id'          => $m->id_metode,
-                    'name'        => $m->nama_metode,
-                    'type'        => $type,
-                    'fee'         => (int) $m->biaya_layanan,
+                    'id' => $m->id_metode,
+                    'name' => $m->nama_metode,
+                    'type' => $type,
+                    'fee' => (int) $m->biaya_layanan,
                     'description' => $type === 'va'
                         ? 'Transfer ke Virtual Account'
-                        : 'Bayar ke nomor ' . $m->nama_metode . ' Anda',
+                        : 'Bayar ke nomor '.$m->nama_metode.' Anda',
                 ];
             })
             ->values();
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'methods'    => $methods,
+            'data' => [
+                'methods' => $methods,
                 'min_amount' => self::MIN_AMOUNT,
                 'max_amount' => self::MAX_AMOUNT,
             ],
@@ -58,7 +61,7 @@ class TopupController extends Controller
         $validated = $request->validate([
             'method' => ['required', 'integer',
                 Rule::exists('metode_pembayaran', 'id_metode')->where('status_metode', 'Aktif')],
-            'amount' => ['required', 'integer', 'min:' . self::MIN_AMOUNT, 'max:' . self::MAX_AMOUNT],
+            'amount' => ['required', 'integer', 'min:'.self::MIN_AMOUNT, 'max:'.self::MAX_AMOUNT],
         ]);
 
         $metode = DB::table('metode_pembayaran')->where('id_metode', $validated['method'])->first();
@@ -82,19 +85,19 @@ class TopupController extends Controller
 
         // VA = kode bank + nomor telepon (tanpa 0 di depan); GoPay/DANA = nomor telepon
         $kodePembayaran = $isVa
-            ? $this->bankCodeOf($metode->nama_metode) . ltrim($phone, '0')
+            ? $this->bankCodeOf($metode->nama_metode).ltrim($phone, '0')
             : $phone;
 
         $topup = Topup::create([
-            'id_wallet'        => $dompet->id_wallet,
-            'id_payment'       => null, // top up tidak memakai tabel payment
-            'id_metode'        => $metode->id_metode,
-            'referensi'        => 'EVT' . now()->format('Ymd') . '-' . strtoupper(Str::random(6)),
-            'kode_pembayaran'  => $kodePembayaran,
-            'nominal'          => $validated['amount'],
-            'biaya_layanan'    => (int) $metode->biaya_layanan,
-            'status_topup'     => 'Pending',
-            'waktu_topup'      => now(),
+            'id_wallet' => $dompet->id_wallet,
+            'id_payment' => null, // top up tidak memakai tabel payment
+            'id_metode' => $metode->id_metode,
+            'referensi' => 'EVT'.now()->format('Ymd').'-'.strtoupper(Str::random(6)),
+            'kode_pembayaran' => $kodePembayaran,
+            'nominal' => $validated['amount'],
+            'biaya_layanan' => (int) $metode->biaya_layanan,
+            'status_topup' => 'Pending',
+            'waktu_topup' => now(),
             'kedaluwarsa_pada' => now()->addHours(self::EXPIRY_HOURS),
         ]);
 
@@ -114,6 +117,7 @@ class TopupController extends Controller
      * Hanya untuk development. Saat memakai gateway asli (Midtrans/Xendit),
      * panggil settle() dari endpoint webhook.
      */
+    /** Simulasi callback pembayaran yang menyelesaikan top up pada lingkungan demo. */
     public function simulatePay(Request $request, string $reference)
     {
         abort_unless(config('app.debug'), 403, 'Simulasi hanya tersedia saat APP_DEBUG=true.');
@@ -149,6 +153,7 @@ class TopupController extends Controller
 
     /* ---------------- helper ---------------- */
 
+    /** Mengelompokkan metode menjadi tipe instruksi pembayaran frontend. */
     private function typeOf(string $namaMetode): string
     {
         return preg_match('/\bva\b/i', $namaMetode) ? 'va' : 'qr';
@@ -169,13 +174,14 @@ class TopupController extends Controller
     private function bankCodeOf(string $namaMetode): string
     {
         $map = [
-            'va bri'  => '77777',
+            'va bri' => '77777',
             'seabank' => '90100',
         ];
 
         return $map[strtolower(trim($namaMetode))] ?? '';
     }
 
+    /** Memuat dompet milik pengguna terautentikasi atau menghentikan request. */
     private function dompetOf(Request $request): object
     {
         $idUser = $request->user()->getKey();
@@ -193,6 +199,7 @@ class TopupController extends Controller
         return $dompet;
     }
 
+    /** Mencari top up berdasarkan referensi sekaligus memeriksa kepemilikannya. */
     private function findOwned(Request $request, string $reference): Topup
     {
         return Topup::where('referensi', $reference)
@@ -202,6 +209,7 @@ class TopupController extends Controller
             ->firstOrFail();
     }
 
+    /** Menandai instruksi yang melewati batas waktu sebagai kedaluwarsa. */
     private function expireIfNeeded(Topup $topup): Topup
     {
         if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada->isPast()) {
@@ -219,17 +227,17 @@ class TopupController extends Controller
             ->value('nama_metode');
 
         $data = [
-            'reference'    => $topup->referensi,
-            'method'       => $topup->id_metode,
-            'method_name'  => $namaMetode,
-            'type'         => $this->typeOf($namaMetode),
-            'amount'       => $topup->nominal,
-            'total'        => $topup->nominal + $topup->biaya_layanan,
+            'reference' => $topup->referensi,
+            'method' => $topup->id_metode,
+            'method_name' => $namaMetode,
+            'type' => $this->typeOf($namaMetode),
+            'amount' => $topup->nominal,
+            'total' => $topup->nominal + $topup->biaya_layanan,
             'payment_code' => $topup->kode_pembayaran,
             'phone_number' => $this->phoneOfWallet($topup->id_wallet),
-            'status'       => ['Pending' => 'pending', 'Sukses' => 'paid', 'Gagal' => 'expired'][$topup->status_topup],
-            'expires_at'   => $topup->kedaluwarsa_pada->toIso8601String(),
-            'paid_at'      => $topup->status_topup === 'Sukses' ? $topup->waktu_topup->toIso8601String() : null,
+            'status' => ['Pending' => 'pending', 'Sukses' => 'paid', 'Gagal' => 'expired'][$topup->status_topup],
+            'expires_at' => $topup->kedaluwarsa_pada->toIso8601String(),
+            'paid_at' => $topup->status_topup === 'Sukses' ? $topup->waktu_topup->toIso8601String() : null,
         ];
 
         if ($withBalance) {

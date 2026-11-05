@@ -3,6 +3,7 @@ import "./ProfilDriver.css";
 // sesuaikan dengan instance axios/fetch yang sudah kamu punya di folder api/
 import api from "./api/axiosInstance"; 
 
+/** Menghitung umur berdasarkan tanggal lahir, atau null jika tanggal kosong. */
 function hitungUmur(tanggalLahir) {
   if (!tanggalLahir) return null;
   const lahir = new Date(tanggalLahir);
@@ -15,6 +16,7 @@ function hitungUmur(tanggalLahir) {
   return umur;
 }
 
+/** Menampilkan informasi profil pengemudi dalam tampilan khusus profil. */
 export default function ProfilDriver({ onBack }) {
   const [profil, setProfil] = useState(null);
   const [loading, setLoading] = useState(true);

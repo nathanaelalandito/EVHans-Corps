@@ -10,6 +10,7 @@ import { getStoredToken } from './api/auth';
 import './opsDashboard.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
+/** Memilih sapaan dashboard berdasarkan jam lokal pengguna. */
 function getGreeting() {
     const h = new Date().getHours();
     if (h >= 4 && h < 10) return 'Selamat pagi';
@@ -18,6 +19,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
+/** Dashboard operator untuk ringkasan station, status unit, dan gangguan. */
 export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNavigateToCharger, 
     onNavigateToPort, onNavigateToOpsReport, onNavigateToOpsProfil}) {
     
@@ -50,6 +52,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
     // AMBIL DATA REAL DARI DATABASE
+    /** Memuat ringkasan station dan status charger untuk dashboard. */
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
@@ -83,6 +86,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
     }, []);
 
     // AKSI 1: TERIMA MALFUNGSI -> UBAH MESIN JADI MAINTENANCE
+    /** Menandai gangguan sudah ditangani dan memuat ulang ringkasan. */
     const handleAcceptMalfunction = async (alertItem) => {
         const idCharger = alertItem.id_charger || alertItem.id;
         const kode = alertItem.kode_perangkat || alertItem.message?.split(':')[0] || 'Unit Mesin';
@@ -107,6 +111,7 @@ export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNav
     };
 
     // Remote Control Port dari Tabel
+    /** Mengirim perintah start/stop/reboot ke port charger yang dipilih. */
     const handleRemoteAction = async (actionType, portId, portName) => {
         if (window.confirm(`Konfirmasi: Kirim perintah ${actionType} untuk ${portName}?`)) {
             try {

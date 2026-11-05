@@ -11,6 +11,7 @@ const OSRM_BASE_URL = 'https://router.project-osrm.org';
 
 // from/to: { lat, lng }. signal: AbortSignal opsional untuk membatalkan.
 // Mengembalikan { coords: [[lat, lng], ...], distanceM, durationS }.
+/** Mengambil geometri dan estimasi rute jalan dari OSRM tanpa mengirim token API. */
 export async function getDrivingRoute(from, to, signal) {
     const path = `${from.lng},${from.lat};${to.lng},${to.lat}`;
     const url = `${OSRM_BASE_URL}/route/v1/driving/${path}?overview=full&geometries=geojson&alternatives=false&steps=false`;
@@ -36,11 +37,13 @@ export async function getDrivingRoute(from, to, signal) {
 
 // Link navigasi Google Maps. Origin sengaja dikosongkan supaya Google
 // memakai lokasi perangkat saat ini (di ponsel biasanya membuka aplikasinya).
+/** Membuat tautan Google Maps menuju koordinat station yang dipilih. */
 export function googleMapsDirectionsUrl(to) {
     return `https://www.google.com/maps/dir/?api=1&destination=${to.lat},${to.lng}&travelmode=driving`;
 }
 
 // 850 -> "850 m", 12400 -> "12,4 km"
+/** Memformat jarak meter menjadi label meter atau kilometer berbahasa Indonesia. */
 export function formatJarak(meter) {
     const bulat = Math.round(meter);
     if (bulat < 1000) return `${bulat} m`;
@@ -48,6 +51,7 @@ export function formatJarak(meter) {
 }
 
 // 20 -> "< 1 mnt", 1680 -> "28 mnt", 5400 -> "1 jam 30 mnt"
+/** Memformat durasi detik menjadi menit atau jam untuk tampilan rute. */
 export function formatDurasi(detik) {
     const totalMenit = Math.round(detik / 60);
     if (totalMenit < 1) return '< 1 mnt';

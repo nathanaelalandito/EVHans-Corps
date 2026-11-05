@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FiNavigation, FiX } from 'react-icons/fi';
 import './stationDetail.css';
 import { getStationDetail, konektorLabel, sameConnector } from './api/station';
 import { googleMapsDirectionsUrl } from './api/routing';
@@ -13,15 +14,19 @@ const PORT_STATUS = {
     Maintenance: { text: 'Perawatan', tone: 'warn' },
     offline: { text: 'Offline', tone: 'danger' },
 };
+/** Mengubah status port menjadi label dan gaya indikator untuk detail station. */
 const portStatus = (s) => PORT_STATUS[s] ?? { text: s || 'Tidak diketahui', tone: 'danger' };
 
+/** Memformat angka biaya ke format rupiah. */
 const rupiah = (v) => (v == null ? '-' : 'Rp' + Number(v).toLocaleString('id-ID'));
 
+/** Mengubah teks jam HH:mm menjadi jumlah menit untuk perbandingan waktu. */
 const toMinutes = (hhmm) => {
     const [h, m] = String(hhmm).split(':').map(Number);
     return h * 60 + (m || 0);
 };
 
+/** Menentukan apakah station buka saat ini, termasuk jam lintas tengah malam. */
 function operasional(buka, tutup) {
     if (!buka || !tutup) return { label: '-', open: null };
     if (buka === '00:00' && (tutup === '23:59' || tutup === '00:00')) {
@@ -35,6 +40,7 @@ function operasional(buka, tutup) {
     return { label: `${buka} – ${tutup}`, open };
 }
 
+/** Panel detail station dengan tarif, jam buka, konektor, dan port tersedia. */
 export default function StationDetail({ station, activeVehicle, onClose, onShowRoute }) {
     const [detail, setDetail] = useState(null);
     const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
@@ -56,6 +62,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
     }, [station.id_location]);
 
     useEffect(() => {
+        /** Menutup panel detail saat pengguna menekan Escape. */
         const onKey = (e) => e.key === 'Escape' && onClose();
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -87,6 +94,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
     const perKonektor = Object.values(
         allPorts.reduce((acc, p) => {
             const tipe = p.tipe_konektor;
+            /** Mengelompokkan port agar jumlah total dan tersedia dihitung per konektor. */
             const k = (acc[tipe] ??= { tipe, total: 0, tersedia: 0 });
             k.total += 1;
             if (p.status_port === 'Available' || p.status_port === 'tersedia') k.tersedia += 1;
@@ -121,7 +129,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
                         <p className="sd-address">{station.alamat}</p>
                     </div>
                     <button className="sd-close" onClick={onClose} aria-label="Tutup detail station">
-                        ✕
+                        <FiX aria-hidden="true" />
                     </button>
                 </header>
 
@@ -217,7 +225,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
 
                 <footer className="sd-actions">
                     <button className="sd-primary" onClick={() => onShowRoute(station)}>
-                        🧭 Tampilkan Rute
+                        <FiNavigation aria-hidden="true" /> Tampilkan Rute
                     </button>
                     <a
                         className="sd-secondary"

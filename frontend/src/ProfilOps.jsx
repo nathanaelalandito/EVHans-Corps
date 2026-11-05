@@ -11,6 +11,7 @@ import './chargerMonitor.css'; // Mengimpor CSS overlay modal (.cm-)
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 import defaultAvatar from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
+/** Menentukan sapaan operator berdasarkan waktu lokal. */
 function getGreeting() {
     const h = new Date().getHours();
     if (h >= 4 && h < 10) return 'Selamat pagi';
@@ -19,6 +20,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
+/** Menampilkan profil dan informasi station yang ditugaskan kepada operator. */
 export default function ProfilOps({ 
     user, 
     onLogout, 
@@ -42,6 +44,7 @@ export default function ProfilOps({
     const [soundAlert, setSoundAlert] = useState(true);
     const [autoRefreshInterval, setAutoRefreshInterval] = useState(30);
 
+    /** Mengambil data profil operator beserta informasi penugasannya. */
     const fetchProfileData = async () => {
         setLoading(true);
         try {
@@ -72,6 +75,7 @@ export default function ProfilOps({
     }, []);
 
     // Aksi: Terima Malfungsi -> Ubah Status Charger ke Maintenance
+    /** Mencatat tindak lanjut kendala dari halaman profil operator. */
     const handleAcceptMalfunction = async (alertItem) => {
         const idCharger = alertItem.id_charger || alertItem.id;
         const kode = alertItem.kode_perangkat || alertItem.message?.split(':')[0] || 'Unit Mesin';

@@ -4,10 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Charger;
-use App\Models\StationOperator;
-use App\Models\Tarif;
 
+/** Model lokasi SPKLU yang mengelompokkan charger, operator, dan riwayat tarif. */
 class Location extends Model
 {
     use HasFactory;
@@ -23,19 +21,27 @@ class Location extends Model
         'longitude' => 'float',
     ];
 
-
+    /** Seluruh versi tarif yang pernah atau sedang berlaku di lokasi ini. */
     public function tarifs()
     {
         return $this->hasMany(Tarif::class, 'id_location', 'id_location');
     }
 
-    public function chargers(){
+    /** Unit charger yang terpasang di lokasi ini. */
+    public function chargers()
+    {
         return $this->hasMany(Charger::class, 'id_location', 'id_location');
     }
-    public function stationoperator(){
+
+    /** Penugasan operator yang bertanggung jawab atas lokasi ini. */
+    public function stationoperator()
+    {
         return $this->hasMany(StationOperator::class, 'id_location', 'id_location');
     }
-    public function transliterator_create_from_rules(){
+
+    /** Alias relasi tarif yang saat ini masih dipakai kode pemanggil lama. */
+    public function transliterator_create_from_rules()
+    {
         return $this->hasMany(Tarif::class, 'id_location', 'id_location');
     }
 

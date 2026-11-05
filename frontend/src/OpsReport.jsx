@@ -10,6 +10,7 @@ import { getStoredToken } from './api/auth';
 import './opsReport.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
+/** Menghasilkan sapaan sesuai waktu lokal operator. */
 function getGreeting() {
     const h = new Date().getHours();
     if (h >= 4 && h < 10) return 'Selamat pagi';
@@ -18,6 +19,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
+/** Halaman laporan penggunaan charger, transaksi, dan gangguan operasional. */
 export default function OpsReport({ 
     user, 
     onLogout, 
@@ -50,6 +52,7 @@ export default function OpsReport({
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
     // Ambil Data Laporan Transaksi & Notifikasi dari Backend
+    /** Mengambil data laporan untuk station yang menjadi lingkup operator. */
     const fetchReports = async () => {
         setLoading(true);
         try {
@@ -88,6 +91,7 @@ export default function OpsReport({
     }, [filterStatus]);
 
     // Aksi: Terima Malfungsi Mesin -> Alihkan ke Maintenance
+    /** Menyelesaikan tindak lanjut gangguan dari panel laporan. */
     const handleAcceptMalfunction = async (alertItem) => {
         const idCharger = alertItem.id_charger || alertItem.id;
         const kode = alertItem.kode_perangkat || alertItem.message?.split(':')[0] || 'Unit Mesin';
@@ -115,6 +119,7 @@ export default function OpsReport({
         String(tx.id || tx.id_session || '').includes(searchTerm)
     );
 
+    /** Mengunduh baris laporan yang sedang ditampilkan sebagai berkas CSV. */
     const handleExportCSV = () => {
         if (transactions.length === 0) {
             alert("Tidak ada data untuk diekspor.");

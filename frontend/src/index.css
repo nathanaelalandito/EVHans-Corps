@@ -1,13 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* EVHUB visual tokens — sumber kebenaran untuk semua halaman. */
+:root {
+  /* Neutrals */
+  --ev-bg: #f5f7f6;
+  --ev-surface: #ffffff;
+  --ev-surface-subtle: #f9fbfa;
+  --ev-ink: #182721;
+  --ev-text: #34423c;
+  --ev-text-muted: #6d7c75;
+  --ev-text-disabled: #9aa59f;
+  --ev-border: #e2e9e5;
+  --ev-border-strong: #cbd7d0;
+
+  /* Brand and semantic colors */
+  --ev-primary: #167a55;
+  --ev-primary-hover: #106545;
+  --ev-primary-active: #0b4e35;
+  --ev-primary-soft: #e6f4ed;
+  --ev-success: #16845b;
+  --ev-success-soft: #e5f6ed;
+  --ev-warning: #b76a13;
+  --ev-warning-soft: #fff3dc;
+  --ev-danger: #c13d45;
+  --ev-danger-soft: #fcebed;
+  --ev-info: #2475a8;
+  --ev-info-soft: #e8f3fb;
+
+  /* Typography */
+  --ev-font-sans: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+  --ev-font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  --ev-text-xs: 0.75rem;
+  --ev-text-sm: 0.875rem;
+  --ev-text-base: 1rem;
+  --ev-text-lg: 1.125rem;
+  --ev-text-xl: 1.25rem;
+  --ev-text-2xl: 1.5rem;
+  --ev-text-3xl: 1.875rem;
+
+  /* Spacing and shape */
+  --ev-space-1: 0.25rem;
+  --ev-space-2: 0.5rem;
+  --ev-space-3: 0.75rem;
+  --ev-space-4: 1rem;
+  --ev-space-5: 1.25rem;
+  --ev-space-6: 1.5rem;
+  --ev-space-8: 2rem;
+  --ev-space-10: 2.5rem;
+  --ev-space-12: 3rem;
+  --ev-radius-sm: 0.5rem;
+  --ev-radius-md: 0.75rem;
+  --ev-radius-lg: 1rem;
+  --ev-radius-xl: 1.25rem;
+  --ev-radius-pill: 999px;
+  --ev-touch-target: 2.75rem;
+
+  /* Elevation and interaction */
+  --ev-shadow-sm: 0 1px 2px rgb(24 39 33 / 4%);
+  --ev-shadow-card: 0 8px 24px rgb(24 39 33 / 6%);
+  --ev-shadow-float: 0 14px 32px rgb(24 39 33 / 10%);
+  --ev-focus-ring: 0 0 0 3px rgb(22 122 85 / 22%);
+  --ev-transition-fast: 160ms ease;
+}
+
 /* Reset dasar CSS */
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  background: var(--ev-bg);
+}
+
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  color: #0e8333;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: var(--ev-font-sans);
+  color: var(--ev-text);
+  background: var(--ev-bg);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ev-focus-ring);
 }

@@ -10,8 +10,10 @@ import seabankLogo from './assets/payment foto/seabank.png';
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
 
+/** Memformat nominal top up ke format rupiah. */
 const rupiah = (n) => 'Rp' + Number(n || 0).toLocaleString('id-ID');
 
+/** Mengubah sisa waktu instruksi pembayaran menjadi menit dan detik. */
 const formatCountdown = (ms) => {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = String(Math.floor(total / 3600)).padStart(2, '0');
@@ -20,6 +22,7 @@ const formatCountdown = (ms) => {
   return `${h}:${m}:${s}`;
 };
 
+/** Mengambil pesan error top up dari respons backend jika tersedia. */
 const errMessage = (err) =>
   err?.response?.data?.message ||
   Object.values(err?.response?.data?.errors || {})[0]?.[0] ||
@@ -47,12 +50,15 @@ const BANK_CODES = {
   'seabank': '90100',
 };
 
+/** Menghapus seluruh karakter nonangka dari input pembayaran. */
 const onlyDigits = (v) => String(v || '').replace(/\D/g, '');
 
 // 081234567890 -> 0812-3456-7890
+/** Mengelompokkan digit nomor telepon agar mudah dibaca. */
 const formatPhone = (v) => onlyDigits(v).replace(/(\d{4})(?=\d)/g, '$1-');
 
 // Tentukan jenis pembayaran & kode yang ditampilkan
+/** Menentukan nomor tujuan dan instruksi sesuai jenis metode top up. */
 function getPayInfo(topup, phoneNumber) {
   const key = String(topup.method_name || '').toLowerCase().trim();
   const kind = PAYMENT_KIND[key] || (topup.type === 'va' ? 'va' : 'phone');
@@ -66,6 +72,7 @@ function getPayInfo(topup, phoneNumber) {
   return { kind, phone, code: phone };
 }
 
+/** Menampilkan logo metode pembayaran yang cocok dengan nama metode. */
 function MethodLogo({ name }) {
   const src = LOGOS[name.toLowerCase().trim()];
 
@@ -86,6 +93,7 @@ function MethodLogo({ name }) {
  *  - onBack(): kembali ke halaman sebelumnya
  *  - onDone(saldoBaru): dipanggil saat user menekan "Kembali ke Beranda"
  */
+/** Alur memilih metode, membuat instruksi, dan menyelesaikan top up saldo. */
 export default function TopUp({ phoneNumber, onBack, onDone }) {
   const [step, setStep] = useState('select'); // select | pay | success
   const [methods, setMethods] = useState([]);
@@ -136,6 +144,7 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
 
   const amountValid = amount >= limits.min && amount <= limits.max;
 
+  /** Membuat instruksi pembayaran dari nominal dan metode terpilih. */
   const handleCreate = async () => {
     setError('');
     setLoading(true);
@@ -151,6 +160,7 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
     }
   };
 
+  /** Menjalankan pembayaran simulasi dan mengirim saldo baru ke pemanggil. */
   const handleSimulate = async () => {
     setError('');
     try {
@@ -162,6 +172,7 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
     }
   };
 
+  /** Menyalin nomor rekening atau referensi instruksi ke clipboard. */
   const handleCopy = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -172,6 +183,7 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
     }
   };
 
+  /** Mengulang alur top up dengan menghapus instruksi dan error lama. */
   const restart = () => {
     setTopup(null);
     setError('');

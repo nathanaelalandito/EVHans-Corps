@@ -3,16 +3,19 @@ import './welcome.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg'; // Sesuaikan lokasi logo kamu
 import { login } from './api/auth';
 
+/** Layar awal yang menyediakan akses ke login dan registrasi pengemudi. */
 export default function Welcome({ onNavigateToRegister, onLoginSuccess }) {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [errors, setErrors] = useState({});
     const [serverMessage, setServerMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
+    /** Menyimpan perubahan kredensial pada formulir login awal. */
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    /** Mengirim kredensial ke layanan autentikasi dan memproses responsnya. */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrors({});

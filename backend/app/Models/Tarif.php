@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
 
+/** Model tarif lokasi yang berlaku pada rentang waktu tertentu. */
 class Tarif extends Model
 {
     use HasFactory;
@@ -45,8 +46,9 @@ class Tarif extends Model
     public function scopeAktif($query)
     {
         $now = Carbon::now();
+
         return $query->where('periode_mulai', '<=', $now)
-                     ->where('periode_berakhir', '>=', $now);
+            ->where('periode_berakhir', '>=', $now);
     }
 
     /**
@@ -56,6 +58,7 @@ class Tarif extends Model
      *  - biaya parkir   = tarif parkir x jam berjalan (dibulatkan ke atas, min. 1 jam)
      * Dipakai bersama oleh estimasi (start), penyelesaian sesi, dan invoice.
      */
+    /** Menghitung estimasi biaya energi dan parkir untuk jumlah energi tertentu. */
     public function costFor(float $kwh, float $powerKw): array
     {
         $kwh = round($kwh, 2);

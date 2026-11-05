@@ -2,103 +2,107 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Dompet;
 use App\Models\User;
 use App\Models\UserProfile;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 
+/** Menangani registrasi akun, login token, dan logout pengguna. */
 class AuthController extends Controller
 {
+    /** Membuat akun, profil, dan dompet pengemudi dalam satu proses registrasi. */
     public function register(Request $request)
     {
-    // 1. Validasi input dari frontend (tambahkan nomor_telepon dan alamat)
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:users,email',
-        'password' => 'required|string|min:6',
-        'nomor_telepon' => 'required|string|max:15',
-        'alamat' => 'required|string|max:255',
-        'tanggal_lahir' => 'required|date',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json([
-            'errors' => $validator->errors()
-        ], 422);
-    }
-
-    DB::beginTransaction();
-
-    try {
-        $email = $request->email;
-        $prefix = 'DRV'; // Default untuk user biasa / driver
-
-        // Tentukan prefix berdasarkan domain email
-        if (str_ends_with($email, '@admin.ac.id')) {
-            $prefix = 'ADM';
-        } elseif (str_ends_with($email, '@ops.ac.id')) {
-            $prefix = 'OPS';
-        }
-
-        // Generate ID otomatis (ADM, OPS, DRV) - format char(13)
-        $lastUser = User::where('id_user', 'LIKE', "{$prefix}%")
-                        ->orderBy('id_user', 'desc')
-                        ->first();
-
-        $nextNumber = 1;
-        if ($lastUser) {
-            $cleaned = preg_replace('/[^0-9]/', '', $lastUser->id_user);
-            $nextNumber = ((int) $cleaned) + 1;
-        }
-
-        $paddedNumber = str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
-        $customId = "{$prefix}{$paddedNumber}";
-
-        $peran = $prefix === 'ADM' ? 'admin' : ($prefix === 'OPS' ? 'operator' : 'driver');
-
-        // 2. Simpan ke tabel Users
-        $user = User::create([
-            'id_user' => $customId,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'peran' => $peran,
-            'status_akun' => 'Aktif',
+        // 1. Validasi input dari frontend (tambahkan nomor_telepon dan alamat)
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => 'required|string|min:6',
+            'nomor_telepon' => 'required|string|max:15',
+            'alamat' => 'required|string|max:255',
+            'tanggal_lahir' => 'required|date',
         ]);
 
-        // 3. Simpan ke tabel User_Profile (dengan data lengkap)
-        UserProfile::create([
-            'id_user' => $user->id_user,
-            'nama_lengkap' => $request->name,
-            'nomor_telepon' => $request->nomor_telepon,
-            'alamat' => $request->alamat,
-            'tanggal_lahir' => $request->tanggal_lahir,
-        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'errors' => $validator->errors(),
+            ], 422);
+        }
 
-        // 4. Buat Dompet Digital EVChargeHub otomatis (PRD 7.1)
-        Dompet::firstOrCreate(
-            ['id_user' => $user->id_user],
-            ['saldo' => 0, 'saldo_hold' => 0, 'status_dompet' => 'Aktif']
-        );
+        DB::beginTransaction();
 
-        DB::commit();
+        try {
+            $email = $request->email;
+            $prefix = 'DRV'; // Default untuk user biasa / driver
 
-        return response()->json([
-            'message' => 'Registrasi berhasil!',
-            'user' => $user
-        ], 201);
+            // Tentukan prefix berdasarkan domain email
+            if (str_ends_with($email, '@admin.ac.id')) {
+                $prefix = 'ADM';
+            } elseif (str_ends_with($email, '@ops.ac.id')) {
+                $prefix = 'OPS';
+            }
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'message' => 'Terjadi kesalahan pada server.',
-            'error' => $e->getMessage()
-        ], 500);
+            // Generate ID otomatis (ADM, OPS, DRV) - format char(13)
+            $lastUser = User::where('id_user', 'LIKE', "{$prefix}%")
+                ->orderBy('id_user', 'desc')
+                ->first();
+
+            $nextNumber = 1;
+            if ($lastUser) {
+                $cleaned = preg_replace('/[^0-9]/', '', $lastUser->id_user);
+                $nextNumber = ((int) $cleaned) + 1;
+            }
+
+            $paddedNumber = str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
+            $customId = "{$prefix}{$paddedNumber}";
+
+            $peran = $prefix === 'ADM' ? 'admin' : ($prefix === 'OPS' ? 'operator' : 'driver');
+
+            // 2. Simpan ke tabel Users
+            $user = User::create([
+                'id_user' => $customId,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'peran' => $peran,
+                'status_akun' => 'Aktif',
+            ]);
+
+            // 3. Simpan ke tabel User_Profile (dengan data lengkap)
+            UserProfile::create([
+                'id_user' => $user->id_user,
+                'nama_lengkap' => $request->name,
+                'nomor_telepon' => $request->nomor_telepon,
+                'alamat' => $request->alamat,
+                'tanggal_lahir' => $request->tanggal_lahir,
+            ]);
+
+            // 4. Buat Dompet Digital EVChargeHub otomatis (PRD 7.1)
+            Dompet::firstOrCreate(
+                ['id_user' => $user->id_user],
+                ['saldo' => 0, 'saldo_hold' => 0, 'status_dompet' => 'Aktif']
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Registrasi berhasil!',
+                'user' => $user,
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'message' => 'Terjadi kesalahan pada server.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
-    }
 
+    /** Memvalidasi kredensial dan menerbitkan token akses Sanctum. */
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -108,7 +112,7 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -116,13 +120,13 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Email atau password salah.'
+                'message' => 'Email atau password salah.',
             ], 401);
         }
 
         if ($user->status_akun !== 'Aktif') {
             return response()->json([
-                'message' => 'Akun Anda tidak aktif. Hubungi admin.'
+                'message' => 'Akun Anda tidak aktif. Hubungi admin.',
             ], 403);
         }
 
@@ -138,12 +142,13 @@ class AuthController extends Controller
         ]);
     }
 
+    /** Menghapus token yang sedang dipakai agar sesi saat ini berakhir. */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'message' => 'Berhasil keluar.'
+            'message' => 'Berhasil keluar.',
         ]);
     }
 }

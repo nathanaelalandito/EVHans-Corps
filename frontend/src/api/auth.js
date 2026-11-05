@@ -1,5 +1,6 @@
 import api from './client';
 
+/** Mengautentikasi pengguna, lalu menyimpan token dan data akun di browser. */
 export async function login(email, password) {
     const { data } = await api.post('/login', { email, password });
     // Simpan token & profil user supaya request berikutnya otomatis
@@ -9,11 +10,13 @@ export async function login(email, password) {
     return data.user;
 }
 
+/** Mengirim data registrasi akun pengemudi ke backend. */
 export async function register(payload) {
     const { data } = await api.post('/register', payload);
     return data;
 }
 
+/** Meminta backend mengakhiri token dan selalu membersihkan sesi lokal. */
 export async function logout() {
     try {
         await api.post('/logout');
@@ -23,11 +26,13 @@ export async function logout() {
     }
 }
 
+/** Membaca data akun yang disimpan saat login, atau null jika belum login. */
 export function getStoredUser() {
     const raw = localStorage.getItem('ev_user');
     return raw ? JSON.parse(raw) : null;
 }
 
+/** Mengambil token akses yang dipakai interceptor request API. */
 export function getStoredToken() {
     return localStorage.getItem('ev_token');
 }

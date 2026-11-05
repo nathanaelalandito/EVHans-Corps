@@ -6,12 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Models\UserProfile;
- use App\Models\Vehicle;
- use App\Models\ChargingSession;
- use App\Models\ErrorLog;
- use App\Models\StationOperator;
 
+/** Model akun autentikasi untuk peran pengemudi, operator, dan admin. */
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
@@ -29,34 +25,39 @@ class User extends Authenticatable
     protected $hidden = ['password', 'remember_token'];
 
     // Relasi ke UserProfile (One to One)
+    /** Data profil pribadi yang melengkapi akun autentikasi. */
     public function profile()
     {
         return $this->hasOne(UserProfile::class, 'id_user', 'id_user');
     }
 
+    /** Dompet digital yang digunakan pengguna untuk transaksi. */
     public function dompet()
     {
         return $this->hasOne(Dompet::class, 'id_user', 'id_user');
     }
 
+    /** Kendaraan yang didaftarkan oleh pengguna. */
     public function vehicles()
     {
         return $this->hasMany(Vehicle::class, 'id_user', 'id_user'); // sesuaikan nama model/tabel kendaraan kamu
     }
 
+    /** Riwayat sesi charging milik pengguna. */
     public function chargingSessions()
     {
         return $this->hasMany(ChargingSession::class, 'id_user', 'id_user'); // sesuaikan
     }
 
+    /** Laporan gangguan yang terkait dengan pengguna. */
     public function errorLog()
     {
         return $this->hasMany(ErrorLog::class, 'id_user', 'id_user');
     }
+
+    /** Penugasan station bagi akun yang berperan sebagai operator. */
     public function stationoperator()
     {
         return $this->hasMany(StationOperator::class, 'id_user', 'id_user');
     }
-
-
 }

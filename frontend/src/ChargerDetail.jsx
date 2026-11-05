@@ -11,6 +11,7 @@ import { getStoredToken } from './api/auth';
 import './chargerMonitor.css'; // Menggunakan stylesheet utama
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
+/** Memilih sapaan operator berdasarkan jam lokal. */
 function getGreeting() {
     const h = new Date().getHours();
     if (h >= 4 && h < 10) return 'Selamat pagi';
@@ -19,6 +20,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
+/** Detail unit charger untuk monitoring port, tarif, notifikasi, dan kendali jarak jauh. */
 export default function ChargerDetail({ 
     user, 
     charger, 
@@ -72,10 +74,13 @@ export default function ChargerDetail({
         : (user?.profile?.nama_lengkap || user?.name || user?.email || '');
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
+    /** Menampilkan nilai biaya sebagai rupiah. */
     const formatRp = (val) => (!val && val !== 0 ? 'Rp 0' : `Rp ${Number(val).toLocaleString('id-ID')}`);
+    /** Memformat tanggal transaksi atau status yang kosong. */
     const formatDate = (val) => (!val ? '-' : new Date(val).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }));
 
     // Ambil Data Lengkap Charger, Tarif, Port, dan Notifikasi
+    /** Memuat detail charger, tarif, port, dan notifikasi dari backend. */
     const fetchDetail = async () => {
         if (!chargerId) return;
         setLoading(true);
@@ -107,6 +112,7 @@ export default function ChargerDetail({
     }, [chargerId]);
 
     // Aksi: Terima Malfungsi Mesin -> Alihkan ke Maintenance
+    /** Meneruskan tindak lanjut gangguan dan memuat ulang data perangkat. */
     const handleAcceptMalfunction = async (alertItem) => {
         const targetChargerId = alertItem.id_charger || alertItem.id;
         const kode = alertItem.kode_perangkat || alertItem.message?.split(':')[0] || 'Unit Mesin';
@@ -130,6 +136,7 @@ export default function ChargerDetail({
     };
 
     // Remote Control Mesin Utama
+    /** Mengirim perintah start, stop, atau reboot untuk unit charger. */
     const handleRemoteControl = async (action) => {
         if (!window.confirm(`Kirim perintah ${action} untuk mesin ${activeCharger.kode_perangkat}?`)) return;
         try {
@@ -150,6 +157,7 @@ export default function ChargerDetail({
     };
 
     // Aksi Tombol Start/Stop pada Port
+    /** Mengubah port antara status tersedia dan tidak dapat digunakan. */
     const handleTogglePortStatus = async (port) => {
         const isAvailable = (port.status_port || '').toLowerCase() === 'available';
         const action = isAvailable ? 'STOP' : 'START';
@@ -175,6 +183,7 @@ export default function ChargerDetail({
     };
 
     // Aksi Reboot Port
+    /** Meminta restart satu port setelah operator memberi konfirmasi. */
     const handleRebootPort = async (portId, portLabel) => {
         if (!window.confirm(`Reboot ${portLabel}?`)) return;
         try {
@@ -190,6 +199,7 @@ export default function ChargerDetail({
     };
 
     // Modal Ubah Tarif Stasiun (FR26)
+    /** Membuka formulir tarif dengan tarif aktif atau nilai awal bawaan. */
     const handleOpenEditTarif = () => {
         setTarifForm({
             harga_per_kwh: activeTarif?.harga_per_kwh || 2466,
@@ -199,6 +209,7 @@ export default function ChargerDetail({
         setShowTarifModal(true);
     };
 
+    /** Mengirim periode tarif baru untuk station charger ini. */
     const handleTarifSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -220,6 +231,7 @@ export default function ChargerDetail({
     };
 
     // Modal Tambah Port
+    /** Membuka formulir port baru dengan nomor port berikutnya. */
     const handleOpenAddPort = () => {
         setIsEditingPort(false);
         setCurrentPortId(null);
@@ -235,6 +247,7 @@ export default function ChargerDetail({
     };
 
     // Modal Edit Port
+    /** Mengisi formulir dari data port yang akan diubah. */
     const handleOpenEditPort = (port) => {
         setIsEditingPort(true);
         setCurrentPortId(port.id_port);
@@ -249,6 +262,7 @@ export default function ChargerDetail({
         setShowPortModal(true);
     };
 
+    /** Membuat port baru atau menyimpan perubahan port yang diedit. */
     const handlePortSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -268,6 +282,7 @@ export default function ChargerDetail({
         }
     };
 
+    /** Menghapus port setelah konfirmasi dan menyegarkan detail charger. */
     const handleDeletePort = async (portId, portLabel) => {
         if (!window.confirm(`Hapus ${portLabel}?`)) return;
         try {
@@ -463,6 +478,7 @@ export default function ChargerDetail({
                                         const portMode = port.tipe_charging || port.mode_daya || 'DC';
                                         const portPower = port.daya_maks_kw || port.daya_maksimal || '50';
 
+                                        // Normalisasi status untuk menentukan warna indikator pada kartu port.
                                         const pStatus = (port.status_port || 'Available').toLowerCase();
                                         const statusClass = pStatus.replace(/\s+/g, '-');
                                         const isAvailable = pStatus === 'available';

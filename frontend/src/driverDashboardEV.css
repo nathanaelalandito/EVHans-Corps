@@ -1,0 +1,598 @@
+/*
+ * Lapisan visual pengemudi EVHUB.
+ * Dimuat setelah stylesheet lama agar tampilan dapat dimigrasikan tanpa
+ * mengubah perilaku alur charging yang sudah berjalan.
+ */
+
+.app-shell,
+.home-screen,
+.mapdash-container {
+  background: var(--ev-bg);
+  color: var(--ev-text);
+}
+
+/* Kerangka dashboard */
+.home-header {
+  background: var(--ev-surface);
+  border-bottom: 1px solid var(--ev-border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px 20px;
+}
+
+.home-header-top,
+.home-header-summary,
+.home-content {
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.home-header-top {
+  align-items: center;
+  margin-bottom: var(--ev-space-6);
+}
+
+.home-greeting-text {
+  margin: 0 0 var(--ev-space-1);
+  color: var(--ev-ink);
+  font-family: var(--ev-font-display);
+  font-size: var(--ev-text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.home-greeting-sub,
+.home-section-caption,
+.home-vehicle-connector,
+.mapdash-station-mini-meta,
+.mapdash-station-mini-dist,
+.invoice-label,
+.dash-empty,
+.transaction-meta {
+  color: var(--ev-text-muted);
+}
+
+.home-icon-btn {
+  width: var(--ev-touch-target);
+  height: var(--ev-touch-target);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-md);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+  font-size: 18px;
+  transition: background-color var(--ev-transition-fast), border-color var(--ev-transition-fast), color var(--ev-transition-fast);
+}
+
+.home-icon-btn:hover {
+  border-color: var(--ev-border-strong);
+  background: var(--ev-surface-subtle);
+  color: var(--ev-primary);
+}
+
+.home-header-summary {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: var(--ev-space-3);
+}
+
+.home-balance-panel,
+.home-vehicle-panel {
+  min-height: 104px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface-subtle);
+  box-shadow: none;
+  padding: var(--ev-space-4);
+}
+
+.home-balance-panel { align-items: flex-end; }
+
+.home-wallet-label,
+.home-vehicle-panel-head {
+  color: var(--ev-text-muted);
+  font-size: var(--ev-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.home-wallet-value {
+  color: var(--ev-ink);
+  font-family: var(--ev-font-display);
+  font-size: var(--ev-text-2xl);
+  letter-spacing: -0.025em;
+}
+
+.home-wallet-topup {
+  min-height: 40px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-primary);
+  font-size: var(--ev-text-sm);
+  font-weight: 700;
+}
+
+.home-wallet-topup:hover {
+  border-color: var(--ev-primary);
+  background: var(--ev-primary-soft);
+}
+
+.home-vehicle-panel { gap: var(--ev-space-2); }
+
+.home-vehicle-pill-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-primary-soft);
+  color: var(--ev-primary);
+  font-size: 13px;
+}
+
+.home-vehicle-select,
+.home-vehicle-add-btn {
+  min-height: 42px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-ink);
+}
+
+/* Konten utama */
+.home-content {
+  padding: var(--ev-space-8) 20px calc(var(--ev-space-12) + env(safe-area-inset-bottom, 0px));
+  gap: var(--ev-space-8) var(--ev-space-10);
+}
+
+.home-search-card { grid-column: 1 / -1; }
+
+.home-cta-map {
+  min-height: 96px;
+  border: 1px solid var(--ev-primary);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-primary);
+  box-shadow: none;
+  padding: var(--ev-space-5) var(--ev-space-6);
+  transition: background-color var(--ev-transition-fast), transform var(--ev-transition-fast);
+}
+
+.home-cta-map:hover { background: var(--ev-primary-hover); }
+
+.home-cta-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--ev-radius-md);
+  background: rgb(255 255 255 / 15%);
+  font-size: 22px;
+}
+
+.home-cta-title,
+.home-section-title,
+.home-session-title {
+  font-family: var(--ev-font-display);
+  letter-spacing: -0.015em;
+}
+
+.home-cta-title { font-size: var(--ev-text-lg); }
+.home-cta-sub { color: rgb(255 255 255 / 76%); }
+
+.home-section-title,
+.home-session-title {
+  color: var(--ev-ink);
+  font-size: var(--ev-text-xl);
+  font-weight: 600;
+}
+
+.home-section-title-row { margin-bottom: var(--ev-space-4); }
+
+.home-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ev-space-1);
+  border-color: var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  color: var(--ev-primary);
+}
+
+.home-station-scroll { gap: var(--ev-space-3); }
+
+.home-station-scroll .mapdash-station-mini,
+.home-session-card,
+.home-invoice-card {
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface);
+  box-shadow: var(--ev-shadow-sm);
+}
+
+.home-station-scroll .mapdash-station-mini {
+  min-height: 118px;
+  padding: var(--ev-space-4);
+}
+
+.home-station-scroll .mapdash-station-mini:hover,
+.home-station-scroll .mapdash-station-mini:focus-visible {
+  border-color: var(--ev-primary);
+  background: var(--ev-surface);
+}
+
+.mapdash-station-mini-name,
+.home-station-scroll .mapdash-station-mini-name,
+.invoice-grid strong,
+.transaction-side strong,
+.transaction-location {
+  color: var(--ev-ink);
+}
+
+.dash-status-badge.ok { background: var(--ev-success-soft); color: var(--ev-success); }
+.dash-status-badge.warn { background: var(--ev-warning-soft); color: var(--ev-warning); }
+.dash-status-badge.danger { background: var(--ev-danger-soft); color: var(--ev-danger); }
+
+.home-session-card,
+.home-invoice-card { padding: var(--ev-space-6); }
+
+.invoice-grid div {
+  background: var(--ev-surface-subtle);
+  border-radius: var(--ev-radius-sm);
+}
+
+.home-history-section .transaction-list {
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface);
+}
+
+.home-history-section .transaction-item {
+  padding: var(--ev-space-4);
+  border-bottom-color: var(--ev-border);
+}
+
+.transaction-item:hover { background: var(--ev-surface-subtle); }
+
+/* Kontrol peta menggunakan tampilan tenang dan elevasi yang sama. */
+.mapdash-map-title,
+.mapdash-round-btn,
+.mapdash-sheet,
+.route-card {
+  border: 1px solid var(--ev-border);
+  box-shadow: var(--ev-shadow-card);
+}
+
+.mapdash-map-title,
+.mapdash-round-btn,
+.mapdash-sheet,
+.route-card { background: var(--ev-surface); }
+.mapdash-map-title,
+.mapdash-round-btn { color: var(--ev-ink); }
+
+.mapdash-filter-chip {
+  border-color: var(--ev-border);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+}
+
+.mapdash-filter-chip.active,
+.route-card-primary,
+.dash-btn-navigate {
+  border-color: var(--ev-primary);
+  background: var(--ev-primary);
+}
+
+.mapdash-filter-chip.active { color: #fff; }
+
+/* Ikon vektor mengikuti baseline teks agar semua kontrol terasa seragam. */
+.mapdash-notif span svg,
+.mapdash-session-location svg,
+.dash-station-meta svg,
+.transaction-icon svg,
+.profile-row-icon svg,
+.settings-pin-status-icon svg,
+.mapdash-round-btn svg,
+.route-card button svg {
+  vertical-align: middle;
+}
+
+.mapdash-session-location,
+.dash-station-meta span,
+.route-card-primary,
+.route-card-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.charge-flow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Panel filter berdiri sendiri karena menyaring port pada seluruh station. */
+.mapdash-filter-panel {
+  position: absolute;
+  top: auto;
+  bottom: calc(164px + env(safe-area-inset-bottom, 0px));
+  left: 16px;
+  right: auto;
+  z-index: 11;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 6px 8px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-pill);
+  background: var(--ev-surface);
+  box-shadow: var(--ev-shadow-card);
+}
+
+/* Saat daftar diperluas, filter tetap berada tepat di atasnya. */
+.mapdash-filter-panel.is-sheet-expanded {
+  bottom: calc(62dvh + 16px + env(safe-area-inset-bottom, 0px));
+}
+
+.mapdash-filter-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.mapdash-filter-panel .mapdash-filters {
+  position: static;
+  display: flex;
+  gap: var(--ev-space-2);
+  overflow-x: auto;
+  padding: 0;
+}
+
+/* Topbar dan kartu rute kembali memakai ruang bagian atas peta. */
+.mapdash-topbar { top: calc(16px + env(safe-area-inset-top, 0px)); }
+.mapdash-notif { top: calc(74px + env(safe-area-inset-top, 0px)); }
+.route-card { top: calc(116px + env(safe-area-inset-top, 0px)); }
+
+.home-cta-arrow,
+.home-map-link svg,
+.mapdash-station-mini-dist svg {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+@media (max-width: 700px) {
+  .home-header { padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 16px; }
+  .home-header-summary { grid-template-columns: minmax(0, 1fr); }
+  .home-content {
+    gap: var(--ev-space-6);
+    padding: var(--ev-space-6) 16px calc(var(--ev-space-10) + env(safe-area-inset-bottom, 0px));
+  }
+  .home-cta-map { min-height: 84px; padding: var(--ev-space-4); }
+}
+
+@media (min-width: 1024px) {
+  .home-content { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr); }
+  .home-header { max-width: none; }
+
+  /* Letakkan filter di area peta agar tidak tertutup panel daftar station. */
+  .mapdash-filter-panel {
+    top: 24px;
+    bottom: auto;
+    left: 428px;
+    right: auto;
+  }
+
+  .mapdash-filter-panel.is-sheet-expanded { bottom: auto; }
+
+  .mapdash-topbar { top: 24px; }
+  .mapdash-notif { top: 86px; }
+  .route-card { top: 84px; }
+}
+
+/* Pengaturan pengemudi */
+.settings-overlay {
+  background: rgb(24 39 33 / 32%);
+  backdrop-filter: blur(3px);
+  padding: 20px 16px;
+}
+
+.settings-panel {
+  width: min(100%, 480px);
+  max-height: min(86dvh, 760px);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-xl);
+  background: var(--ev-surface);
+  box-shadow: var(--ev-shadow-float);
+}
+
+.settings-panel-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--ev-radius-pill);
+  background: var(--ev-border-strong);
+}
+
+.settings-panel-header {
+  min-height: 52px;
+  border-bottom: 1px solid var(--ev-border);
+  padding: 0 var(--ev-space-5);
+}
+
+.settings-panel-title {
+  color: var(--ev-ink);
+  font-family: var(--ev-font-display);
+  font-size: var(--ev-text-lg);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.settings-profile {
+  margin: var(--ev-space-5);
+  width: calc(100% - var(--ev-space-10));
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface-subtle);
+  padding: var(--ev-space-4);
+  text-align: left;
+}
+
+.settings-profile:hover { border-color: var(--ev-border-strong); }
+
+.settings-profile-avatar,
+.settings-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ev-primary);
+  background: var(--ev-primary-soft);
+}
+
+.settings-profile-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--ev-radius-md);
+  font-size: 20px;
+}
+
+.settings-profile-name,
+.settings-menu-label,
+.settings-pin-status-title {
+  color: var(--ev-ink);
+}
+
+.settings-profile-sub,
+.settings-menu-sublabel,
+.settings-pin-desc,
+.settings-pin-status-sub {
+  color: var(--ev-text-muted);
+}
+
+.settings-menu {
+  gap: 0;
+  margin: 0 var(--ev-space-5);
+  overflow: hidden;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface);
+}
+
+.settings-menu-item {
+  min-height: 60px;
+  border: 0;
+  border-bottom: 1px solid var(--ev-border);
+  border-radius: 0;
+  background: var(--ev-surface);
+  padding: var(--ev-space-3) var(--ev-space-4);
+}
+
+.settings-menu-item:last-child { border-bottom: 0; }
+.settings-menu-item:hover { background: var(--ev-surface-subtle); }
+
+.settings-menu-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--ev-radius-sm);
+  font-size: 17px;
+}
+
+.settings-menu-arrow {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ev-text-disabled);
+  font-size: 18px;
+}
+
+.settings-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ev-space-2);
+  min-height: var(--ev-touch-target);
+  margin: var(--ev-space-5);
+  width: calc(100% - var(--ev-space-10));
+  border: 1px solid #f2cbd0;
+  border-radius: var(--ev-radius-md);
+  background: var(--ev-danger-soft);
+  color: var(--ev-danger);
+  font-weight: 700;
+}
+
+.settings-subscreen { padding-bottom: var(--ev-space-5); }
+
+.settings-back-btn,
+.settings-panel .mapdash-notif-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+}
+
+.settings-pin-form,
+.settings-pin-status {
+  margin: var(--ev-space-5);
+  padding: var(--ev-space-5);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-lg);
+  background: var(--ev-surface-subtle);
+}
+
+.settings-pin-label {
+  color: var(--ev-text);
+  font-size: var(--ev-text-sm);
+  font-weight: 600;
+}
+
+.settings-pin-input {
+  min-height: var(--ev-touch-target);
+  border: 1px solid var(--ev-border-strong);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-ink);
+}
+
+.settings-pin-input:focus { border-color: var(--ev-primary); box-shadow: var(--ev-focus-ring); }
+
+.settings-pin-submit {
+  min-height: var(--ev-touch-target);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-primary);
+  color: #fff;
+}
+
+.settings-pin-submit:hover { background: var(--ev-primary-hover); }
+
+.settings-pin-cancel {
+  min-height: var(--ev-touch-target);
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-surface);
+  color: var(--ev-text);
+}
+
+.settings-pin-success {
+  margin: var(--ev-space-5) var(--ev-space-5) 0;
+  border: 1px solid #bfe6cf;
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-success-soft);
+  color: var(--ev-success);
+}
+
+.settings-pin-error {
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-danger-soft);
+  color: var(--ev-danger);
+}
+
+.settings-pin-status-icon {
+  border-radius: var(--ev-radius-md);
+  background: var(--ev-primary-soft);
+  color: var(--ev-primary);
+}
+
+.settings-pin-disable-btn {
+  border: 1px solid #f2cbd0;
+  border-radius: var(--ev-radius-sm);
+  background: var(--ev-danger-soft);
+  color: var(--ev-danger);
+}

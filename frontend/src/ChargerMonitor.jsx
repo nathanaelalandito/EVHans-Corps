@@ -10,6 +10,7 @@ import { getStoredToken } from './api/auth';
 import './chargerMonitor.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
+/** Menghasilkan sapaan singkat sesuai waktu lokal. */
 function getGreeting() {
     const h = new Date().getHours();
     if (h >= 4 && h < 10) return 'Selamat pagi';
@@ -18,6 +19,7 @@ function getGreeting() {
     return 'Selamat malam';
 }
 
+/** Halaman operator untuk mengelola unit charger dan merespons gangguan. */
 export default function ChargerMonitor({ 
     user, 
     onLogout, 
@@ -61,6 +63,7 @@ export default function ChargerMonitor({
     const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
 
     // Mengambil data charger & notifikasi dari server
+    /** Memuat data charger sesuai lingkup station operator. */
     const fetchChargersData = async () => {
         setLoading(true);
         try {
@@ -92,6 +95,7 @@ export default function ChargerMonitor({
     }, []);
 
     // Aksi: Terima Malfungsi -> Ubah Status Charger ke Maintenance
+    /** Menandai notifikasi gangguan sebagai diterima/ditangani. */
     const handleAcceptMalfunction = async (alertItem) => {
         const idCharger = alertItem.id_charger || alertItem.id;
         const kode = alertItem.kode_perangkat || alertItem.message?.split(':')[0] || 'Unit Mesin';
@@ -115,6 +119,7 @@ export default function ChargerMonitor({
     };
 
     // Buka Modal Tambah Charger
+    /** Membuka form untuk menambahkan unit charger baru. */
     const handleOpenAddModal = () => {
         setIsEditing(false);
         setFormData({
@@ -127,6 +132,7 @@ export default function ChargerMonitor({
     };
 
     // Buka Modal Edit Charger
+    /** Mengisi form edit dengan data unit charger yang dipilih. */
     const handleOpenEditModal = (charger) => {
         setIsEditing(true);
         const chargerId = charger.id_charger || charger.id;
@@ -141,6 +147,7 @@ export default function ChargerMonitor({
     };
 
     // Simpan Data (Create / Update ke Operator API)
+    /** Memvalidasi lalu membuat atau memperbarui unit charger. */
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -162,6 +169,7 @@ export default function ChargerMonitor({
     };
 
     // Kontrol Jarak Jauh (Start / Stop / Reboot)
+    /** Mengirim perintah kendali jarak jauh ke unit charger. */
     const handleRemoteControl = async (action, id, kode) => {
         if (window.confirm(`Konfirmasi: Kirim perintah [${action}] untuk perangkat ${kode}?`)) {
             try {
@@ -185,6 +193,7 @@ export default function ChargerMonitor({
     };
 
     // Hapus Charger
+    /** Menghapus unit charger setelah konfirmasi operator. */
     const handleDeleteCharger = async (id, kode) => {
         if (window.confirm(`Peringatan: Apakah Anda yakin ingin menghapus mesin perangkat ${kode}?`)) {
             try {
