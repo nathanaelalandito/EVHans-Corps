@@ -1,0 +1,3 @@
+/* Shared destructive action for every active Operator sidebar. */
+.op-logout-btn,.cm-logout-btn,.rep-logout-btn{width:100%;justify-content:center;border:1px solid #edc7cc!important;background:var(--ev-danger-soft)!important;color:var(--ev-danger)!important;font-size:var(--ev-text-sm)!important}.op-logout-btn:hover,.cm-logout-btn:hover,.rep-logout-btn:hover{background:#f8dadd!important}
+.op-sidebar-exit,.cm-sidebar-exit,.rep-sidebar-exit{display:block;margin-top:var(--ev-space-3);padding-top:var(--ev-space-3);border-top:1px solid var(--ev-border);list-style:none}

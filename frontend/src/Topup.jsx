@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTopup, getTopup, getTopupMethods, simulatePayTopup } from './api/Topup';
+import { verifyPin } from './api/wallet';
 import './Topup.css';
-
-// Logo metode pembayaran (folder: src/assets/payment foto)
-import gopayLogo from './assets/payment foto/gopay.png';
-import danaLogo from './assets/payment foto/dana.webp';
-import briLogo from './assets/payment foto/bri.png';
-import seabankLogo from './assets/payment foto/seabank.png';
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
 
@@ -27,14 +22,6 @@ const errMessage = (err) =>
   err?.response?.data?.message ||
   Object.values(err?.response?.data?.errors || {})[0]?.[0] ||
   'Terjadi kesalahan. Coba lagi.';
-
-// Kunci = nama metode di tabel metode_pembayaran (huruf kecil).
-const LOGOS = {
-  'gopay': gopayLogo,
-  'dana': danaLogo,
-  'va bri': briLogo,
-  'seabank': seabankLogo,
-};
 
 // 'phone' = bayar ke nomor telepon (e-wallet), 'va' = Virtual Account
 const PAYMENT_KIND = {
@@ -72,21 +59,6 @@ function getPayInfo(topup, phoneNumber) {
   return { kind, phone, code: phone };
 }
 
-/** Menampilkan logo metode pembayaran yang cocok dengan nama metode. */
-function MethodLogo({ name }) {
-  const src = LOGOS[name.toLowerCase().trim()];
-
-  if (!src) {
-    return (
-      <span className="tu-logo tu-logo-fallback" aria-hidden="true">
-        {name.slice(0, 2).toUpperCase()}
-      </span>
-    );
-  }
-
-  return <img className="tu-logo" src={src} alt="" />;
-}
-
 /**
  * Props:
  *  - phoneNumber: nomor telepon driver (user_profile.nomor_telepon)
@@ -94,17 +66,21 @@ function MethodLogo({ name }) {
  *  - onDone(saldoBaru): dipanggil saat user menekan "Kembali ke Beranda"
  */
 /** Alur memilih metode, membuat instruksi, dan menyelesaikan top up saldo. */
-export default function TopUp({ phoneNumber, onBack, onDone }) {
+export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConfirmation = false, onManagePin }) {
   const [step, setStep] = useState('select'); // select | pay | success
   const [methods, setMethods] = useState([]);
   const [limits, setLimits] = useState({ min: 10000, max: 5000000 });
   const [method, setMethod] = useState('');
   const [amount, setAmount] = useState(100000);
   const [topup, setTopup] = useState(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinVerified, setPinVerified] = useState(skipPinConfirmation);
+  const [hideBalance] = useState(() => localStorage.getItem('ev_hide_saldo') === '1');
   const pollRef = useRef(null);
 
   useEffect(() => {
@@ -143,9 +119,13 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
   const expired = step === 'pay' && topup && (topup.status === 'expired' || remaining <= 0);
 
   const amountValid = amount >= limits.min && amount <= limits.max;
+  const walletActive = !wallet?.status_dompet || String(wallet.status_dompet).toLowerCase() === 'aktif';
+  const selectedMethod = methods.find((item) => String(item.id) === String(method));
+  const paymentFee = Number(selectedMethod?.fee ?? 0);
+  const paymentTotal = amount + paymentFee;
 
-  /** Membuat instruksi pembayaran dari nominal dan metode terpilih. */
-  const handleCreate = async () => {
+  /** Membuat instruksi pembayaran setelah Driver melewati konfirmasi PIN. */
+  const createPaymentInstruction = async () => {
     setError('');
     setLoading(true);
     try {
@@ -155,6 +135,38 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
       setStep('pay');
     } catch (e) {
       setError(errMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** Meminta PIN sebelum instruksi Top Up dibuat. */
+  const handleCreate = () => {
+    if (pinVerified) {
+      createPaymentInstruction();
+      return;
+    }
+    setError('');
+    setShowPinPrompt(true);
+  };
+
+  /** Memverifikasi PIN lalu membuat instruksi pembayaran Top Up. */
+  const handleConfirmPin = async (event) => {
+    event.preventDefault();
+    if (pin.length !== 6) {
+      setError('PIN harus terdiri dari 6 digit angka.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await verifyPin(pin);
+      setPinVerified(true);
+      setShowPinPrompt(false);
+      setPin('');
+      await createPaymentInstruction();
+    } catch (verificationError) {
+      setError(errMessage(verificationError));
     } finally {
       setLoading(false);
     }
@@ -187,6 +199,9 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
   const restart = () => {
     setTopup(null);
     setError('');
+    setPin('');
+    setPinVerified(skipPinConfirmation);
+    setShowPinPrompt(false);
     setStep('select');
   };
 
@@ -206,7 +221,7 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
             <div>
               <dt>Tanggal</dt>
               <dd>
-                {new Date(topup.paid_at || Date.now()).toLocaleString('id-ID', {
+                {new Date(topup.paid_at || now).toLocaleString('id-ID', {
                   day: '2-digit', month: 'short', year: 'numeric',
                   hour: '2-digit', minute: '2-digit',
                 })}
@@ -306,6 +321,17 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
         <h1>Top Up Saldo</h1>
       </header>
 
+      <section className="tu-card tu-wallet-summary" aria-label="Ringkasan saldo dompet">
+        <div>
+          <span className="tu-muted">Saldo tersedia</span>
+          <strong>{hideBalance ? 'Rp ••••••' : rupiah(wallet?.saldo_tersedia ?? Math.max(0, Number(wallet?.saldo ?? 0) - Number(wallet?.saldo_hold ?? 0)))}</strong>
+        </div>
+        <div>
+          <span className="tu-muted">Saldo tertahan</span>
+          <strong>{hideBalance ? 'Rp ••••••' : rupiah(wallet?.saldo_hold ?? 0)}</strong>
+        </div>
+      </section>
+
       <section className="tu-card">
         <h2>Nominal</h2>
         <input
@@ -335,39 +361,81 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
       </section>
 
       <section className="tu-card">
-        <h2>Pilih Metode Pembayaran</h2>
-        <ul className="tu-methods">
+        <label className="tu-label" htmlFor="tu-payment-method">Metode Pembayaran</label>
+        <select
+          id="tu-payment-method"
+          className="tu-select"
+          value={method}
+          onChange={(event) => setMethod(event.target.value)}
+          disabled={methods.length === 0}
+          required
+        >
+          <option value="" disabled>
+            {methods.length ? 'Pilih metode pembayaran' : 'Metode pembayaran belum tersedia'}
+          </option>
           {methods.map((m) => (
-            <li key={m.id}>
-              <button
-                className={`tu-method ${method === m.id ? 'is-active' : ''}`}
-                onClick={() => setMethod(m.id)}
-                aria-pressed={method === m.id}
-              >
-                <MethodLogo name={m.name} />
-                <span className="tu-method-text">
-                  <span className="tu-method-name">{m.name}</span>
-                  <span className="tu-muted">
-                    {m.description}
-                    {m.fee > 0 ? ` · Biaya layanan ${rupiah(m.fee)}` : ''}
-                  </span>
-                </span>
-                {method === m.id && <span className="tu-method-check" aria-hidden="true">✓</span>}
-              </button>
-            </li>
+            <option key={m.id} value={m.id}>
+              {m.name}{m.fee > 0 ? ` · Biaya ${rupiah(m.fee)}` : ''}
+            </option>
           ))}
-        </ul>
+        </select>
+        {method && selectedMethod?.description && (
+          <p className="tu-muted tu-method-description">
+            {selectedMethod.description}
+          </p>
+        )}
       </section>
+
+      {method && amountValid && (
+        <section className="tu-card tu-order-summary" aria-label="Ringkasan pembayaran">
+          <h2>Ringkasan Top Up</h2>
+          <div><span>Nominal Top Up</span><strong>{rupiah(amount)}</strong></div>
+          <div><span>Metode Pembayaran</span><strong>{selectedMethod?.name}</strong></div>
+          <div><span>Biaya layanan</span><strong>{rupiah(paymentFee)}</strong></div>
+          <div className="tu-order-total"><span>Total pembayaran</span><strong>{rupiah(paymentTotal)}</strong></div>
+        </section>
+      )}
 
       {error && <p className="tu-error" role="alert">{error}</p>}
 
-      <button
-        className="tu-btn"
-        disabled={!method || !amountValid || loading}
-        onClick={handleCreate}
-      >
-        {loading ? 'Memproses…' : 'Lanjut Bayar'}
-      </button>
+      {showPinPrompt ? (
+        <form className="tu-card tu-pin-confirm" onSubmit={handleConfirmPin}>
+          <h2>Konfirmasi PIN</h2>
+          <p className="tu-muted">Masukkan PIN untuk membuat instruksi pembayaran.</p>
+          <label className="tu-label" htmlFor="tu-confirm-pin">PIN Dompet</label>
+          <input
+            id="tu-confirm-pin"
+            className="tu-input"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={pin}
+            onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            autoFocus
+          />
+          <button className="tu-btn" type="submit" disabled={loading || pin.length !== 6}>
+            {loading ? 'Memeriksa PIN…' : 'Konfirmasi & Lanjut Bayar'}
+          </button>
+          <button className="tu-text-btn" type="button" onClick={() => { setShowPinPrompt(false); setPin(''); setError(''); }}>
+            Kembali ke ringkasan
+          </button>
+        </form>
+      ) : (
+        <>
+          <button
+            className="tu-btn"
+            disabled={!method || !amountValid || loading || !walletActive}
+            onClick={handleCreate}
+          >
+            {loading ? 'Memproses…' : 'Lanjut Bayar'}
+          </button>
+          <button type="button" className="tu-text-btn" onClick={onManagePin}>
+            Kelola PIN
+          </button>
+          {!walletActive && <p className="tu-error" role="alert">Dompet sedang tidak aktif. Hubungi bantuan sebelum melakukan Top Up.</p>}
+        </>
+      )}
     </div>
   );
 }

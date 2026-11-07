@@ -2062,19 +2062,20 @@
     background: rgba(15, 30, 20, 0.45);
     z-index: 50;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
+    padding: 24px 16px;
     animation: mapdashFadeUp 0.2s ease both;
 }
 
 .settings-panel {
-    width: 100%;
+    width: min(100%, 480px);
     max-width: 480px;
     background: #ffffff;
-    border-radius: 22px 22px 0 0;
-    padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18);
-    max-height: 85vh;
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+    max-height: min(85vh, 760px);
     overflow-y: auto;
     animation: settingsSlideUp 0.25s ease both;
 }
@@ -2085,11 +2086,7 @@
 }
 
 .settings-panel-handle {
-    width: 40px;
-    height: 4px;
-    border-radius: 999px;
-    background: #dfe3d2;
-    margin: 6px auto 12px;
+    display: none;
 }
 
 .settings-panel-header {
@@ -3575,19 +3572,20 @@
     background: rgba(15, 30, 20, 0.45);
     z-index: 50;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
+    padding: 24px 16px;
     animation: mapdashFadeUp 0.2s ease both;
 }
 
 .settings-panel {
-    width: 100%;
+    width: min(100%, 480px);
     max-width: 480px;
     background: #ffffff;
-    border-radius: 22px 22px 0 0;
-    padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.18);
-    max-height: 85vh;
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+    max-height: min(85vh, 760px);
     overflow-y: auto;
     animation: settingsSlideUp 0.25s ease both;
 }
@@ -3598,11 +3596,7 @@
 }
 
 .settings-panel-handle {
-    width: 40px;
-    height: 4px;
-    border-radius: 999px;
-    background: #dfe3d2;
-    margin: 6px auto 12px;
+    display: none;
 }
 
 .settings-panel-header {
@@ -4468,6 +4462,465 @@
     border-radius: 0;
 }
 
+.home-history-section > .home-section-title {
+    margin: 0 0 18px;
+    color: #1b4d2e;
+    font-size: clamp(20px, 2vw, 26px);
+}
+
+.home-history-controls {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.home-history-periods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.home-history-period {
+    min-height: 42px;
+    padding: 8px 18px;
+    border: 2px solid #ddd8be;
+    border-radius: 999px;
+    background: #fff;
+    color: #697b65;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.home-history-period.is-active {
+    border-color: #2e7d32;
+    background: #2e7d32;
+    color: #fff;
+}
+
+.home-history-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.home-history-dates label {
+    display: grid;
+    gap: 4px;
+    color: #66746b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.home-history-dates input,
+.home-history-search input {
+    box-sizing: border-box;
+    min-height: 46px;
+    border: 1px solid #dfe7e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #1b4d2e;
+    font: inherit;
+}
+
+.home-history-dates input {
+    padding: 8px 10px;
+}
+
+.home-history-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 54px;
+    padding: 0 14px;
+    border: 1px solid #dfe7e1;
+    border-radius: 10px;
+    background: #fff;
+    color: #697b65;
+}
+
+.home-history-search:focus-within {
+    border-color: #2e7d32;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.16);
+}
+
+.home-history-search input {
+    width: 100%;
+    min-height: 50px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+}
+
+.home-history-section .transaction-list {
+    overflow: hidden;
+    border: 0;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(27, 77, 46, 0.09);
+}
+
+.home-history-section .transaction-item {
+    min-height: 88px;
+    padding: 16px 18px;
+    border: 0;
+    border-bottom: 1px solid #e9ece8;
+    background: #fff;
+    box-shadow: none;
+}
+
+.home-history-section .transaction-item:last-child {
+    border-bottom: 0;
+}
+
+.home-history-section .transaction-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    color: #2e7d32;
+}
+
+.home-history-section .transaction-location {
+    font-size: 15px;
+}
+
+.home-history-section .transaction-meta {
+    color: #929995;
+    font-size: 13px;
+}
+
+.home-history-section .transaction-side strong {
+    color: #2e7d32;
+    font-size: 17px;
+}
+
+.home-history-section .transaction-side .dash-status-badge {
+    background: transparent;
+    color: #46534b;
+}
+
+.home-history-controls {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: end;
+}
+
+.home-history-filter-label {
+    grid-column: 1;
+    color: #66746b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.home-history-period-select {
+    grid-column: 2;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 36px 0 12px;
+    border: 1px solid #dfe7e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #1b4d2e;
+    font: inherit;
+    font-size: 14px;
+}
+
+.home-history-dates {
+    grid-column: 1 / -1;
+}
+
+.home-history-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+}
+
+.home-history-section,
+.home-stations-section {
+    min-width: 0;
+}
+
+.home-content {
+    box-sizing: border-box;
+    width: min(100%, 1240px);
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: 24px;
+}
+
+.home-history-section .transaction-item {
+    min-width: 0;
+}
+
+.home-history-section .transaction-main,
+.home-history-section .transaction-main > div {
+    min-width: 0;
+}
+
+.home-history-section .transaction-location,
+.home-history-section .transaction-meta {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.home-history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 14px;
+    color: #66746b;
+    font-size: 13px;
+}
+
+.home-history-pagination button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #dfe7e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #1b4d2e;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.home-history-pagination button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+@media (max-width: 900px) {
+    .home-header-top {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .home-vehicle-panel {
+        grid-column: 1;
+        grid-row: 2;
+        max-width: 520px;
+    }
+
+    .home-header-actions {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .home-content {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .home-history-controls {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+    }
+
+    .home-history-filter-label,
+    .home-history-period-select {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .home-history-search {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .home-history-section .transaction-item {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        padding: 14px;
+    }
+
+    .home-history-section .transaction-main {
+        flex: 1 1 100%;
+    }
+
+    .home-history-section .transaction-side {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding-left: 60px;
+    }
+}
+
+/* Identitas kendaraan tampil di area sapaan; kontrol tetap ringkas dan responsif. */
+.home-header-top {
+    display: grid;
+    grid-template-columns: minmax(210px, 0.8fr) minmax(280px, 1.2fr) auto;
+    align-items: center;
+    gap: 16px;
+}
+
+.home-header-summary {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.home-balance-panel {
+    width: min(100%, 660px);
+    justify-self: start;
+}
+
+.home-vehicle-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    min-width: 0;
+    width: 100%;
+    max-width: 520px;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid #dce6df;
+    border-radius: 10px;
+    background: #f8faf8;
+}
+
+.home-vehicle-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    min-width: 0;
+}
+
+.home-vehicle-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #66746b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.home-vehicle-panel-head .home-vehicle-pill-icon {
+    display: grid;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    place-items: center;
+}
+
+.home-vehicle-panel .home-vehicle-select,
+.home-vehicle-panel .home-vehicle-add-btn {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 30px 0 2px;
+    border: 0;
+    background-color: transparent;
+    color: #1b4d2e;
+    font-size: 14px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+}
+
+.home-vehicle-selection-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.home-vehicle-panel .home-vehicle-selection-row .home-vehicle-select {
+    flex: 1 1 240px;
+    width: auto;
+    max-width: 300px;
+}
+
+.home-vehicle-panel .home-vehicle-add-btn {
+    padding: 0;
+    text-align: left;
+}
+
+.home-vehicle-empty {
+    margin: 2px 0 0;
+    padding-left: 33px;
+    color: #66746b;
+    font-size: 12px;
+}
+
+.home-vehicle-panel .home-vehicle-connector {
+    flex: 0 0 auto;
+    padding-left: 0;
+    color: #66746b;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.home-vehicle-add-link {
+    flex: 0 0 auto;
+    min-height: 30px;
+    padding: 4px 7px;
+    border: 0;
+    background: transparent;
+    color: #1f6b3d;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.home-vehicle-add-link:hover {
+    text-decoration: underline;
+}
+
+.home-vehicle-add-link:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid #2e7d32;
+    outline-offset: 3px;
+}
+
+@media (max-width: 900px) {
+    .home-header-top {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .home-vehicle-panel {
+        grid-column: 1;
+        grid-row: 2;
+        max-width: 100%;
+    }
+
+    .home-header-actions {
+        grid-column: 2;
+        grid-row: 1;
+    }
+}
+
+@media (max-width: 600px) {
+    .home-header-top {
+        gap: 12px;
+    }
+
+    .home-vehicle-panel {
+        padding: 8px 10px;
+    }
+
+    .home-vehicle-panel .home-vehicle-select {
+        font-size: 13px;
+    }
+
+    .home-vehicle-selection-row {
+        gap: 8px;
+    }
+
+    .home-vehicle-panel .home-vehicle-selection-row .home-vehicle-select {
+        flex-basis: 150px;
+        max-width: none;
+    }
+
+    .home-vehicle-panel .home-vehicle-connector {
+        font-size: 10px;
+    }
+}
+
 .home-session-actions {
     flex-wrap: wrap;
 }
@@ -4551,7 +5004,23 @@
 .app-shell .home-wallet-label-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
+}
+
+.app-shell .home-wallet-held {
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--ev-border);
+    border-radius: 999px;
+    background: var(--ev-surface);
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-xs);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .app-shell .home-wallet-actions {
@@ -4587,5 +5056,194 @@
     .app-shell .home-wallet-actions {
         width: 100%;
         justify-content: flex-start;
+    }
+}
+
+/* Saldo dan pencarian station menjadi dua aksi utama dalam satu baris. */
+.home-header-summary {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+}
+
+.home-header-summary .home-balance-panel {
+    flex: 1 1 0;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    min-height: 112px;
+}
+
+.home-header-summary .home-search-card {
+    display: flex;
+    flex: 0 1 44%;
+    min-width: 0;
+    width: auto;
+    max-width: 460px;
+    justify-self: start;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.home-header-summary .home-cta-map {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 112px;
+    border-radius: 10px;
+    padding: 16px 18px;
+}
+
+.home-header-summary .home-cta-title {
+    font-size: clamp(15px, 1.5vw, 19px);
+}
+
+.home-header-summary .home-cta-sub {
+    font-size: 12px;
+}
+
+@media (max-width: 480px) {
+    .home-header-summary {
+        flex-direction: column;
+    }
+
+    .home-header-summary .home-balance-panel,
+    .home-header-summary .home-cta-map {
+        min-height: 92px;
+    }
+}
+
+.home-station-scroll .mapdash-station-mini-meta {
+    overflow-wrap: anywhere;
+}
+
+.home-session-error {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border: 1px solid #efcfca;
+    border-radius: 8px;
+    background: #fff7f5;
+    color: #8a302a;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.home-session-actions button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+/* Menyeimbangkan ukuran panel kendaraan di area identitas dashboard. */
+.home-header-top {
+    grid-template-columns: minmax(190px, 0.8fr) minmax(260px, 1fr) auto;
+}
+
+.home-header-top > .home-vehicle-panel {
+    max-width: 420px;
+}
+
+/* Menampilkan saldo tertahan sebagai rincian sekunder tepat di bawah saldo utama. */
+.app-shell .home-wallet-held {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-height: 0;
+    margin: 2px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-xs);
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: normal;
+}
+
+.app-shell .home-wallet-held strong {
+    color: var(--ev-text-muted);
+    font-size: inherit;
+    font-weight: 600;
+}
+
+/* Beri Station Terdekat porsi lebar lebih besar daripada riwayat. */
+.home-content {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    gap: 28px;
+}
+
+.home-history-section > .home-section-title,
+.home-stations-section .home-section-title {
+    font-size: clamp(19px, 2vw, 22px);
+}
+
+/* Jaga kolom transaksi cukup lebar agar nominal, tanggal, dan status tidak bertumpuk. */
+@media (max-width: 1080px) {
+    .home-content {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Area filter dan aksi tetap mudah dipindai saat lebar layar mengecil. */
+.home-history-filter-label {
+    align-self: center;
+}
+
+.home-history-period-select,
+.home-history-dates input {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.home-history-section .transaction-side {
+    flex: 0 1 auto;
+    min-width: 120px;
+}
+
+.home-station-scroll .mapdash-station-mini:focus-visible,
+.home-history-pagination button:focus-visible,
+.home-cta-map:focus-visible,
+.home-wallet-topup:focus-visible,
+.home-vehicle-add-link:focus-visible {
+    outline: 3px solid rgba(46, 125, 50, 0.35);
+    outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+    .home-history-dates {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .home-history-dates label,
+    .home-history-dates input {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .home-history-section .transaction-side {
+        min-width: 0;
+        gap: 12px;
+    }
+
+    .home-history-section .transaction-side strong {
+        overflow-wrap: anywhere;
+    }
+
+    .home-history-pagination {
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 360px) {
+    .home-history-section .transaction-side {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+        padding-left: 60px;
     }
 }

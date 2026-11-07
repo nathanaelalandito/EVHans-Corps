@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Welcome from './Welcome';
 import Registrasi from './Registrasi';
-import Login from './Login';
 import DriverDashboard from './DriverDashboard';
 import DompetDigital from './DompetDigital';
 import OperatorAdminDashboard from './OperatorAdminDashboard';
@@ -17,9 +16,11 @@ import ChargerDetail from './ChargerDetail';
 /** Menentukan layar aktif serta membagikan status autentikasi antar halaman. */
 export default function App() {
     const [user, setUser] = useState(getStoredUser);
+    const [registrationMessage, setRegistrationMessage] = useState('');
     
     // 1. STATE UNTUK MENYIMPAN DATA CHARGER YANG DIPILIH
     const [selectedCharger, setSelectedCharger] = useState(null);
+    const [resumeChargingContext, setResumeChargingContext] = useState(null);
 
     const [currentPage, setCurrentPage] = useState(() => {
         if (!getStoredToken()) return 'welcome';
@@ -55,11 +56,16 @@ export default function App() {
 
     const isStaff = ['operator', 'admin'].includes(user?.peran);
 
-    /** Membuka halaman Dompet Digital untuk akun Driver. */
-    const handleNavigateToWallet = () => setCurrentPage('wallet');
+    /** Membuka alur Top Up yang mencakup verifikasi PIN Driver. */
+    const handleNavigateToWallet = (chargingContext = null) => {
+        setResumeChargingContext(chargingContext);
+        setCurrentPage('wallet');
+    };
 
-    /** Mengembalikan Driver dari halaman dompet ke dashboard. */
-    const handleWalletBack = () => setCurrentPage('dashboard');
+    /** Mengembalikan Driver dari alur Top Up ke dashboard. */
+    const handleWalletBack = () => {
+        setCurrentPage('dashboard');
+    };
 
     /** Mengakhiri sesi API lalu mengembalikan aplikasi ke layar awal. */
     const handleLogout = async () => {
@@ -72,20 +78,21 @@ export default function App() {
         <div>
             {currentPage === 'welcome' && (
                 <Welcome
-                    onNavigateToRegister={() => setCurrentPage('register')}
+                    onNavigateToRegister={() => {
+                        setRegistrationMessage('');
+                        setCurrentPage('register');
+                    }}
                     onLoginSuccess={handleLoginSuccess}
+                    registrationMessage={registrationMessage}
                 />
             )}
             {currentPage === 'register' && (
                 <Registrasi
                     onBackToWelcome={() => setCurrentPage('welcome')}
-                    onNavigateToLogin={() => setCurrentPage('login')}
-                />
-            )}
-            {currentPage === 'login' && (
-                <Login
-                    onBackToWelcome={() => setCurrentPage('welcome')}
-                    onLoginSuccess={handleLoginSuccess}
+                    onRegistrationComplete={() => {
+                        setRegistrationMessage('Akun berhasil dibuat. Silakan masuk untuk melanjutkan.');
+                        setCurrentPage('welcome');
+                    }}
                 />
             )}
             {currentPage === 'dashboard' && (
@@ -97,12 +104,16 @@ export default function App() {
                         onLogout={handleLogout}
                         onNavigateToVehicles={() => setCurrentPage('vehicles')}
                         onNavigateToHelp={() => setCurrentPage('help')}
-                        onNavigateToWallet={handleNavigateToWallet}
+                        onNavigateToWalletTopup={handleNavigateToWallet}
+                        resumeChargingContext={resumeChargingContext}
+                        onResumeChargingHandled={() => setResumeChargingContext(null)}
                     />
                 )
             )}
             {currentPage === 'wallet' && !isStaff && (
-                <DompetDigital onBack={handleWalletBack} />
+                <DompetDigital
+                    onBack={handleWalletBack}
+                />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />

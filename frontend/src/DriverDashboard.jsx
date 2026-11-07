@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FiArrowLeft, FiArrowRight, FiBattery, FiBell, FiCalendar, FiChevronRight, FiCreditCard, FiCrosshair, FiEdit2, FiEye, FiEyeOff, FiFileText, FiHelpCircle, FiLock, FiLogOut, FiMap, FiMapPin, FiNavigation, FiPhone, FiSettings, FiTruck, FiUser, FiX, FiZap } from 'react-icons/fi';
+import { FiArrowDown, FiArrowLeft, FiArrowRight, FiBattery, FiBell, FiCalendar, FiChevronRight, FiCrosshair, FiEye, FiEyeOff, FiFileText, FiHelpCircle, FiLogOut, FiMap, FiMapPin, FiNavigation, FiPhone, FiSearch, FiSettings, FiTruck, FiUser, FiX, FiZap } from 'react-icons/fi';
 import './driverDashboard.css';
 import './driverDashboardEV.css';
-import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi, topUpWallet } from './api/wallet';
+import { getWallet } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
 import { getDrivingRoute, googleMapsDirectionsUrl, formatJarak, formatDurasi } from './api/routing';
@@ -37,7 +37,6 @@ const ACTIVE_VEHICLE_KEY = 'ev_active_vehicle';
 const FALLBACK_DRIVER_POSITION = { lat: -7.8014, lng: 110.3644 };
 const DUMMY_ACTIVE_SESSION = null;
 const CONNECTOR_FILTERS = ['Semua', 'CCS2', 'Type 2', 'CHAdeMO'];
-const TOP_UP_METHODS = ['Mandiri', 'OVO', 'BCA', 'BRI', 'BNI'];
 
 /** Menampilkan nominal sebagai rupiah dengan pemisah angka lokal. */
 function formatRupiah(value) {
@@ -111,7 +110,7 @@ function capitalize(str) {
 }
 
 /** Mengelola peta station, dompet, profil, transaksi, dan sesi aktif pengemudi. */
-export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp, onNavigateToWallet }) {
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp, onNavigateToWalletTopup, resumeChargingContext, onResumeChargingHandled }) {
     const user = {
         nama: authUser?.profile?.nama_lengkap || authUser?.email || DUMMY_USER.nama,
     };
@@ -133,15 +132,14 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [stoppingSession, setStoppingSession] = useState(false);
     const [startPortId, setStartPortId] = useState(null); // port yang dipilih dari daftar station
     const [invoice, setInvoice] = useState(null);
-    const [showTopUp, setShowTopUp] = useState(false);
-    const [topUpAmount, setTopUpAmount] = useState(100000);
-    const [topUpMethod, setTopUpMethod] = useState('Mandiri');
-    const [topUpPin, setTopUpPin] = useState('');
-    const [topUpError, setTopUpError] = useState('');
-    const [topUpSubmitting, setTopUpSubmitting] = useState(false);
     const [transactionHistory, setTransactionHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState('');
+    const [historyPeriod, setHistoryPeriod] = useState('all');
+    const [historyKeyword, setHistoryKeyword] = useState('');
+    const [historyFrom, setHistoryFrom] = useState('');
+    const [historyTo, setHistoryTo] = useState('');
+    const [historyPage, setHistoryPage] = useState(0);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
     const [connectorFilter, setConnectorFilter] = useState('Semua');
@@ -270,14 +268,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     };
 
     const [settingsScreen, setSettingsScreen] = useState('menu');
-    const hasPin = !!wallet?.pin_sudah_diset;
-    const [pinFormMode, setPinFormMode] = useState(null);
-    const [pinOldInput, setPinOldInput] = useState('');
-    const [pinNewInput, setPinNewInput] = useState('');
-    const [pinConfirmInput, setPinConfirmInput] = useState('');
-    const [pinError, setPinError] = useState('');
-    const [pinSuccess, setPinSuccess] = useState('');
-    const [pinSubmitting, setPinSubmitting] = useState(false);
     const [driverPosition, setDriverPosition] = useState(FALLBACK_DRIVER_POSITION);
     const [locationStatus, setLocationStatus] = useState('locating');
     const [view, setView] = useState('home');
@@ -396,6 +386,17 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     const selectedStation = stations.find((s) => s.id_location === selectedStationId) ?? null;
     const detailStation = stations.find((s) => s.id_location === detailStationId) ?? null;
+    /** Membuka kembali station dan port yang tertunda setelah Driver menyelesaikan Top Up. */
+    useEffect(() => {
+        if (!resumeChargingContext?.stationId || stationsLoading) return;
+        const station = stations.find((item) => String(item.id_location) === String(resumeChargingContext.stationId));
+        if (station) {
+            setSelectedStationId(station.id_location);
+            setStartPortId(resumeChargingContext.portId ?? null);
+            setShowStartCharging(true);
+        }
+        onResumeChargingHandled?.();
+    }, [resumeChargingContext, stations, stationsLoading, onResumeChargingHandled]);
     const distToSelectedM =
         selectedStation && locationStatus === 'live' ? distanceMeters(driverPosition, selectedStation) : null;
     const hasArrived = distToSelectedM != null && distToSelectedM <= ARRIVAL_RADIUS_M;
@@ -556,6 +557,27 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
           Math.round(activeSession.energi_kwh * activeSession.tarif_per_kwh + activeSession.biaya_parkir)
         : 0;
 
+    /** Menyaring transaksi berdasarkan periode, rentang tanggal, dan kata kunci. */
+    const filteredTransactionHistory = useMemo(() => {
+        const now = new Date();
+        const start = new Date(now);
+        if (historyPeriod === '7') start.setDate(now.getDate() - 7);
+        if (historyPeriod === '30') start.setDate(now.getDate() - 30);
+        return transactionHistory.filter((trx) => {
+            const date = new Date(trx.tanggal);
+            if (historyPeriod === '7' && (Number.isNaN(date.getTime()) || date < start)) return false;
+            if (historyPeriod === '30' && (Number.isNaN(date.getTime()) || date < start)) return false;
+            if (historyPeriod === 'custom') {
+                const dateKey = Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+                if (historyFrom && (!dateKey || dateKey < historyFrom)) return false;
+                if (historyTo && (!dateKey || dateKey > historyTo)) return false;
+            }
+            const searchable = `${trx.nama_lokasi ?? ''} ${trx.metode_pembayaran ?? ''} ${trx.status ?? ''} ${trx.total ?? ''}`.toLocaleLowerCase('id-ID');
+            return searchable.includes(historyKeyword.trim().toLocaleLowerCase('id-ID'));
+        });
+    }, [transactionHistory, historyPeriod, historyFrom, historyTo, historyKeyword]);
+    const visibleTransactionHistory = filteredTransactionHistory.slice(historyPage * 10, historyPage * 10 + 10);
+
     /** Mengambil riwayat transaksi untuk daftar dan panel invoice. */
     const fetchTransactionHistory = async () => {
         setHistoryLoading(true);
@@ -662,148 +684,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         }
     };
 
-    /** Membuka formulir penambahan saldo dompet. */
-    const openTopUpModal = () => {
-        setTopUpAmount(100000);
-        setTopUpMethod('Mandiri');
-        setTopUpPin('');
-        setTopUpError('');
-        setShowTopUp(true);
-    };
-
-    /** Mengirim top up dari dashboard lalu memperbarui saldo. */
-    const handleTopUpSubmit = async (e) => {
-        e.preventDefault();
-        setTopUpError('');
-
-        if (hasPin && topUpPin.length !== 6) {
-            setTopUpError('Masukkan PIN Dompet 6 digit untuk top up.');
-            return;
-        }
-
-        setTopUpSubmitting(true);
-        try {
-            await topUpWallet(Number(topUpAmount), topUpMethod, topUpPin);
-            await fetchWallet();
-            await fetchTransactionHistory();
-            setShowTopUp(false);
-        } catch (err) {
-            setTopUpError(extractErrorMessage(err, 'Top up gagal. Coba lagi.'));
-        } finally {
-            setTopUpSubmitting(false);
-        }
-    };
-
-    /** Mengosongkan field PIN dan pesan validasi pada pengelola PIN. */
-    const resetPinInputs = () => {
-        setPinOldInput('');
-        setPinNewInput('');
-        setPinConfirmInput('');
-        setPinError('');
-    };
-
-    /** Membuka pengaturan PIN dompet digital. */
-    const openPinManager = () => {
-        resetPinInputs();
-        setPinSuccess('');
-        setPinFormMode(hasPin ? null : 'create');
-        setSettingsScreen('pin');
-    };
-
-    /** Menutup pengaturan PIN dan membersihkan state formulirnya. */
-    const closePinManager = () => {
-        resetPinInputs();
-        setPinSuccess('');
-        setPinFormMode(null);
-        setSettingsScreen('menu');
-    };
-
-    /** Membatasi input kode PIN menjadi angka dengan panjang yang diizinkan. */
-    const handlePinDigitsChange = (setter) => (e) => {
-        const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
-        setter(digitsOnly);
-    };
-
-    /** Membuat PIN transaksi baru dan memperbarui status keamanan dompet. */
-    const handleCreatePin = async (e) => {
-        e.preventDefault();
-        setPinError('');
-        if (pinNewInput.length !== 6) {
-            setPinError('PIN harus terdiri dari 6 digit angka.');
-            return;
-        }
-        if (pinNewInput !== pinConfirmInput) {
-            setPinError('Konfirmasi PIN tidak sama dengan PIN baru.');
-            return;
-        }
-        setPinSubmitting(true);
-        try {
-            await createPin(pinNewInput, pinConfirmInput);
-            await fetchWallet();
-            setPinSuccess('PIN dompet berhasil dibuat.');
-            setPinFormMode(null);
-            resetPinInputs();
-        } catch (err) {
-            setPinError(extractErrorMessage(err, 'Gagal membuat PIN. Coba lagi.'));
-        } finally {
-            setPinSubmitting(false);
-        }
-    };
-
-    /** Mengganti PIN dompet setelah memasukkan PIN lama dan PIN baru. */
-    const handleChangePin = async (e) => {
-        e.preventDefault();
-        setPinError('');
-        if (pinOldInput.length !== 6) {
-            setPinError('PIN lama harus 6 digit angka.');
-            return;
-        }
-        if (pinNewInput.length !== 6) {
-            setPinError('PIN baru harus terdiri dari 6 digit angka.');
-            return;
-        }
-        if (pinNewInput === pinOldInput) {
-            setPinError('PIN baru tidak boleh sama dengan PIN lama.');
-            return;
-        }
-        if (pinNewInput !== pinConfirmInput) {
-            setPinError('Konfirmasi PIN baru tidak sama.');
-            return;
-        }
-        setPinSubmitting(true);
-        try {
-            await changePinApi(pinOldInput, pinNewInput, pinConfirmInput);
-            await fetchWallet();
-            setPinSuccess('PIN dompet berhasil diubah.');
-            setPinFormMode(null);
-            resetPinInputs();
-        } catch (err) {
-            setPinError(extractErrorMessage(err, 'Gagal mengubah PIN. Coba lagi.'));
-        } finally {
-            setPinSubmitting(false);
-        }
-    };
-
-    /** Menonaktifkan PIN setelah pengguna mengonfirmasi kredensialnya. */
-    const handleDisablePin = async (e) => {
-        e.preventDefault();
-        setPinError('');
-        if (pinOldInput.length !== 6) {
-            setPinError('Masukkan PIN saat ini (6 digit) untuk konfirmasi.');
-            return;
-        }
-        setPinSubmitting(true);
-        try {
-            await disablePinApi(pinOldInput);
-            await fetchWallet();
-            setPinFormMode('create');
-            setPinSuccess('PIN dompet dinonaktifkan.');
-            resetPinInputs();
-        } catch (err) {
-            setPinError(extractErrorMessage(err, 'Gagal menonaktifkan PIN. Coba lagi.'));
-        } finally {
-            setPinSubmitting(false);
-        }
+    /** Membuka verifikasi PIN lalu form Top Up dari alur charging. */
+    const handleTopupFromCharging = () => {
+        setShowStartCharging(false);
+        onNavigateToWalletTopup?.({
+            stationId: selectedStation?.id_location,
+            portId: startPortId,
+        });
     };
 
     /** Meminta lokasi perangkat lalu memusatkan peta ke posisi pengemudi. */
@@ -908,9 +795,11 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     };
 
     const activeVehicleConnector = activeVehicle ? konektorLabel(activeVehicle.tipe_konektor) : null;
-    const suggestedStations = activeVehicleConnector
-        ? stations.filter(s => s.tipe_konektor_list?.some(t => sameConnector(t, activeVehicle.tipe_konektor)))
-        : stations;
+    const nearbyStations = activeVehicleConnector
+        ? stations
+            .filter((station) => station.tipe_konektor_list?.some((type) => sameConnector(type, activeVehicle.tipe_konektor)))
+            .sort((first, second) => first.jarak_km - second.jarak_km)
+        : [];
     /** Meratakan port semua charger station agar dapat ditampilkan sebagai pilihan. */
     const stationPorts = (station) => (station.chargers ?? []).flatMap(charger =>
         (charger.ports ?? []).map(port => ({ ...port, kode_perangkat: charger.kode_perangkat,
@@ -938,6 +827,41 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         <div className="home-greeting-block">
                             <p className="home-greeting-text">{getGreeting()}, {firstName}</p>
                             <p className="home-greeting-sub">Siap cari charger terdekat hari ini.</p>
+                        </div>
+                        <div className="home-vehicle-panel">
+                            <div className="home-vehicle-heading-row">
+                                <div className="home-vehicle-panel-head">
+                                    <span className="home-vehicle-pill-icon"><FiZap aria-hidden="true" /></span>
+                                    <span>Kendaraan aktif</span>
+                                </div>
+                                <button type="button" className="home-vehicle-add-link" onClick={onNavigateToVehicles}>
+                                    + Tambah Kendaraan
+                                </button>
+                            </div>
+                            {vehicles.length > 0 ? (
+                                <div className="home-vehicle-selection-row">
+                                    <select
+                                        className="home-vehicle-select"
+                                        value={activeVehicleId ?? ''}
+                                        onChange={(event) => setActiveVehicleId(Number(event.target.value))}
+                                        disabled={vehiclesLoading}
+                                        aria-label="Pilih kendaraan aktif"
+                                    >
+                                        {vehicles.map((vehicle) => (
+                                            <option key={vehicle.id_vehicle} value={vehicle.id_vehicle}>
+                                                {vehicle.merek} {vehicle.model} · {vehicle.nomor_polisi}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="home-vehicle-connector">
+                                        {activeVehicleConnector ? `Konektor ${activeVehicleConnector}` : 'Konektor belum tersedia'}
+                                    </span>
+                                </div>
+                            ) : (
+                                <p className="home-vehicle-empty">
+                                    {vehiclesLoading ? 'Memuat kendaraan...' : 'Belum ada kendaraan terdaftar.'}
+                                </p>
+                            )}
                         </div>
                         <div className="home-header-actions">
                             <button
@@ -977,42 +901,30 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 <p className="home-wallet-value">
                                     {hideWalletBalance ? 'Rp ••••••' : walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
                                 </p>
+                                <p className="home-wallet-held">
+                                    <span>Saldo tertahan</span>
+                                    <strong>{hideWalletBalance ? 'Rp ••••••' : walletLoading ? '...' : formatRupiah(wallet?.saldo_hold ?? 0)}</strong>
+                                </p>
                             </div>
+                            {/* Top Up membuka verifikasi atau pembuatan PIN sebelum pembayaran. */}
                             <div className="home-wallet-actions">
-                                <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
-                                <button className="home-wallet-open" onClick={onNavigateToWallet}>Buka Dompet</button>
+                                <button className="home-wallet-topup" onClick={onNavigateToWalletTopup}>+ Top Up</button>
                             </div>
                         </div>
-
-                        <div className="home-vehicle-panel">
-                            <div className="home-vehicle-panel-head">
-                                <span className="home-vehicle-pill-icon"><FiZap aria-hidden="true" /></span>
-                                <span>Kendaraan Aktif</span>
-                            </div>
-                            {vehicles.length > 0 ? (
-                                <>
-                                    <select
-                                        className="home-vehicle-select"
-                                        value={activeVehicleId ?? ''}
-                                        onChange={(e) => setActiveVehicleId(Number(e.target.value))}
-                                        disabled={vehiclesLoading}
-                                    >
-                                        {vehicles.map((v) => (
-                                            <option key={v.id_vehicle} value={v.id_vehicle}>
-                                                {v.merek} {v.model} · {v.nomor_polisi}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <span className="home-vehicle-connector">
-                                        {activeVehicleConnector ? `Konektor ${activeVehicleConnector}` : 'Pilih kendaraan untuk mencocokkan konektor'}
+                        <section className="home-search-card">
+                            <button className="home-cta-map" onClick={() => goToMap()}>
+                                <span className="home-cta-icon"><FiMap aria-hidden="true" /></span>
+                                <span className="home-cta-text">
+                                    <span className="home-cta-title">Cari Charging Station</span>
+                                    <span className="home-cta-sub">
+                                        {activeVehicleConnector
+                                            ? `${Math.min(nearbyStations.length, 5)} terdekat · cocok untuk ${activeVehicleConnector}`
+                                            : `${filteredStations.length} station di sekitar Anda`}
                                     </span>
-                                </>
-                            ) : (
-                                <button className="home-vehicle-add-btn" onClick={onNavigateToVehicles}>
-                                    {vehiclesLoading ? 'Memuat kendaraan...' : '+ Tambah kendaraan'}
-                                </button>
-                            )}
-                        </div>
+                                </span>
+                                <span className="home-cta-arrow"><FiArrowRight aria-hidden="true" /></span>
+                            </button>
+                        </section>
                     </div>
                 </header>
 
@@ -1050,31 +962,16 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 </div>
                             </div>
                             <div className="home-session-actions">
-                                <button className="dash-btn-stop" onClick={handleStopSession}>
-                                    {activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
+                                <button className="dash-btn-stop" onClick={handleStopSession} disabled={stoppingSession}>
+                                    {stoppingSession ? 'Memproses…' : activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
                                 </button>
-                                <button className="dash-btn-issue" onClick={handleInterruptSession}>
+                                <button className="dash-btn-issue" onClick={handleInterruptSession} disabled={stoppingSession}>
                                     Laporkan Gangguan
                                 </button>
                             </div>
+                            {sessionError && <p className="home-session-error" role="alert">{sessionError}</p>}
                         </section>
                     )}
-
-                    <section className="home-search-card">
-                        <button className="home-cta-map" onClick={() => goToMap()}>
-                            <span className="home-cta-icon"><FiMap aria-hidden="true" /></span>
-                            <span className="home-cta-text">
-                                <span className="home-cta-title">Cari Charging Station</span>
-                                <span className="home-cta-sub">
-                                    {activeVehicleConnector
-                                        ? `${suggestedStations.length} station cocok untuk ${activeVehicleConnector}`
-                                        : `${filteredStations.length} station di sekitar Anda`}
-                                </span>
-                            </span>
-                            <span className="home-cta-arrow"><FiArrowRight aria-hidden="true" /></span>
-                        </button>
-
-                    </section>
 
                     {invoice && (
                         <section className="home-invoice-card">
@@ -1109,12 +1006,13 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             <div>
                                 <h2 className="home-section-title">Station sekitar</h2>
                                 <p className="home-section-caption">
-                                    {stationsLoading ? 'Mencari lokasi terdekat...' : `${filteredStations.length} station ditemukan`}
+                                    {stationsLoading
+                                        ? 'Mencari lokasi terdekat...'
+                                        : activeVehicleConnector
+                                            ? `Hingga ${Math.min(nearbyStations.length, 5)} terdekat · konektor ${activeVehicleConnector}`
+                                            : 'Pilih kendaraan untuk rekomendasi konektor'}
                                 </p>
                             </div>
-                            <button className="home-map-link" onClick={() => goToMap()}>
-                                Lihat peta <FiArrowRight aria-hidden="true" />
-                            </button>
                         </div>
                         {stationsError && (
                             <div className="home-inline-error" role="alert">
@@ -1122,12 +1020,21 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 <button className="dash-link-btn" onClick={reloadStations}>Coba lagi</button>
                             </div>
                         )}
-                        {!stationsLoading && !stationsError && filteredStations.length === 0 && (
-                            <p className="dash-empty">Belum ada station yang cocok dengan konektor pilihan.</p>
+                        {!stationsLoading && !stationsError && !activeVehicleConnector && (
+                            <div className="home-nearby-empty">
+                                <p className="dash-empty">Tambahkan kendaraan aktif untuk melihat station dengan konektor yang sesuai.</p>
+                                <button type="button" className="home-map-link" onClick={onNavigateToVehicles}>Tambah kendaraan</button>
+                            </div>
+                        )}
+                        {!stationsLoading && !stationsError && activeVehicleConnector && nearbyStations.length === 0 && (
+                            <div className="home-nearby-empty">
+                                <p className="dash-empty">Belum ada station dengan konektor {activeVehicleConnector} di sekitar Anda.</p>
+                                <button type="button" className="home-map-link" onClick={() => goToMap()}>Lihat semua di Maps</button>
+                            </div>
                         )}
 
                         <div className="mapdash-station-scroll home-station-scroll">
-                            {filteredStations.slice(0, 3).map((s) => {
+                            {nearbyStations.slice(0, 5).map((s) => {
                                 const badge = stationStatusLabel(s.status, s.charger_tersedia);
                                 return (
                                     <button
@@ -1141,7 +1048,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         </div>
                                         <p className="mapdash-station-mini-name">{s.nama_lokasi}</p>
                                         <p className="mapdash-station-mini-meta">
-                                            {(s.tipe_konektor_list ?? []).map(konektorLabel).join(' / ')} · {formatRupiah(s.tarif_per_kwh)}/kWh
+                                            {(s.tipe_konektor_list ?? []).map(konektorLabel).join(' / ')} · {s.charger_tersedia}/{s.charger_total} port tersedia · {formatRupiah(s.tarif_per_kwh)}/kWh
                                         </p>
                                     </button>
                                 );
@@ -1150,11 +1057,37 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     </section>
 
                     <section className="home-section home-history-section">
-                        <div className="home-section-title-row">
-                            <h3 className="home-section-title">Riwayat Transaksi</h3>
-                            <span className="home-section-caption">
-                                {historyLoading ? 'Memuat...' : `${transactionHistory.length} transaksi terakhir`}
-                            </span>
+                        <h2 className="home-section-title">Riwayat Transaksi</h2>
+
+                        <div className="home-history-controls" aria-label="Filter riwayat transaksi">
+                            <label className="home-history-filter-label" htmlFor="history-period">Periode</label>
+                            <select
+                                id="history-period"
+                                className="home-history-period-select"
+                                value={historyPeriod}
+                                onChange={(event) => { setHistoryPeriod(event.target.value); setHistoryPage(0); }}
+                            >
+                                <option value="all">Semua</option>
+                                <option value="7">7 hari</option>
+                                <option value="30">30 hari</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                            {historyPeriod === 'custom' && (
+                                <div className="home-history-dates">
+                                    <label>Mulai <input type="date" value={historyFrom} onChange={(event) => { setHistoryFrom(event.target.value); setHistoryPage(0); }} /></label>
+                                    <label>Sampai <input type="date" value={historyTo} onChange={(event) => { setHistoryTo(event.target.value); setHistoryPage(0); }} /></label>
+                                </div>
+                            )}
+                            <label className="home-history-search">
+                                <FiSearch aria-hidden="true" />
+                                <input
+                                    type="search"
+                                    value={historyKeyword}
+                                    onChange={(event) => { setHistoryKeyword(event.target.value); setHistoryPage(0); }}
+                                    placeholder="Cari transaksi..."
+                                    aria-label="Cari transaksi"
+                                />
+                            </label>
                         </div>
 
                         {historyError && (
@@ -1165,19 +1098,19 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         )}
 
                         <div className="transaction-list">
-                            {!historyLoading && !historyError && transactionHistory.length === 0 && (
+                            {!historyLoading && !historyError && filteredTransactionHistory.length === 0 && (
                                 <p className="dash-empty">Belum ada transaksi.</p>
                             )}
-                            {transactionHistory.map((trx) => (
+                            {visibleTransactionHistory.map((trx) => (
                                 <button
                                     className="transaction-item"
                                     key={trx.id_payment}
                                     onClick={() => handleOpenInvoice(trx.id_payment)}
                                 >
                                     <div className="transaction-main">
-                                        <span className="transaction-icon"><FiFileText aria-hidden="true" /></span>
+                                        <span className="transaction-icon"><FiArrowDown aria-hidden="true" /></span>
                                         <div>
-                                            <p className="transaction-location">{trx.nama_lokasi}</p>
+                                            <p className="transaction-location">{trx.energi_kwh == null ? 'Top Up Dompet Digital' : trx.nama_lokasi}</p>
                                             <p className="transaction-meta">
                                                 {trx.tanggal}
                                                 {trx.energi_kwh !== null ? ` · ${trx.energi_kwh} kWh` : ` · ${trx.metode_pembayaran}`}
@@ -1185,12 +1118,19 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         </div>
                                     </div>
                                     <div className="transaction-side">
-                                        <strong>{formatRupiah(trx.total)}</strong>
+                                        <strong>{trx.energi_kwh == null ? '+' : '−'} {formatRupiah(trx.total)}</strong>
                                         <span className="dash-status-badge ok">{trx.status}</span>
                                     </div>
                                 </button>
                             ))}
                         </div>
+                        {filteredTransactionHistory.length > 10 && (
+                            <div className="home-history-pagination" aria-label="Halaman riwayat transaksi">
+                                <button type="button" onClick={() => setHistoryPage((page) => Math.max(0, page - 1))} disabled={historyPage === 0}>Previous</button>
+                                <span>{historyPage + 1} / {Math.ceil(filteredTransactionHistory.length / 10)}</span>
+                                <button type="button" onClick={() => setHistoryPage((page) => Math.min(Math.ceil(filteredTransactionHistory.length / 10) - 1, page + 1))} disabled={(historyPage + 1) * 10 >= filteredTransactionHistory.length}>Next</button>
+                            </div>
+                        )}
                     </section>
 
                 </main>
@@ -1395,13 +1335,14 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 </div>
                             </div>
                             <div className="home-session-actions">
-                                <button className="dash-btn-stop" onClick={handleStopSession}>
-                                    {activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
+                                <button className="dash-btn-stop" onClick={handleStopSession} disabled={stoppingSession}>
+                                    {stoppingSession ? 'Memproses…' : activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
                                 </button>
-                                <button className="dash-btn-issue" onClick={handleInterruptSession}>
+                                <button className="dash-btn-issue" onClick={handleInterruptSession} disabled={stoppingSession}>
                                     Gangguan
                                 </button>
                             </div>
+                            {sessionError && <p className="home-session-error" role="alert">{sessionError}</p>}
                         </div>
                     ) : (
                         <>
@@ -1512,84 +1453,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     )}
                 </div>
             </div>
-
-            {showTopUp && (
-                <div className="charge-flow-overlay" onClick={() => setShowTopUp(false)}>
-                    <form className="charge-flow-panel" onSubmit={handleTopUpSubmit} onClick={(e) => e.stopPropagation()}>
-                        <div className="settings-panel-header">
-                            <span className="settings-panel-title">Top Up Dompet Digital</span>
-                            <button type="button" className="mapdash-notif-close" onClick={() => setShowTopUp(false)} aria-label="Tutup top up">
-                                <FiX aria-hidden="true" />
-                            </button>
-                        </div>
-
-                        <p className="charge-flow-note">
-                            Top up instant untuk prototype. Integrasi payment gateway bisa disambungkan pada tahap berikutnya.
-                        </p>
-
-                        <label className="settings-pin-label" htmlFor="topup-amount">Nominal Top Up</label>
-                        <input
-                            id="topup-amount"
-                            className="topup-amount-input"
-                            type="number"
-                            min="10000"
-                            step="10000"
-                            value={topUpAmount}
-                            onChange={(e) => setTopUpAmount(e.target.value)}
-                        />
-
-                        <div className="topup-quick-row">
-                            {[50000, 100000, 200000].map((amount) => (
-                                <button
-                                    key={amount}
-                                    type="button"
-                                    className={`topup-quick-btn ${Number(topUpAmount) === amount ? 'active' : ''}`}
-                                    onClick={() => setTopUpAmount(amount)}
-                                >
-                                    {formatRupiah(amount)}
-                                </button>
-                            ))}
-                        </div>
-
-                        <label className="settings-pin-label">Metode Pembayaran</label>
-                        <div className="topup-method-grid">
-                            {TOP_UP_METHODS.map((method) => (
-                                <button
-                                    key={method}
-                                    type="button"
-                                    className={`topup-method-btn ${topUpMethod === method ? 'active' : ''}`}
-                                    onClick={() => setTopUpMethod(method)}
-                                >
-                                    {method}
-                                </button>
-                            ))}
-                        </div>
-
-                        {hasPin && (
-                            <>
-                                <label className="settings-pin-label" htmlFor="topup-pin">PIN Dompet</label>
-                                <input
-                                    id="topup-pin"
-                                    className="settings-pin-input"
-                                    type="password"
-                                    inputMode="numeric"
-                                    autoComplete="off"
-                                    maxLength={6}
-                                    placeholder="••••••"
-                                    value={topUpPin}
-                                    onChange={handlePinDigitsChange(setTopUpPin)}
-                                />
-                            </>
-                        )}
-
-                        {topUpError && <p className="settings-pin-error">{topUpError}</p>}
-
-                        <button type="submit" className="settings-pin-submit" disabled={topUpSubmitting}>
-                            {topUpSubmitting ? 'Memproses...' : 'Top Up Sekarang'}
-                        </button>
-                    </form>
-                </div>
-            )}
 
             {(selectedInvoice || invoiceLoading) && (
                 <div className="charge-flow-overlay" onClick={() => setSelectedInvoice(null)}>
@@ -1926,26 +1789,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         <span className="settings-menu-label">Kendaraan Saya</span>
                                         <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
                                     </button>
-                                    <button className="settings-menu-item">
-                                        <span className="settings-menu-icon"><FiCreditCard aria-hidden="true" /></span>
-                                        <span className="settings-menu-label">Metode Pembayaran</span>
-                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
-                                    </button>
-                                    <button className="settings-menu-item" onClick={openPinManager}>
-                                        <span className="settings-menu-icon"><FiLock aria-hidden="true" /></span>
-                                        <span className="settings-menu-label">
-                                            Kelola PIN Dompet
-                                            <span className="settings-menu-sublabel">
-                                                {hasPin ? 'PIN aktif' : 'Belum diatur'}
-                                            </span>
-                                        </span>
-                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
-                                    </button>
-                                    <button className="settings-menu-item">
-                                        <span className="settings-menu-icon"><FiBell aria-hidden="true" /></span>
-                                        <span className="settings-menu-label">Notifikasi</span>
-                                        <span className="settings-menu-arrow"><FiChevronRight aria-hidden="true" /></span>
-                                    </button>
                                     <button className="settings-menu-item" onClick={onNavigateToHelp}>
                                         <span className="settings-menu-icon"><FiHelpCircle aria-hidden="true" /></span>
                                         <span className="settings-menu-label">Bantuan</span>
@@ -1961,216 +1804,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             </>
                         )}
 
-                        {/* ------------------------------------------------
-                            LAYAR KELOLA PIN DOMPET
-                           ------------------------------------------------ */}
-                        {settingsScreen === 'pin' && (
-                            <div className="settings-subscreen">
-                                <div className="settings-panel-header">
-                                    <button
-                                        className="settings-back-btn"
-                                        onClick={closePinManager}
-                                        aria-label="Kembali ke pengaturan"
-                                    >
-                                        <FiArrowLeft aria-hidden="true" />
-                                    </button>
-                                    <span className="settings-panel-title">Kelola PIN Dompet</span>
-                                    <button
-                                        className="mapdash-notif-close"
-                                        onClick={() => {
-                                            setShowSettings(false);
-                                            setSettingsScreen('menu');
-                                        }}
-                                        aria-label="Tutup pengaturan"
-                                    >
-                                        <FiX aria-hidden="true" />
-                                    </button>
-                                </div>
-
-                                {pinSuccess && <p className="settings-pin-success">✓ {pinSuccess}</p>}
-
-                                {/* Belum punya PIN, atau baru dinonaktifkan -> form buat PIN */}
-                                {(!hasPin || pinFormMode === 'create') && (
-                                    <form className="settings-pin-form" onSubmit={handleCreatePin}>
-                                        <p className="settings-pin-desc">
-                                            Buat PIN 6 digit untuk konfirmasi top up dan pembayaran dari
-                                            saldo dompet Anda.
-                                        </p>
-
-                                        <label className="settings-pin-label" htmlFor="pin-new">PIN Baru</label>
-                                        <input
-                                            id="pin-new"
-                                            className="settings-pin-input"
-                                            type="password"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            maxLength={6}
-                                            placeholder="••••••"
-                                            value={pinNewInput}
-                                            onChange={handlePinDigitsChange(setPinNewInput)}
-                                        />
-
-                                        <label className="settings-pin-label" htmlFor="pin-confirm">Konfirmasi PIN Baru</label>
-                                        <input
-                                            id="pin-confirm"
-                                            className="settings-pin-input"
-                                            type="password"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            maxLength={6}
-                                            placeholder="••••••"
-                                            value={pinConfirmInput}
-                                            onChange={handlePinDigitsChange(setPinConfirmInput)}
-                                        />
-
-                                        {pinError && <p className="settings-pin-error">{pinError}</p>}
-
-                                        <button type="submit" className="settings-pin-submit" disabled={pinSubmitting}>
-                                            {pinSubmitting ? 'Menyimpan...' : 'Simpan PIN'}
-                                        </button>
-                                    </form>
-                                )}
-
-                                {/* Sudah punya PIN & tidak sedang membuat baru -> status + aksi */}
-                                {hasPin && pinFormMode === null && (
-                                    <div className="settings-pin-status">
-                                        <div className="settings-pin-status-row">
-                                            <span className="settings-pin-status-icon"><FiLock aria-hidden="true" /></span>
-                                            <div>
-                                                <p className="settings-pin-status-title">PIN Dompet Aktif</p>
-                                                <p className="settings-pin-status-sub">•• •• ••</p>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            className="settings-menu-item"
-                                            onClick={() => {
-                                                resetPinInputs();
-                                                setPinSuccess('');
-                                                setPinFormMode('change');
-                                            }}
-                                        >
-                                            <span className="settings-menu-icon"><FiEdit2 aria-hidden="true" /></span>
-                                            <span className="settings-menu-label">Ubah PIN</span>
-                                            <span className="settings-menu-arrow">›</span>
-                                        </button>
-
-                                        <button
-                                            className="settings-pin-disable-btn"
-                                            onClick={() => {
-                                                resetPinInputs();
-                                                setPinSuccess('');
-                                                setPinFormMode('disable');
-                                            }}
-                                        >
-                                            Nonaktifkan PIN
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Konfirmasi PIN saat ini sebelum menonaktifkan */}
-                                {hasPin && pinFormMode === 'disable' && (
-                                    <form className="settings-pin-form" onSubmit={handleDisablePin}>
-                                        <p className="settings-pin-desc">
-                                            Masukkan PIN kamu saat ini untuk mengonfirmasi penonaktifan.
-                                        </p>
-
-                                        <label className="settings-pin-label" htmlFor="pin-disable">PIN Saat Ini</label>
-                                        <input
-                                            id="pin-disable"
-                                            className="settings-pin-input"
-                                            type="password"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            maxLength={6}
-                                            placeholder="••••••"
-                                            value={pinOldInput}
-                                            onChange={handlePinDigitsChange(setPinOldInput)}
-                                        />
-
-                                        {pinError && <p className="settings-pin-error">{pinError}</p>}
-
-                                        <div className="settings-pin-form-actions">
-                                            <button
-                                                type="button"
-                                                className="settings-pin-cancel"
-                                                onClick={() => {
-                                                    setPinFormMode(null);
-                                                    resetPinInputs();
-                                                }}
-                                            >
-                                                Batal
-                                            </button>
-                                            <button type="submit" className="settings-pin-submit" disabled={pinSubmitting}>
-                                                {pinSubmitting ? 'Memproses...' : 'Nonaktifkan'}
-                                            </button>
-                                        </div>
-                                    </form>
-                                )}
-
-                                {/* Sedang mengubah PIN yang sudah ada */}
-                                {hasPin && pinFormMode === 'change' && (
-                                    <form className="settings-pin-form" onSubmit={handleChangePin}>
-                                        <label className="settings-pin-label" htmlFor="pin-old">PIN Lama</label>
-                                        <input
-                                            id="pin-old"
-                                            className="settings-pin-input"
-                                            type="password"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            maxLength={6}
-                                            placeholder="••••••"
-                                            value={pinOldInput}
-                                            onChange={handlePinDigitsChange(setPinOldInput)}
-                                        />
-
-                                        <label className="settings-pin-label" htmlFor="pin-new-2">PIN Baru</label>
-                                        <input
-                                            id="pin-new-2"
-                                            className="settings-pin-input"
-                                            type="password"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            maxLength={6}
-                                            placeholder="••••••"
-                                            value={pinNewInput}
-                                            onChange={handlePinDigitsChange(setPinNewInput)}
-                                        />
-
-                                        <label className="settings-pin-label" htmlFor="pin-confirm-2">Konfirmasi PIN Baru</label>
-                                        <input
-                                            id="pin-confirm-2"
-                                            className="settings-pin-input"
-                                            type="password"
-                                            inputMode="numeric"
-                                            autoComplete="off"
-                                            maxLength={6}
-                                            placeholder="••••••"
-                                            value={pinConfirmInput}
-                                            onChange={handlePinDigitsChange(setPinConfirmInput)}
-                                        />
-
-                                        {pinError && <p className="settings-pin-error">{pinError}</p>}
-
-                                        <div className="settings-pin-form-actions">
-                                            <button
-                                                type="button"
-                                                className="settings-pin-cancel"
-                                                onClick={() => {
-                                                    setPinFormMode(null);
-                                                    resetPinInputs();
-                                                }}
-                                            >
-                                                Batal
-                                            </button>
-                                            <button type="submit" className="settings-pin-submit" disabled={pinSubmitting}>
-                                                {pinSubmitting ? 'Menyimpan...' : 'Simpan'}
-                                            </button>
-                                        </div>
-                                    </form>
-                                )}
-                            </div>
-                        )}
                                                 {/* ------------------------------------------------
                             LAYAR PROFIL DRIVER
                            ------------------------------------------------ */}
@@ -2272,10 +1905,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     initialPortId={startPortId}
                     onClose={() => { setShowStartCharging(false); setStartPortId(null); }}
                     onStarted={handleSessionStarted}
-                    onTopUp={() => {
-                        setShowStartCharging(false);
-                        openTopUpModal();
-                    }}
+                    onTopUp={handleTopupFromCharging}
                 />
             )}
 

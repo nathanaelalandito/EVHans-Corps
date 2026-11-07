@@ -805,3 +805,166 @@
         font-size: clamp(26px, 8vw, 38px);
     }
 }
+
+/* Menata seluruh fitur dompet dalam grid responsif mengikuti token EVHUB. */
+.dmp-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px;
+    width: min(100%, 1040px);
+    margin: 0 auto;
+    padding: 22px 0 calc(32px + env(safe-area-inset-bottom, 0px));
+}
+
+.dmp-content > .dmp-content-loading,
+.dmp-content > .dmp-inline-error,
+.dmp-content > .dmp-balance-card,
+.dmp-content > .dmp-actions,
+.dmp-content > .dmp-text-btn {
+    grid-column: 1 / -1;
+}
+
+.dmp-content-loading {
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-sm);
+}
+
+.dmp-inline-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid #f1cfcc;
+    border-radius: var(--ev-radius-md);
+    background: #fff8f7;
+    color: #873934;
+    font-size: var(--ev-text-sm);
+}
+
+.dmp-balance-card {
+    max-width: none;
+    margin: 0;
+    padding: 22px;
+    text-align: left;
+}
+
+.dmp-balance-head {
+    justify-content: flex-start;
+}
+
+.dmp-balance-value {
+    margin: 8px 0 14px;
+    font-size: clamp(28px, 5vw, 40px);
+}
+
+.dmp-balance-meta {
+    justify-content: flex-start;
+}
+
+.dmp-balance-breakdown {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ev-border);
+}
+
+.dmp-balance-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.dmp-balance-detail span {
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-xs);
+}
+
+.dmp-balance-detail strong {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-lg);
+    overflow-wrap: anywhere;
+}
+
+.dmp-balance-detail small {
+    color: var(--ev-text-muted);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+}
+
+.dmp-actions {
+    max-width: none;
+    margin: 0;
+    gap: 12px;
+}
+
+.dmp-actions .dmp-action {
+    min-height: 88px;
+    border: 1px solid var(--ev-border);
+    box-shadow: none;
+}
+
+.dmp-actions .dmp-action:hover:not(:disabled) {
+    border-color: var(--ev-primary);
+    background: var(--ev-primary-soft);
+    box-shadow: none;
+    transform: none;
+}
+
+.dmp-section-heading h2 {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-lg);
+    font-weight: 600;
+}
+
+.dmp-section-heading p {
+    margin-top: 3px;
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-sm);
+}
+
+.dmp-mutasi {
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+
+.dmp-content .dmp-mutasi {
+    padding: 16px;
+}
+
+.dmp-content .dmp-mutasi-header {
+    padding: 0 0 12px;
+}
+
+.dmp-content .dmp-text-btn {
+    width: fit-content;
+    justify-self: center;
+}
+
+@media (max-width: 700px) {
+    .dmp-content {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+        padding: 18px 0 28px;
+    }
+
+    .dmp-content > .dmp-mutasi {
+        grid-column: 1;
+    }
+
+    .dmp-balance-card {
+        padding: 18px;
+    }
+}
+
+@media (max-width: 380px) {
+    .dmp-balance-breakdown {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

@@ -3,6 +3,8 @@ import api from './client';
 /** Mengautentikasi pengguna, lalu menyimpan token dan data akun di browser. */
 export async function login(email, password) {
     const { data } = await api.post('/login', { email, password });
+    // Station aktif adalah konteks per sesi; jangan wariskan pilihan akun sebelumnya.
+    localStorage.removeItem('ev_active_station_id');
     // Simpan token & profil user supaya request berikutnya otomatis
     // ter-autentikasi (lihat interceptor di client.js).
     localStorage.setItem('ev_token', data.token);
@@ -23,6 +25,7 @@ export async function logout() {
     } finally {
         localStorage.removeItem('ev_token');
         localStorage.removeItem('ev_user');
+        localStorage.removeItem('ev_active_station_id');
     }
 }
 

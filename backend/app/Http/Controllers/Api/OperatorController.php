@@ -17,9 +17,50 @@ class OperatorController extends Controller
     /** Memuat lingkup station yang boleh diakses oleh akun operator. */
     private function getOperatorAssignment($user)
     {
-        return DB::table('station_operators')
+        // DNA operasional: semua data operator selalu dibatasi oleh station aktif.
+        // Jika belum dipilih, penugasan pertama menjadi default yang deterministik.
+        $stationId = request()->header('X-Station-Id');
+        $query = DB::table('station_operators')
             ->where('id_user', $user->id_user)
-            ->first();
+            ->orderBy('id_station_operator');
+
+        if ($stationId) {
+            $query->where('id_location', $stationId);
+        }
+
+        return $query->first();
+    }
+
+    /** Mengirim seluruh station yang boleh dikelola; urutan pertama menjadi default UI. */
+    public function getAssignedStations(Request $request)
+    {
+        $stations = DB::table('station_operators')
+            ->join('location', 'station_operators.id_location', '=', 'location.id_location')
+            ->where('station_operators.id_user', $request->user()->id_user)
+            ->orderBy('station_operators.id_station_operator')
+            ->select('location.id_location', 'location.nama_lokasi', 'location.alamat')
+            ->get();
+
+        return response()->json(['status' => 'success', 'data' => $stations]);
+    }
+
+    /** Membaca tarif aktif station terpilih; tarif adalah konteks station, bukan mesin. */
+    public function getActiveTarif(Request $request)
+    {
+        $assignment = $this->getOperatorAssignment($request->user());
+        if (! $assignment) return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
+        $tarif = DB::table('tarif')->where('id_location', $assignment->id_location)->latest('periode_mulai')->first();
+        return response()->json(['status' => 'success', 'data' => $tarif]);
+    }
+
+    /** Menyimpan periode tarif baru untuk station aktif setelah validasi penugasan. */
+    public function storeTarif(Request $request)
+    {
+        $assignment = $this->getOperatorAssignment($request->user());
+        if (! $assignment) return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
+        $data = $request->validate(['harga_per_kwh' => 'required|integer|min:100', 'biaya_minimum' => 'required|integer|min:0', 'biaya_parkir_pjam' => 'required|integer|min:0']);
+        $id = DB::table('tarif')->insertGetId($data + ['id_location' => $assignment->id_location, 'periode_mulai' => now(), 'periode_berakhir' => now()->addYear(), 'created_at' => now(), 'updated_at' => now()]);
+        return response()->json(['status' => 'success', 'message' => 'Tarif station aktif berhasil disimpan.', 'data' => ['id_tarif' => $id]], 201);
     }
 
     /**
@@ -31,8 +72,7 @@ class OperatorController extends Controller
     {
         $user = $request->user();
 
-        // Ambil penugasan operator (otomatis id_location = 2)
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
+        $assignment = $this->getOperatorAssignment($user);
         if (! $assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke stasiun manapun.'], 403);
         }
@@ -77,7 +117,9 @@ class OperatorController extends Controller
             foreach ($alerts as $a) {
                 $criticalAlerts[] = [
                     'id' => $a->id_log ?? $a->id,
-                    'portId' => 'charger',
+                    'idCharger' => $a->id_charger,
+                    'chargerCode' => $a->kode_perangkat,
+                    'occurredAt' => $a->waktu_terjadi ?? $a->created_at,
                     'message' => ($a->kode_perangkat ?? 'Mesin').': '.($a->desk_mslh ?? $a->deskripsi ?? 'Terdeteksi kendala operasional.'),
                 ];
             }
@@ -86,9 +128,22 @@ class OperatorController extends Controller
         // 4. SESI PENGISIAN AKTIF (PORT YANG SEDANG STATUS CHARGING)
         $chargingPorts = DB::table('ports')
             ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('charging_session', function ($join) {
+                $join->on('charging_session.id_port', '=', 'ports.id_port')
+                    ->where('charging_session.status', '=', 'Berlangsung');
+            })
+            ->leftJoin('vehicle', 'charging_session.id_vehicle', '=', 'vehicle.id_vehicle')
             ->where('charger.id_location', $idLocation)
             ->whereRaw('LOWER(ports.status_port) = ?', ['charging'])
-            ->select('ports.*', 'charger.kode_perangkat')
+            ->select(
+                'ports.*',
+                'charger.kode_perangkat',
+                'charging_session.id_session',
+                'charging_session.waktu_mulai',
+                'charging_session.total_energi_kwh',
+                'vehicle.model as vehicle_model',
+                'vehicle.nomor_polisi'
+            )
             ->get();
 
         $activeSessions = [];
@@ -101,10 +156,10 @@ class OperatorController extends Controller
                 'id' => $cp->id_port,
                 'port' => $cp->kode_perangkat.' - Port '.($cp->nomor_port ?? $cp->id_port),
                 'type' => ($cp->tipe_konektor ?? 'Konektor').' ('.$mode.')',
-                'user' => 'Pengguna Aktif',
+                'vehicle' => trim(($cp->vehicle_model ?? '').' '.($cp->nomor_polisi ?? '')) ?: 'Sesi aktif',
                 'power' => $power.' kW',
-                'duration' => 'Sedang Berjalan',
-                'energy' => '-',
+                'startedAt' => $cp->waktu_mulai,
+                'energy' => $cp->total_energi_kwh !== null ? number_format($cp->total_energi_kwh, 2, ',', '.').' kWh' : 'Belum tersedia',
             ];
         }
 
@@ -225,7 +280,11 @@ class OperatorController extends Controller
         $user = $request->user();
 
         // Ambil penugasan operator (otomatis dapat id_location = 2)
-        $assignment = DB::table('station_operators')->where('id_user', $user->id_user)->first();
+        // Detail charger mengikuti station aktif yang sama dengan dashboard dan daftar unit.
+        $assignment = $this->getOperatorAssignment($user);
+        if (! $assignment) {
+            return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
+        }
 
         // 1. Ambil data charger milik lokasi 2
         $charger = DB::table('charger')
@@ -540,12 +599,28 @@ class OperatorController extends Controller
             $query->where('charging_session.status', $request->status);
         }
 
+        // Ringkasan mengikuti rentang tanggal dan status yang sedang dipilih operator.
+        // Clone dipakai agar agregasi tidak mengubah query pagination di bawahnya.
+        $summaryQuery = clone $query;
+        $summary = [
+            'total' => (clone $summaryQuery)->count('charging_session.id_session'),
+            'ongoing' => (clone $summaryQuery)->where('charging_session.status', 'Berlangsung')->count('charging_session.id_session'),
+            'completed' => (clone $summaryQuery)->where('charging_session.status', 'Selesai')->count('charging_session.id_session'),
+            'cancelled' => (clone $summaryQuery)->whereIn('charging_session.status', ['Dibatalkan', 'Gagal'])->count('charging_session.id_session'),
+            'revenue' => (clone $summaryQuery)
+                ->where('payment.status_pembayaran', 'Sukses')
+                ->sum('payment.total_bayar'),
+        ];
+
         // Menggunakan paginate agar respons ringan
         $transactions = $query->orderBy('charging_session.created_at', 'desc')->paginate(15);
 
         return response()->json([
             'status' => 'success',
-            'data' => $transactions,
+            'data' => [
+                'transactions' => $transactions,
+                'summary' => $summary,
+            ],
         ]);
     }
 
@@ -573,6 +648,20 @@ class OperatorController extends Controller
                 'assignment' => $assignment,
             ],
         ]);
+    }
+
+    /** Mengubah data kontak operator tanpa membuka perubahan identitas, role, email, atau penugasan. */
+    public function updateProfile(Request $request)
+    {
+        $data = $request->validate([
+            'nomor_telepon' => 'required|string|max:13',
+            'alamat' => 'nullable|string|max:1000',
+        ]);
+        DB::table('user_profile')->updateOrInsert(
+            ['id_user' => $request->user()->id_user],
+            $data + ['updated_at' => now(), 'created_at' => now()]
+        );
+        return response()->json(['status' => 'success', 'message' => 'Informasi akun berhasil diperbarui.']);
     }
 
     /**

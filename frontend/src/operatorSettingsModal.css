@@ -1,0 +1,23 @@
+/* Pengaturan Operator — surface tunggal, tenang, dan mudah dipindai sesuai DNA EVHUB. */
+.os-modal-backdrop{position:fixed;inset:0;z-index:60;padding:var(--ev-space-4);display:grid;place-items:center;background:rgb(24 39 33 / 40%);backdrop-filter:blur(2px)}
+.os-modal{width:min(100%,560px);max-height:calc(100vh - 32px);overflow:auto;background:var(--ev-surface);border:1px solid var(--ev-border);border-radius:var(--ev-radius-lg);box-shadow:var(--ev-shadow-float);font-family:var(--ev-font-sans)}
+.os-modal header{padding:var(--ev-space-6);display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--ev-border);background:var(--ev-surface-subtle)}
+.os-modal header p{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ev-text-muted)}
+.os-modal header h2{margin-top:var(--ev-space-1);font:600 var(--ev-text-xl)/1.25 var(--ev-font-display);color:var(--ev-ink)}
+.os-modal header button{width:var(--ev-touch-target);height:var(--ev-touch-target);display:grid;place-items:center;border:0;border-radius:var(--ev-radius-sm);background:transparent;color:var(--ev-text);cursor:pointer}
+.os-modal header button:hover{background:var(--ev-border)}
+.os-section{padding:var(--ev-space-6);display:grid;gap:var(--ev-space-3);border-bottom:1px solid var(--ev-border)}
+.os-section h3{display:flex;align-items:center;gap:var(--ev-space-2);margin-bottom:var(--ev-space-1);font-size:var(--ev-text-base);color:var(--ev-ink)}
+.os-section h3 svg{color:var(--ev-primary)}
+.os-section>span{font-size:var(--ev-text-sm);color:var(--ev-text-muted);line-height:1.5}
+.os-account-form{gap:var(--ev-space-4)}
+.os-account-form label{display:grid;gap:var(--ev-space-2);font-size:var(--ev-text-sm);font-weight:600;color:var(--ev-text)}
+.os-account-form input{width:100%;min-height:var(--ev-touch-target);padding:0 var(--ev-space-3);border:1px solid var(--ev-border-strong);border-radius:var(--ev-radius-sm);background:var(--ev-surface);color:var(--ev-ink);font:var(--ev-text-sm) var(--ev-font-sans)}
+.os-account-form input:focus-visible,.os-preference select:focus-visible{outline:none;box-shadow:var(--ev-focus-ring);border-color:var(--ev-primary)}
+.os-account-form input[readonly]{background:var(--ev-surface-subtle);color:var(--ev-text-muted);cursor:not-allowed}
+.os-save{min-height:var(--ev-touch-target);margin-top:var(--ev-space-1);border:1px solid var(--ev-primary);border-radius:var(--ev-radius-sm);background:var(--ev-primary);color:#fff;font-size:var(--ev-text-sm);font-weight:700;cursor:pointer}
+.os-save:hover{background:var(--ev-primary-hover)}.os-save:disabled{opacity:.65;cursor:wait}
+.os-notice{padding:10px 12px;border:1px solid #bce5cf;border-radius:var(--ev-radius-sm);background:var(--ev-success-soft);color:var(--ev-success)!important;font-size:var(--ev-text-sm)!important}
+.os-section .operator-station-picker{width:100%;justify-content:flex-start}.os-section .operator-station-picker select{flex:1;max-width:none}
+.os-preference{display:flex;align-items:center;justify-content:space-between;gap:var(--ev-space-4)}.os-preference>div{display:grid;gap:var(--ev-space-1)}.os-preference h3{margin:0}.os-preference select{min-width:130px;min-height:var(--ev-touch-target);padding:0 var(--ev-space-3);border:1px solid var(--ev-border-strong);border-radius:var(--ev-radius-sm);background:var(--ev-surface);color:var(--ev-ink);font:600 var(--ev-text-sm) var(--ev-font-sans)}
+@media(max-width:600px){.os-modal header,.os-section{padding:var(--ev-space-5)}.os-preference{align-items:stretch;flex-direction:column}.os-preference select{width:100%}}

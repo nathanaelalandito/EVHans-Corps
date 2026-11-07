@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './registrasi.css';
 import { register } from './api/auth';
 
 /** Form pembuatan akun pengemudi dan data kendaraan awal. */
-export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
+export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -34,7 +34,7 @@ export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
 
         try {
             await register(formData);
-            onNavigateToLogin();
+            onRegistrationComplete();
         } catch (error) {
             console.error("DETAIL ERROR ASLI:", error); // Cek ini di F12 -> Console
         
@@ -148,10 +148,10 @@ export default function Registrasi({ onBackToWelcome, onNavigateToLogin }) {
                     </button>
                 </form>
 
-                {onNavigateToLogin && (
+                {onRegistrationComplete && (
                     <p className="subtitle" style={{ marginTop: '1rem' }}>
                         Sudah punya akun?{' '}
-                        <button type="button" onClick={onNavigateToLogin} className="btn-back" style={{ display: 'inline' }}>
+                        <button type="button" onClick={onRegistrationComplete} className="btn-back" style={{ display: 'inline' }}>
                             Masuk di sini
                         </button>
                     </p>

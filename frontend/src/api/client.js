@@ -16,6 +16,12 @@ api.interceptors.request.use((config) => {
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+    // Station aktif dikirim secara konsisten untuk seluruh modul Operator.
+    // Backend tetap memvalidasi bahwa station ini termasuk penugasan operator.
+    const activeStationId = localStorage.getItem('ev_active_station_id');
+    if (activeStationId) {
+        config.headers['X-Station-Id'] = activeStationId;
+    }
     return config;
 });
 

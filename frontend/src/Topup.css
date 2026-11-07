@@ -484,3 +484,218 @@ body {
     .tu-success,
     .tu-check { animation: none; }
 }
+
+/* Menyamakan alur top up dengan komponen dan warna Design DNA EVHUB. */
+html,
+body,
+#root,
+.tu-page {
+    background: var(--ev-bg);
+}
+
+.tu-page {
+    max-width: 760px;
+    gap: 16px;
+    color: var(--ev-text);
+    font-family: var(--ev-font-sans);
+}
+
+.tu-header {
+    align-items: center;
+    border-bottom: 1px solid var(--ev-border);
+    border-radius: 0;
+    background: var(--ev-surface);
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 18px;
+}
+
+.tu-header h1 {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+}
+
+.tu-icon-btn {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-md);
+    background: var(--ev-surface);
+    color: var(--ev-text);
+}
+
+.tu-icon-btn:hover {
+    background: var(--ev-primary-soft);
+    color: var(--ev-primary);
+}
+
+.tu-card,
+.tu-success {
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-lg);
+    background: var(--ev-surface);
+    box-shadow: var(--ev-shadow-card);
+}
+
+.tu-header + .tu-card {
+    margin-top: 0;
+}
+
+.tu-card h2,
+.tu-method-name,
+.tu-success h1,
+.tu-timer strong,
+.tu-amount strong {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+}
+
+.tu-input,
+.tu-method,
+.tu-chip {
+    border-color: var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+}
+
+.tu-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--ev-ink);
+    font-size: var(--ev-text-sm);
+    font-weight: 600;
+}
+
+.tu-select {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 12px;
+    border: 1px solid var(--ev-border);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-surface);
+    color: var(--ev-ink);
+    font: inherit;
+}
+
+.tu-select:focus {
+    border-color: var(--ev-primary);
+    outline: 3px solid color-mix(in srgb, var(--ev-primary) 18%, transparent);
+}
+
+.tu-method-description {
+    margin: 8px 0 0;
+    font-size: var(--ev-text-xs);
+}
+
+.tu-wallet-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.tu-wallet-summary > div {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.tu-wallet-summary strong {
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: clamp(15px, 4vw, 19px);
+    overflow-wrap: anywhere;
+}
+
+.tu-order-summary h2,
+.tu-pin-confirm h2 {
+    margin: 0 0 10px;
+    color: var(--ev-ink);
+    font-family: var(--ev-font-display);
+    font-size: var(--ev-text-md);
+}
+
+.tu-order-summary > div {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--ev-border);
+    color: var(--ev-text-muted);
+    font-size: var(--ev-text-sm);
+}
+
+.tu-order-summary > div strong {
+    color: var(--ev-ink);
+    text-align: right;
+}
+
+.tu-order-summary > .tu-order-total {
+    border-bottom: 0;
+    color: var(--ev-ink);
+    font-weight: 700;
+}
+
+.tu-order-summary > .tu-order-total strong {
+    color: var(--ev-primary);
+    font-size: var(--ev-text-md);
+}
+
+.tu-pin-confirm {
+    display: grid;
+    gap: 10px;
+}
+
+.tu-pin-confirm .tu-btn {
+    margin: 0;
+}
+
+.tu-text-btn {
+    min-height: 42px;
+    border: 0;
+    background: transparent;
+    color: var(--ev-primary);
+    font: inherit;
+    font-size: var(--ev-text-sm);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tu-text-btn:focus-visible {
+    border-radius: var(--ev-radius-sm);
+    outline: 3px solid color-mix(in srgb, var(--ev-primary) 24%, transparent);
+    outline-offset: 2px;
+}
+
+@media (max-width: 360px) {
+    .tu-wallet-summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.tu-input:focus,
+.tu-method.is-active {
+    border-color: var(--ev-primary);
+    background: var(--ev-primary-soft);
+}
+
+.tu-chip.is-active,
+.tu-btn {
+    border-color: var(--ev-primary);
+    border-radius: var(--ev-radius-sm);
+    background: var(--ev-primary);
+    color: #ffffff;
+}
+
+.tu-btn:hover:not(:disabled) {
+    background: var(--ev-primary-hover);
+}
+
+.tu-method:hover {
+    border-color: var(--ev-primary);
+}
+
+.tu-method-check,
+.tu-check {
+    background: var(--ev-primary);
+}
+
+.tu-success {
+    margin-top: 0;
+}

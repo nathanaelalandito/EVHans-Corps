@@ -1,567 +1,110 @@
-import React, { useState, useEffect } from 'react';
-import { 
-    FaBell, FaCog, FaTachometerAlt, FaChargingStation, FaPlug, 
-    FaFileAlt, FaUser, FaSignOutAlt, FaBolt, FaCheckCircle, 
-    FaExclamationTriangle, FaDollarSign, FaSyncAlt, FaPowerOff, FaStop, 
-    FaChartLine, FaExclamationCircle, FaTimes, FaWrench, FaReceipt, FaCheck, FaVolumeUp
-} from 'react-icons/fa';
-import axios from 'axios';
-import { getStoredToken } from './api/auth';
+import { useCallback, useEffect, useState } from 'react';
+import { FaBell, FaBolt, FaCheckCircle, FaChargingStation, FaCog, FaExclamationTriangle, FaFileAlt, FaPowerOff, FaSignOutAlt, FaStop, FaSyncAlt, FaTachometerAlt, FaWrench, FaTimes, FaArrowRight } from 'react-icons/fa';
+import api from './api/client';
+import OperatorStationPicker from './OperatorStationPicker';
+import OperatorSettingsModal from './OperatorSettingsModal';
 import './opsDashboard.css';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
-/** Memilih sapaan dashboard berdasarkan jam lokal pengguna. */
-function getGreeting() {
-    const h = new Date().getHours();
-    if (h >= 4 && h < 10) return 'Selamat pagi';
-    if (h >= 10 && h < 15) return 'Selamat siang';
-    if (h >= 15 && h < 18) return 'Selamat sore';
-    return 'Selamat malam';
+function greeting() {
+    const hour = new Date().getHours();
+    return hour < 10 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 18 ? 'Selamat sore' : 'Selamat malam';
+}
+function displayTime(value) {
+    if (!value) return 'belum disinkronkan';
+    return new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+function duration(value) {
+    if (!value) return 'Berlangsung';
+    const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+    return `${Math.floor(minutes / 60)}j ${String(minutes % 60).padStart(2, '0')}m`;
+}
+function Metric({ icon, label, value, tone, note }) {
+    return <article className="op-stat-card"><span className={`op-stat-icon ${tone}`}>{icon}</span><div><p>{label}</p><strong>{value}</strong><small>{note}</small></div></article>;
 }
 
-/** Dashboard operator untuk ringkasan station, status unit, dan gangguan. */
-export default function OperatorDashboard({ user, onLogout, setActiveMenu, onNavigateToCharger, 
-    onNavigateToPort, onNavigateToOpsReport, onNavigateToOpsProfil}) {
-    
-    const [stats, setStats] = useState({
-        activeCharging: 0,
-        activeCharge: 0,
-        errorPorts: 0,
-        totalRevenueToday: 'Rp 0'
-    });
-    
-    const [activeSessions, setActiveSessions] = useState([]);
-    const [criticalAlerts, setCriticalAlerts] = useState([]);
-    const [transactionAlerts, setTransactionAlerts] = useState([]); // Notifikasi Transaksi
+export default function OperatorDashboard({ user, onLogout, onNavigateToCharger, onNavigateToOpsReport }) {
+    const [dashboard, setDashboard] = useState({ stats: {}, criticalAlerts: [], activeSessions: [], transactionAlerts: [] });
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [refreshInterval, setRefreshInterval] = useState(30);
+    const [modal, setModal] = useState(null);
+    const [pendingAction, setPendingAction] = useState(null);
+    const [processing, setProcessing] = useState(false);
+    const [notice, setNotice] = useState('');
+    const name = user?.profile?.nama_lengkap || user?.name || user?.email || '';
+    const stats = dashboard.stats || {};
+    const usablePorts = (stats.availablePorts || 0) + (stats.activeCharging || 0);
+    const allPorts = usablePorts + (stats.errorPorts || 0);
+    const readiness = allPorts ? Math.round((usablePorts / allPorts) * 100) : 0;
 
-    // STATE UNTUK MODEL OVERLAY (POP-UP)
-    const [showNotifModal, setShowNotifModal] = useState(false);
-    const [showSettingsModal, setShowSettingsModal] = useState(false);
-    const [notifTab, setNotifTab] = useState('malfunction'); // 'malfunction' | 'transaction'
-    const [processingId, setProcessingId] = useState(null);
-
-    // State Pengaturan
-    const [soundAlert, setSoundAlert] = useState(true);
-    const [autoRefreshInterval, setAutoRefreshInterval] = useState(30);
-
-    const nameString = typeof user === 'string' 
-        ? user 
-        : (user?.profile?.nama_lengkap || user?.name || user?.email || '');
-
-    const firstName = (!nameString || nameString === 'Petugas') ? '' : nameString.split(' ')[0];
-
-    // AMBIL DATA REAL DARI DATABASE
-    /** Memuat ringkasan station dan status charger untuk dashboard. */
-    const fetchDashboardData = async () => {
-        setLoading(true);
+    const load = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
+        setError('');
         try {
-            const token = getStoredToken();
-            const res = await axios.get('http://127.0.0.1:8000/api/operator/dashboard', {
-                headers: { Authorization: `Bearer ${token}` }
+            const { data } = await api.get('/operator/dashboard');
+            setDashboard({
+                stats: data.data?.stats || {},
+                criticalAlerts: data.data?.criticalAlerts || [],
+                activeSessions: data.data?.activeSessions || [],
+                transactionAlerts: data.data?.transactionAlerts || [],
             });
-
-            if (res.data?.data) {
-                setStats(res.data.data.stats || {
-                    activeCharging: 0,
-                    availablePorts: 0,
-                    errorPorts: 0,
-                    totalRevenueToday: 'Rp 0'
-                });
-                setCriticalAlerts(res.data.data.criticalAlerts || []);
-                setActiveSessions(res.data.data.activeSessions || []);
-                setTransactionAlerts(res.data.data.transactionAlerts || [
-                    { id: 1, kode: 'TRX-8821', user: 'Driver B 1234 XYZ', desc: 'Gagal verifikasi saldo e-wallet.', time: 'Baru saja' }
-                ]);
-            }
-        } catch (error) {
-            console.error("Gagal memuat data real dashboard:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
-
-    // AKSI 1: TERIMA MALFUNGSI -> UBAH MESIN JADI MAINTENANCE
-    /** Menandai gangguan sudah ditangani dan memuat ulang ringkasan. */
-    const handleAcceptMalfunction = async (alertItem) => {
-        const idCharger = alertItem.id_charger || alertItem.id;
-        const kode = alertItem.kode_perangkat || alertItem.message?.split(':')[0] || 'Unit Mesin';
-
-        if (!window.confirm(`Konfirmasi: Terima laporan gangguan dan alihkan status ${kode} ke mode MAINTENANCE?`)) return;
-
-        setProcessingId(alertItem.id);
-        try {
-            const token = getStoredToken();
-            // Ubah status mesin menjadi Maintenance di backend
-            await axios.post(`http://127.0.0.1:8000/api/operator/charger/${idCharger}/reboot`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            alert(`Laporan diterima. Status ${kode} berhasil dialihkan ke Maintenance.`);
-            fetchDashboardData(); // Segarkan data dashboard
+            setLastUpdated(new Date());
         } catch (err) {
-            alert(`Gagal memproses penanganan: ${err.response?.data?.message || err.message}`);
-        } finally {
-            setProcessingId(null);
-        }
+            setError(err.response?.data?.message || 'Data operasional belum dapat dimuat. Periksa koneksi lalu coba lagi.');
+        } finally { if (!silent) setLoading(false); }
+    }, []);
+    useEffect(() => {
+        const timer = window.setTimeout(() => load(), 0);
+        return () => window.clearTimeout(timer);
+    }, [load]);
+    useEffect(() => {
+        const timer = window.setInterval(() => load(true), refreshInterval * 1000);
+        return () => window.clearInterval(timer);
+    }, [load, refreshInterval]);
+    useEffect(() => {
+        if (!notice) return undefined;
+        const timer = window.setTimeout(() => setNotice(''), 4000);
+        return () => window.clearTimeout(timer);
+    }, [notice]);
+
+    const runAction = async () => {
+        if (!pendingAction) return;
+        setProcessing(true);
+        try {
+            const path = pendingAction.type === 'maintenance'
+                ? `/operator/charger/${pendingAction.id}/reboot`
+                : `/operator/port/${pendingAction.id}/${pendingAction.type === 'stop' ? 'stop' : 'reboot'}`;
+            const { data } = await api.post(path);
+            setNotice(data.message || 'Perintah berhasil dikirim.');
+            setPendingAction(null);
+            await load(true);
+        } catch (err) {
+            setNotice(err.response?.data?.message || 'Perintah tidak dapat dikirim.');
+        } finally { setProcessing(false); }
     };
+    const alertCount = dashboard.criticalAlerts.length + dashboard.transactionAlerts.length;
 
-    // Remote Control Port dari Tabel
-    /** Mengirim perintah start/stop/reboot ke port charger yang dipilih. */
-    const handleRemoteAction = async (actionType, portId, portName) => {
-        if (window.confirm(`Konfirmasi: Kirim perintah ${actionType} untuk ${portName}?`)) {
-            try {
-                const token = getStoredToken();
-                const headers = { Authorization: `Bearer ${token}` };
-                
-                if (actionType === 'STOP') {
-                    await axios.post(`http://127.0.0.1:8000/api/operator/port/${portId}/stop`, {}, { headers });
-                } else if (actionType === 'REBOOT') {
-                    await axios.post(`http://127.0.0.1:8000/api/operator/port/${portId}/reboot`, {}, { headers });
-                }
-
-                alert(`Perintah ${actionType} berhasil dikirim.`);
-                fetchDashboardData();
-            } catch (err) {
-                alert(`Gagal mengeksekusi perintah: ${err.response?.data?.message || err.message}`);
-            }
-        }
-    };
-
-    const totalUnreadNotif = criticalAlerts.length + transactionAlerts.length;
-
-    return (
-        <div className="op-layout-container">
-            {/* --- HEADER --- */}
-            <header className="op-header">
-                <div className="op-header-left">
-                    <div className="op-logo-box">
-                        <img src={logoECH} alt="EV Charge Hub Logo"/>
-                    </div>
-                    <div className="op-welcome-text">
-                        <h2>{getGreeting()}, Petugas {firstName}</h2>
-                        <p>Kami siap bertugas</p>
-                    </div>
-                </div>
-
-                {/* TOMBOL NOTIFIKASI & PENGATURAN */}
-                <div className="op-header-right">
-                    {/* Buka Overlay Notifikasi */}
-                    <button 
-                        className="op-icon-btn" 
-                        title="Pemberitahuan Sistem"
-                        onClick={() => setShowNotifModal(true)}
-                    >
-                        <FaBell />
-                        {totalUnreadNotif > 0 && <span className="op-badge">{totalUnreadNotif}</span>}
-                    </button>
-
-                    {/* Buka Overlay Pengaturan */}
-                    <button 
-                        className="op-icon-btn" 
-                        title="Pengaturan Panel" 
-                        onClick={() => setShowSettingsModal(true)}
-                    >
-                        <FaCog />
-                    </button>
-                </div>
-            </header>
-
-            {/* --- BODY CONTAINER --- */}
-            <div className="op-body-wrapper">
-                
-                {/* --- SIDEBAR --- */}
-                <aside className="op-sidebar">
-                    <ul className="op-menu-list">
-                        <li className="op-menu-item active">
-                            <FaTachometerAlt className="op-menu-icon" />
-                            <span>Dashboard</span>
-                        </li>
-                        <li className="op-menu-item" onClick={onNavigateToCharger}>
-                            <FaChargingStation className="op-menu-icon" />
-                            <span>Manage Charger</span>
-                        </li>
-                        <li className="op-menu-item" onClick={onNavigateToOpsReport}>
-                            <FaFileAlt className="op-menu-icon" />
-                            <span>Transaction Report</span>
-                        </li>
-                        <li className="op-menu-item" onClick={onNavigateToOpsProfil}>
-                            <FaUser className="op-menu-icon" />
-                            <span>Profil</span>
-                        </li>
-                    </ul>
-
-                    <div className="op-sidebar-footer">
-                        <button className="op-logout-btn" onClick={onLogout}>
-                            <FaSignOutAlt /> <span>Keluar</span>
-                        </button>
-                    </div>
-                </aside>
-
-                {/* --- MAIN CONTENT --- */}
-                <main className="op-main-content">
-                    <div className="op-dashboard-container">
-                        
-                        {/* Baris Atas: Judul & Tombol Refresh */}
-                        <div className="op-dash-top-bar">
-                            <div className="op-dash-title">
-                                <h1>Dashboard Operasional SPKLU</h1>
-                                <p>Pusat kendali real-time, telemetri, dan analitik performa stasiun pengisian.</p>
-                            </div>
-                            <button className="op-refresh-btn" onClick={fetchDashboardData} disabled={loading}>
-                                <FaSyncAlt className={loading ? "fa-spin" : ""} /> {loading ? "Memuat..." : "Segarkan Data"}
-                            </button>
-                        </div>
-
-                        {/* WIDGET LIVE TICKER: Menampilkan Notifikasi Malfungsi Cepat */}
-                        {criticalAlerts.length > 0 && (
-                            <div className="op-alert-ticker">
-                                <FaExclamationCircle className="op-alert-icon-left" />
-                                <div className="op-alert-content">
-                                    <span className="op-alert-title">Peringatan Kritis Sistem Aktif:</span>
-                                    {criticalAlerts.map(alert => (
-                                        <span 
-                                            key={alert.id} 
-                                            className="op-alert-link"
-                                            onClick={() => setShowNotifModal(true)}
-                                        >
-                                            {alert.message} (Klik untuk tangani &rarr;)
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* KARTU STATISTIK RINGKAS */}
-                        <div className="op-stats-grid">
-                            <div className="op-stat-card">
-                                <div className="op-stat-icon bolt"><FaBolt /></div>
-                                <div className="op-stat-info">
-                                    <p>Sedang Charging</p>
-                                    <h3>{stats.activeCharging} Port</h3>
-                                </div>
-                            </div>
-
-                            <div className="op-stat-card">
-                                <div className="op-stat-icon check"><FaCheckCircle /></div>
-                                <div className="op-stat-info">
-                                    <p>Unit Aktif</p>
-                                    <h3>{stats.activeCharge} Unit</h3>
-                                </div>
-                            </div>
-
-                            <div className="op-stat-card">
-                                <div className="op-stat-icon warning"><FaExclamationTriangle /></div>
-                                <div className="op-stat-info">
-                                    <p>Port Bermasalah (Fault)</p>
-                                    <h3>{stats.errorPorts} Port</h3>
-                                </div>
-                            </div>
-
-                            <div className="op-stat-card">
-                                <div className="op-stat-icon money"><FaDollarSign /></div>
-                                <div className="op-stat-info">
-                                    <p>Pendapatan Hari Ini</p>
-                                    <h3>{stats.totalRevenueToday}</h3>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* GRAFIK UTILITAS & PERFORMA */}
-                        <div className="op-analytics-grid">
-                            <div className="op-table-card op-chart-box">
-                                <div className="op-chart-header">
-                                    <h3>Utilitas Jam Sibuk (Peak Hours)</h3>
-                                    <FaChartLine className="op-chart-icon-title" />
-                                </div>
-                                <p className="op-chart-desc">Estimasi kepadatan stasiun berdasarkan data operasional.</p>
-                                <div className="op-bar-chart-container">
-                                    <div className="op-bars-wrapper">
-                                        <div className="op-bar-item"><div className="op-bar bar-low" style={{ height: '50px' }}></div><span className="op-bar-label">08:00</span></div>
-                                        <div className="op-bar-item"><div className="op-bar bar-peak" style={{ height: '115px' }} title="Puncak Tertinggi"></div><span className="op-bar-label bold">12:00</span></div>
-                                        <div className="op-bar-item"><div className="op-bar bar-mid" style={{ height: '75px' }}></div><span className="op-bar-label">15:00</span></div>
-                                        <div className="op-bar-item"><div className="op-bar bar-peak" style={{ height: '125px' }} title="Puncak Tertinggi"></div><span className="op-bar-label bold">18:00</span></div>
-                                        <div className="op-bar-item"><div className="op-bar bar-low" style={{ height: '35px' }}></div><span className="op-bar-label">21:00</span></div>
-                                    </div>
-                                    <span className="op-chart-footer-note">⚡ Puncak kepadatan stasiun terjadi pada pukul 12:00 & 18:00 WIB.</span>
-                                </div>
-                            </div>
-
-                            <div className="op-table-card op-chart-box">
-                                <div className="op-chart-header">
-                                    <h3>Status Performa Port</h3>
-                                    <span className="op-success-pill">
-                                        {stats.availablePorts + stats.activeCharging > 0 
-                                            ? `${Math.round(((stats.availablePorts + stats.activeCharging) / (stats.availablePorts + stats.activeCharging + stats.errorPorts || 1)) * 100)}% Operasional`
-                                            : '100% Siap'}
-                                    </span>
-                                </div>
-                                <p className="op-chart-desc">Rasio kesiapan port nozzle pengisian hari ini.</p>
-                                <div className="op-progress-container">
-                                    <div className="op-progress-row">
-                                        <div className="op-progress-info">
-                                            <span>Siap / Digunakan</span>
-                                            <span className="text-success">{stats.availablePorts + stats.activeCharging} Port</span>
-                                        </div>
-                                        <div className="op-progress-track">
-                                            <div className="op-progress-fill success" style={{ 
-                                                width: `${Math.round(((stats.availablePorts + stats.activeCharging) / ((stats.availablePorts + stats.activeCharging + stats.errorPorts) || 1)) * 100)}%` 
-                                            }}></div>
-                                        </div>
-                                    </div>
-                                    <div className="op-progress-row">
-                                        <div className="op-progress-info">
-                                            <span>Bermasalah / Maintenance</span>
-                                            <span className="text-danger">{stats.errorPorts} Port</span>
-                                        </div>
-                                        <div className="op-progress-track">
-                                            <div className="op-progress-fill danger" style={{ 
-                                                width: `${Math.round((stats.errorPorts / ((stats.availablePorts + stats.activeCharging + stats.errorPorts) || 1)) * 100)}%` 
-                                            }}></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* TABEL SESI PENGISIAN DAYA AKTIF */}
-                        <div className="op-table-card">
-                            <h3>Sesi Pengisian Daya Aktif (Live Database)</h3>
-                            <div className="op-table-responsive">
-                                <table className="op-data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Port & Tipe</th>
-                                            <th>Pengguna / Kendaraan</th>
-                                            <th>Daya Output (kW)</th>
-                                            <th>Durasi Sesi</th>
-                                            <th>Energi Masuk</th>
-                                            <th>Aksi Cepat (Remote)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {activeSessions.length > 0 ? (
-                                            activeSessions.map((session) => (
-                                                <tr key={session.id}>
-                                                    <td>
-                                                        <strong>{session.port}</strong><br/>
-                                                        <span className="op-sub-text">{session.type}</span>
-                                                    </td>
-                                                    <td>{session.user}</td>
-                                                    <td><span className="op-power-val">{session.power}</span></td>
-                                                    <td>{session.duration}</td>
-                                                    <td>{session.energy}</td>
-                                                    <td>
-                                                        <div className="op-action-btns">
-                                                            <button 
-                                                                className="op-btn-remote stop"
-                                                                title="Remote Stop" 
-                                                                onClick={() => handleRemoteAction('STOP', session.id, session.port)}
-                                                            >
-                                                                <FaStop size={12} />
-                                                            </button>
-                                                            <button 
-                                                                className="op-btn-remote reboot"
-                                                                title="Remote Reboot Mesin" 
-                                                                onClick={() => handleRemoteAction('REBOOT', session.id, session.port)}
-                                                            >
-                                                                <FaPowerOff size={12} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="6" className="op-empty-row">
-                                                    Tidak ada sesi pengisian aktif saat ini di stasiun.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                    </div>
-                </main>
-            </div>
-
-            {/* ========================================================
-                1. OVERLAY POP-UP NOTIFIKASI (MALFUNGSI & TRANSAKSI)
-               ======================================================== */}
-            {showNotifModal && (
-                <div className="op-modal-backdrop" onClick={() => setShowNotifModal(false)}>
-                    <div className="op-modal-dialog" onClick={(e) => e.stopPropagation()}>
-                        
-                        <div className="op-modal-head">
-                            <div>
-                                <h3>Pusat Pemberitahuan Stasiun</h3>
-                                <p>Monitoring malfungsi unit charger & anomali transaksi</p>
-                            </div>
-                            <button className="op-modal-close" onClick={() => setShowNotifModal(false)}>
-                                <FaTimes />
-                            </button>
-                        </div>
-
-                        {/* 2 Tab Pemisah Notifikasi */}
-                        <div className="op-notif-tabs">
-                            <button 
-                                className={`op-tab-btn ${notifTab === 'malfunction' ? 'active' : ''}`}
-                                onClick={() => setNotifTab('malfunction')}
-                            >
-                                <FaExclamationTriangle /> Malfungsi Mesin ({criticalAlerts.length})
-                            </button>
-                            <button 
-                                className={`op-tab-btn ${notifTab === 'transaction' ? 'active' : ''}`}
-                                onClick={() => setNotifTab('transaction')}
-                            >
-                                <FaReceipt /> Gangguan Transaksi ({transactionAlerts.length})
-                            </button>
-                        </div>
-
-                        <div className="op-modal-body">
-                            {/* TAB 1: MALFUNGSI MESIN (ACTIONABLE -> BISA LANGSUNG SET MAINTENANCE) */}
-                            {notifTab === 'malfunction' && (
-                                <div className="op-notif-list">
-                                    {criticalAlerts.length > 0 ? (
-                                        criticalAlerts.map((alert) => (
-                                            <div key={alert.id} className="op-notif-card danger">
-                                                <div className="op-notif-title-line">
-                                                    <span className="op-notif-badge-danger">
-                                                        <FaWrench /> Peringatan Sistem
-                                                    </span>
-                                                    <span className="op-notif-time">Aktif Saat Ini</span>
-                                                </div>
-                                                <p className="op-notif-text">{alert.message}</p>
-
-                                                <div className="op-notif-footer-actions">
-                                                    {/* TOMBOL AKSI: MENGUBAH MESIN MENJADI MAINTENANCE */}
-                                                    <button 
-                                                        className="op-btn-action-maintenance"
-                                                        onClick={() => handleAcceptMalfunction(alert)}
-                                                        disabled={processingId === alert.id}
-                                                    >
-                                                        <FaCheck /> {processingId === alert.id ? 'Memproses...' : 'Terima & Set Maintenance'}
-                                                    </button>
-                                                    <button 
-                                                        className="op-btn-action-link"
-                                                        onClick={() => {
-                                                            setShowNotifModal(false);
-                                                            if (onNavigateToCharger) onNavigateToCharger();
-                                                        }}
-                                                    >
-                                                        Periksa di Manage Charger &rarr;
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="op-notif-empty">
-                                            <FaCheckCircle size={30} style={{ color: '#059669', marginBottom: '8px' }} />
-                                            <p>Semua unit mesin charger beroperasi normal.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* TAB 2: GANGGUAN TRANSAKSI (HANYA INFORMASI / VIEW ONLY) */}
-                            {notifTab === 'transaction' && (
-                                <div className="op-notif-list">
-                                    {transactionAlerts.length > 0 ? (
-                                        transactionAlerts.map((trx) => (
-                                            <div key={trx.id} className="op-notif-card warning">
-                                                <div className="op-notif-title-line">
-                                                    <span className="op-notif-badge-warning">
-                                                        <FaReceipt /> {trx.kode || 'TRX-ERROR'}
-                                                    </span>
-                                                    <span className="op-notif-time">{trx.time || 'Hari ini'}</span>
-                                                </div>
-                                                <p className="op-notif-text">
-                                                    <strong>{trx.user}</strong>: {trx.desc}
-                                                </p>
-                                                <span className="op-info-note">
-                                                    *Informasi saja: driver diarahkan mencoba metode bayar lain.
-                                                </span>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="op-notif-empty">
-                                            <FaCheckCircle size={30} style={{ color: '#059669', marginBottom: '8px' }} />
-                                            <p>Tidak ada gangguan transaksi yang tercatat.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ========================================================
-                2. OVERLAY POP-UP PENGATURAN PANEL OPERATOR
-               ======================================================== */}
-            {showSettingsModal && (
-                <div className="op-modal-backdrop" onClick={() => setShowSettingsModal(false)}>
-                    <div className="op-modal-dialog settings-box" onClick={(e) => e.stopPropagation()}>
-                        <div className="op-modal-head">
-                            <div>
-                                <h3>Pengaturan Panel Operator</h3>
-                                <p>Preferensi notifikasi dan telemetri stasiun</p>
-                            </div>
-                            <button className="op-modal-close" onClick={() => setShowSettingsModal(false)}>
-                                <FaTimes />
-                            </button>
-                        </div>
-
-                        <div className="op-modal-body">
-                            <div className="op-setting-item">
-                                <div>
-                                    <strong>Suara Alarm Gangguan</strong>
-                                    <p>Bunyikan alarm browser saat terdeteksi malfungsi unit mesin</p>
-                                </div>
-                                <input 
-                                    type="checkbox" 
-                                    checked={soundAlert} 
-                                    onChange={(e) => setSoundAlert(e.target.checked)} 
-                                />
-                            </div>
-
-                            <div className="op-setting-item">
-                                <div>
-                                    <strong>Auto-Refresh Data</strong>
-                                    <p>Interval sinkronisasi data telemetri otomatis</p>
-                                </div>
-                                <select 
-                                    value={autoRefreshInterval} 
-                                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
-                                >
-                                    <option value={15}>Setiap 15 Detik</option>
-                                    <option value={30}>Setiap 30 Detik</option>
-                                    <option value={60}>Setiap 1 Menit</option>
-                                </select>
-                            </div>
-
-                            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button 
-                                    className="op-btn-action-maintenance" 
-                                    style={{ background: '#1b5e20' }}
-                                    onClick={() => {
-                                        alert("Pengaturan preferensi berhasil disimpan.");
-                                        setShowSettingsModal(false);
-                                    }}
-                                >
-                                    Simpan Pengaturan
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+    return <div className="op-layout-container">
+        <header className="op-header">
+            <div className="op-header-left"><img className="op-logo" src={logoECH} alt="EV Charge Hub" /><div><p className="op-eyebrow">PANEL OPERATOR</p><h2>{greeting()}{name ? `, ${name.split(' ')[0]}` : ''}</h2></div></div>
+            <div className="op-header-right"><OperatorStationPicker onStationChange={() => load()} /><button className="op-icon-btn" aria-label="Pusat notifikasi" onClick={() => setModal('alerts')}><FaBell />{alertCount > 0 && <span className="op-badge">{alertCount}</span>}</button><button className="op-icon-btn" aria-label="Pengaturan dashboard" onClick={() => setModal('settings')}><FaCog /></button></div>
+        </header>
+        <div className="op-body-wrapper">
+            <aside className="op-sidebar"><nav><button className="op-menu-item active"><FaTachometerAlt />Dashboard</button><button className="op-menu-item" onClick={onNavigateToCharger}><FaChargingStation />Kelola charger</button><button className="op-menu-item" onClick={onNavigateToOpsReport}><FaFileAlt />Laporan transaksi</button><div className="op-sidebar-exit"><button className="op-logout-btn" onClick={onLogout}><FaSignOutAlt />Keluar</button></div></nav></aside>
+            <main className="op-main-content"><div className="op-dashboard-container">
+                <section className="op-page-head"><div><p className="op-eyebrow">RINGKASAN STASIUN</p><h1>Dashboard operasional</h1><p>Prioritaskan gangguan, pantau sesi aktif, dan tindak lanjuti unit dengan aman.</p></div><div className="op-refresh-wrap"><span>Terakhir diperbarui {displayTime(lastUpdated)}</span><button className="op-refresh-btn" onClick={() => load()} disabled={loading}><FaSyncAlt className={loading ? 'fa-spin' : ''} />{loading ? 'Memuat' : 'Segarkan'}</button></div></section>
+                {error && <section className="op-inline-state error"><FaExclamationTriangle /><div><strong>Data tidak tersinkron</strong><p>{error}</p></div><button onClick={() => load()}>Coba lagi</button></section>}
+                {notice && <div className="op-toast" role="status">{notice}</div>}
+                {dashboard.criticalAlerts.length > 0 && <section className="op-attention"><div><span className="op-attention-icon"><FaExclamationTriangle /></span><div><p className="op-eyebrow">PERLU TINDAKAN</p><strong>{dashboard.criticalAlerts.length} gangguan unit perlu ditangani</strong><p>Periksa detail gangguan sebelum mengubah status unit.</p></div></div><button onClick={() => setModal('alerts')}>Lihat gangguan <FaArrowRight /></button></section>}
+                <section className="op-stats-grid"><Metric tone="charging" icon={<FaBolt />} label="Sedang mengisi" value={`${stats.activeCharging || 0} port`} note="Sesi aktif saat ini" /><Metric tone="ready" icon={<FaCheckCircle />} label="Port siap" value={`${stats.availablePorts || 0} port`} note="Tersedia untuk driver" /><Metric tone="warning" icon={<FaExclamationTriangle />} label="Perlu perhatian" value={`${stats.errorPorts || 0} port`} note="Fault atau maintenance" /><Metric tone="revenue" icon="Rp" label="Pendapatan hari ini" value={stats.totalRevenueToday || 'Rp 0'} note="Transaksi berhasil" /></section>
+                <section className="op-content-grid"><article className="op-panel"><div className="op-panel-head"><div><h2>Kesiapan port</h2><p>Ringkasan ketersediaan perangkat saat ini.</p></div><strong className={`op-readiness ${readiness < 100 ? 'attention' : ''}`}>{readiness}% siap</strong></div><div className="op-readiness-bar"><span style={{ width: `${readiness}%` }} /></div><div className="op-health-legend"><span><i className="ready" />Tersedia <strong>{stats.availablePorts || 0}</strong></span><span><i className="charging" />Digunakan <strong>{stats.activeCharging || 0}</strong></span><span><i className="fault" />Gangguan <strong>{stats.errorPorts || 0}</strong></span></div></article><article className="op-panel"><div className="op-panel-head"><div><h2>Langkah berikutnya</h2><p>Fokus kerja operator hari ini.</p></div></div><ol className="op-next-list">{dashboard.criticalAlerts.length > 0 && <li><FaWrench />Tinjau {dashboard.criticalAlerts.length} gangguan perangkat</li>}{(stats.activeCharging || 0) > 0 && <li><FaBolt />Pantau {stats.activeCharging} sesi charging aktif</li>}{!dashboard.criticalAlerts.length && !(stats.activeCharging || 0) && <li><FaCheckCircle />Semua kondisi operasional normal</li>}</ol></article></section>
+                <section className="op-panel op-sessions-panel"><div className="op-panel-head"><div><h2>Sesi pengisian aktif</h2><p>Data diperbarui otomatis setiap {refreshInterval} detik.</p></div><span className="op-live-dot">LIVE</span></div>{loading && !lastUpdated ? <div className="op-empty-state">Memuat sesi aktif…</div> : dashboard.activeSessions.length ? <div className="op-table-responsive"><table className="op-data-table"><thead><tr><th>Port</th><th>Kendaraan</th><th>Daya</th><th>Durasi</th><th>Energi</th><th>Aksi</th></tr></thead><tbody>{dashboard.activeSessions.map(session => <tr key={session.id}><td><strong>{session.port}</strong><small>{session.type}</small></td><td>{session.vehicle}</td><td>{session.power}</td><td>{duration(session.startedAt)}</td><td>{session.energy}</td><td><div className="op-action-btns"><button className="op-secondary-action" onClick={() => setPendingAction({ type: 'reboot', id: session.id, target: session.port, label: 'Reboot port' })}><FaPowerOff />Reboot</button><button className="op-danger-action" onClick={() => setPendingAction({ type: 'stop', id: session.id, target: session.port, label: 'Hentikan sesi' })}><FaStop />Hentikan</button></div></td></tr>)}</tbody></table></div> : <div className="op-empty-state"><FaChargingStation /><strong>Belum ada sesi pengisian aktif</strong><p>Port yang sedang digunakan akan muncul di sini secara otomatis.</p></div>}</section>
+            </div></main>
         </div>
-    );
+        {modal === 'alerts' && <div className="op-modal-backdrop" onClick={() => setModal(null)}><section className="op-modal-dialog" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}><header className="op-modal-head"><div><p className="op-eyebrow">PUSAT NOTIFIKASI</p><h2>Gangguan operasional</h2></div><button className="op-modal-close" aria-label="Tutup" onClick={() => setModal(null)}><FaTimes /></button></header><div className="op-modal-body">{dashboard.criticalAlerts.length ? dashboard.criticalAlerts.map(alert => <article className="op-alert-card" key={alert.id}><span><FaWrench /></span><div><strong>{alert.chargerCode || 'Unit charger'}</strong><p>{alert.message}</p><small>{alert.occurredAt ? `Dilaporkan ${displayTime(alert.occurredAt)}` : 'Perlu verifikasi'}</small><div className="op-alert-actions"><button className="op-link-action" onClick={() => { setModal(null); onNavigateToCharger(); }}>Buka kelola charger</button><button className="op-danger-action" onClick={() => { setModal(null); setPendingAction({ type: 'maintenance', id: alert.idCharger, target: alert.chargerCode || 'unit charger', label: 'Set maintenance' }); }}>Set maintenance</button></div></div></article>) : <div className="op-empty-state"><FaCheckCircle /><strong>Tidak ada gangguan aktif</strong></div>}</div></section></div>}
+        {modal === 'settings' && <OperatorSettingsModal user={user} onClose={() => setModal(null)} onLogout={onLogout} refreshInterval={refreshInterval} onRefreshIntervalChange={setRefreshInterval} onStationChange={() => load()} />}
+        {pendingAction && <div className="op-modal-backdrop"><section className="op-confirm-dialog" role="alertdialog" aria-modal="true"><span className="op-confirm-icon"><FaExclamationTriangle /></span><h2>{pendingAction.label}?</h2><p>Anda akan menjalankan perintah pada <strong>{pendingAction.target}</strong>. Pastikan unit dan sesi yang dipilih sudah benar.</p><div><button className="op-cancel-btn" disabled={processing} onClick={() => setPendingAction(null)}>Batal</button><button className="op-danger-action" disabled={processing} onClick={runAction}>{processing ? 'Mengirim…' : 'Ya, lanjutkan'}</button></div></section></div>}
+    </div>;
 }

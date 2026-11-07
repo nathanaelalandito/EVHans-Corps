@@ -81,6 +81,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/topup/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
 });
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/operator/stations', [OperatorController::class, 'getAssignedStations']);
+    Route::get('/operator/tarif', [OperatorController::class, 'getActiveTarif']);
+    Route::post('/operator/tarif', [OperatorController::class, 'storeTarif']);
     Route::get('/operator/dashboard', [OperatorController::class, 'getDashboard']);
     Route::get('/operator/chargers', [OperatorController::class, 'getChargers']);
     Route::post('/operator/storechargers', [OperatorController::class, 'storeCharger']);
@@ -100,6 +103,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/operator/delports/{id}', [OperatorController::class, 'destroyPort']);
     Route::get('/operator/reports', [OperatorController::class, 'getOperationalReports']);
     Route::get('/operator/profile', [OperatorController::class, 'getProfile']);
+    Route::put('/operator/profile', [OperatorController::class, 'updateProfile']);
 
     Route::get('/operator/notifications', [OperatorController::class, 'getNotifications']);
     Route::post('/operator/malfunction/{idCharger}/{idLog}/accept', [OperatorController::class, 'handleMalfunctionAction']);
