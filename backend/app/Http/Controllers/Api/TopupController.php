@@ -25,6 +25,9 @@ class TopupController extends Controller
     {
         $methods = DB::table('metode_pembayaran')
             ->where('status_metode', 'aktif')
+            // "Saldo Dompet" adalah metode internal untuk pembayaran charging,
+            // bukan metode top up, jadi tidak ditampilkan di sini.
+            ->whereRaw('LOWER(TRIM(nama_metode)) <> ?', ['saldo dompet'])
             ->orderBy('id_metode')
             ->get()
             ->map(function ($m) {

@@ -1,0 +1,83 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: evcharge-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123"
+      MYSQL_DATABASE: evcharge
+    ports:
+      - "3307:3306"   # host 3307 supaya tidak bentrok dengan MySQL lokal
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p123"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      # args:
+      #   PHP_VERSION: "8.4"   # aktifkan kalau composer.json butuh PHP 8.4
+    image: evcharge-backend
+    container_name: evcharge-backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DB_HOST: db          # override 127.0.0.1 dari .env
+      DB_PORT: 3306
+      APP_URL: http://localhost:8000
+    ports:
+      - "8000:80"
+    volumes:
+      - backend_storage:/var/www/html/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "php artisan migrate --force &&
+             (php artisan storage:link || true) &&
+             exec apache2-foreground"
+    # Apache baru jalan setelah migrate sukses, jadi "healthy" = migrasi selesai
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 80) ? 0 : 1);'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  queue:
+    image: evcharge-backend
+    container_name: evcharge-queue
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+    volumes:
+      - backend_storage:/var/www/html/storage
+    depends_on:
+      backend:
+        condition: service_started
+    command: php artisan queue:work --tries=3 --timeout=90
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: evcharge-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules   # jaga node_modules dari image
+    environment:
+      CHOKIDAR_USEPOLLING: "true"   # hot reload di Windows/macOS
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  backend_storage:
