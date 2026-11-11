@@ -67,9 +67,13 @@ class ChargingSessionSettler
             $wallet->saldo_hold = max(0, (int) $wallet->saldo_hold - $hold);
             $wallet->save();
 
-            // Port kembali tersedia; kalau gagal, tandai rusak supaya operator memeriksanya.
+            // Port kembali tersedia. Untuk CHG-02 (demo), jangan tandai Out of Order
+            // agar tetap bisa dipakai; charger lain tetap ditandai rusak saat gagal.
             if ($port) {
-                $port->status_port = $finalStatus === 'Gagal' ? 'Out of Order' : Port::AVAILABLE;
+                $isChg02 = $session->charger?->kode_perangkat === 'CHG-02';
+                $port->status_port = ($finalStatus === 'Gagal' && ! $isChg02)
+                    ? 'Out of Order'
+                    : Port::AVAILABLE;
                 $port->save();
             }
 

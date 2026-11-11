@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: evhans-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: project_rpl
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: rpl
+      MYSQL_PASSWORD: rpl
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: evhans-app
+    volumes:
+      - ./backend:/var/www/html
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: project_rpl
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    command: >
+      sh -c "php -r \"copy('https://getcomposer.org/installer','composer-setup.php');\" &&
+             php composer-setup.php --install-dir=/usr/local/bin --filename=composer &&
+             rm composer-setup.php &&
+             composer install --no-interaction &&
+             php artisan migrate --force &&
+             php artisan db:seed --force &&
+             php artisan serve --host=0.0.0.0 --port=8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: evhans-frontend
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    command: >
+      sh -c "npm install &&
+             npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      - app
+
+volumes:
+  db_data:
