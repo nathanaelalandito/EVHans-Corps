@@ -530,9 +530,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         return;
                     }
                     setActiveSession(session);
-                    // Demo auto-fail khusus CHG-02: tiba-tiba gagal saat mencapai setengah target.
+                    // Demo auto-fail: CHG-01/CHG-02 tiba-tiba gagal saat mencapai setengah target.
                     if (
-                        session.kode_charger === 'CHG-02' &&
+                        (session.kode_charger === 'CHG-01' || session.kode_charger === 'CHG-02') &&
                         session.target_kwh > 0 &&
                         session.energi_kwh / session.target_kwh >= 0.5 &&
                         !autoFailTriggeredRef.current
