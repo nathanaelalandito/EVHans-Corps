@@ -11,6 +11,7 @@ use App\Models\StationOperator;
 use App\Models\Tarif;
 use App\Models\User;
 use App\Models\UserProfile;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -235,6 +236,162 @@ class OperationsController extends Controller
         return response()->json([
             'message' => $message,
             'data' => collect($this->operators())->firstWhere('id_user', $user->id_user),
+        ]);
+    }
+
+    public function updateOperatorStatus(Request $request, string $operator): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $user = User::where('id_user', $operator)->where('peran', 'operator')->firstOrFail();
+
+        $data = $request->validate([
+            'status_akun' => ['required', Rule::in(['Aktif', 'Nonaktif', 'Suspend', 'Banned'])],
+        ]);
+
+        $user->update(['status_akun' => $data['status_akun']]);
+
+        return response()->json([
+            'message' => "Status akun operator berhasil diubah menjadi {$data['status_akun']}.",
+            'data' => collect($this->operators())->firstWhere('id_user', $user->id_user),
+        ]);
+    }
+
+    public function auditLogs(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        // 1. Audit Transaksi Sesi Pengisian & Pembayaran
+        $transaksiLogs = ChargingSession::with(['charger.location', 'user.profile', 'payment'])
+            ->latest('created_at')
+            ->limit(30)
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'id' => 'TRX-' . $s->id_session,
+                    'kategori' => 'Transaksi Charging',
+                    'aktor' => $s->user?->profile?->nama_lengkap ?? $s->id_user,
+                    'stasiun' => $s->charger?->location?->nama_lokasi ?? 'Stasiun SPKLU',
+                    'detail' => "Sesi di {$s->charger?->kode_perangkat} ({$s->total_energi_kwh} kWh, status: {$s->status})",
+                    'nominal' => $s->payment?->total_bayar ?? $s->saldo_hold,
+                    'status' => $s->status,
+                    'timestamp' => $s->created_at ? $s->created_at->format('Y-m-d H:i:s') : '-',
+                ];
+            });
+
+        // 2. Audit Perubahan Tarif
+        $tarifLogs = Tarif::with('location')
+            ->latest('created_at')
+            ->limit(20)
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => 'TRF-' . $t->id_tarif,
+                    'kategori' => 'Perubahan Tarif',
+                    'aktor' => 'Admin / Operator',
+                    'stasiun' => $t->location?->nama_lokasi ?? 'Stasiun SPKLU',
+                    'detail' => "Tarif baru: Rp " . number_format($t->harga_per_kwh, 0, ',', '.') . "/kWh, Minimum: Rp " . number_format($t->biaya_minimum, 0, ',', '.') . ", Parkir: Rp " . number_format($t->biaya_parkir_pjam, 0, ',', '.') . "/jam",
+                    'nominal' => $t->harga_per_kwh,
+                    'status' => 'Berlaku',
+                    'timestamp' => $t->created_at ? $t->created_at->format('Y-m-d H:i:s') : '-',
+                ];
+            });
+
+        // 3. Audit Gangguan Perangkat (Error Log)
+        $gangguanLogs = DB::table('error_log')
+            ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('location', 'charger.id_location', '=', 'location.id_location')
+            ->leftJoin('users', 'error_log.id_user', '=', 'users.id_user')
+            ->leftJoin('user_profile', 'users.id_user', '=', 'user_profile.id_user')
+            ->select('error_log.*', 'charger.kode_perangkat', 'location.nama_lokasi', 'user_profile.nama_lengkap as nama_pelapor')
+            ->latest('error_log.created_at')
+            ->limit(20)
+            ->get()
+            ->map(function ($g) {
+                return [
+                    'id' => 'ERR-' . $g->id_log,
+                    'kategori' => 'Gangguan Perangkat',
+                    'aktor' => $g->nama_pelapor ?? 'Sistem / Sensor',
+                    'stasiun' => $g->nama_lokasi ?? 'Stasiun SPKLU',
+                    'detail' => "{$g->kode_perangkat}: {$g->jenis_error} - " . ($g->desk_mslh ?? '-'),
+                    'nominal' => 0,
+                    'status' => $g->status_tanganan,
+                    'timestamp' => Carbon::parse($g->created_at)->format('Y-m-d H:i:s'),
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'transaksi' => $transaksiLogs,
+                'tarif' => $tarifLogs,
+                'gangguan' => $gangguanLogs,
+            ]
+        ]);
+    }
+
+    public function getSystemConfig(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'arrival_radius_m' => (int) config('charging.arrival_radius_m', 200),
+                'require_arrival' => (bool) config('charging.require_arrival', true),
+                'default_battery_kwh' => (float) config('charging.default_battery_kwh', 50),
+                'simulation_speed' => (float) config('charging.simulation_speed', 60),
+                'app_name' => config('app.name', 'EVChargeHub'),
+            ]
+        ]);
+    }
+
+    public function updateSystemConfig(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $data = $request->validate([
+            'arrival_radius_m' => ['required', 'integer', 'min:10', 'max:5000'],
+            'require_arrival' => ['required', 'boolean'],
+            'default_battery_kwh' => ['required', 'numeric', 'min:10', 'max:200'],
+            'simulation_speed' => ['required', 'numeric', 'min:1', 'max:3600'],
+        ]);
+
+        config(['charging.arrival_radius_m' => $data['arrival_radius_m']]);
+        config(['charging.require_arrival' => $data['require_arrival']]);
+        config(['charging.default_battery_kwh' => $data['default_battery_kwh']]);
+        config(['charging.simulation_speed' => $data['simulation_speed']]);
+
+        $envPath = base_path('.env');
+        if (file_exists($envPath)) {
+            $env = file_get_contents($envPath);
+            if (str_contains($env, 'CHARGING_ARRIVAL_RADIUS_M=')) {
+                $env = preg_replace('/^CHARGING_ARRIVAL_RADIUS_M=.*/m', "CHARGING_ARRIVAL_RADIUS_M={$data['arrival_radius_m']}", $env);
+            } else {
+                $env .= "\nCHARGING_ARRIVAL_RADIUS_M={$data['arrival_radius_m']}";
+            }
+            if (str_contains($env, 'CHARGING_REQUIRE_ARRIVAL=')) {
+                $env = preg_replace('/^CHARGING_REQUIRE_ARRIVAL=.*/m', "CHARGING_REQUIRE_ARRIVAL=" . ($data['require_arrival'] ? 'true' : 'false'), $env);
+            } else {
+                $env .= "\nCHARGING_REQUIRE_ARRIVAL=" . ($data['require_arrival'] ? 'true' : 'false');
+            }
+            if (str_contains($env, 'CHARGING_DEFAULT_BATTERY_KWH=')) {
+                $env = preg_replace('/^CHARGING_DEFAULT_BATTERY_KWH=.*/m', "CHARGING_DEFAULT_BATTERY_KWH={$data['default_battery_kwh']}", $env);
+            } else {
+                $env .= "\nCHARGING_DEFAULT_BATTERY_KWH={$data['default_battery_kwh']}";
+            }
+            if (str_contains($env, 'CHARGING_SIMULATION_SPEED=')) {
+                $env = preg_replace('/^CHARGING_SIMULATION_SPEED=.*/m', "CHARGING_SIMULATION_SPEED={$data['simulation_speed']}", $env);
+            } else {
+                $env .= "\nCHARGING_SIMULATION_SPEED={$data['simulation_speed']}";
+            }
+            file_put_contents($envPath, $env);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Konfigurasi sistem berhasil diperbarui.',
+            'data' => $data,
         ]);
     }
 

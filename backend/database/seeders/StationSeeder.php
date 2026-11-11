@@ -33,8 +33,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 50,
                         'status_mesin' => 'Active',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 50, 'status_port' => 'Available']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 50, 'status_port' => 'Available'],
+                        ],
                     ],
                     [
                         'kode_perangkat' => 'CHG-02',
@@ -42,8 +42,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 22,
                         'status_mesin' => 'Active',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Charging']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Available'],
+                        ],
                     ],
                     [
                         'kode_perangkat' => 'CHG-03',
@@ -51,8 +51,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 50,
                         'status_mesin' => 'Active',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 50, 'status_port' => 'Available']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 50, 'status_port' => 'Available'],
+                        ],
                     ],
                     [
                         'kode_perangkat' => 'CHG-04',
@@ -60,8 +60,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 22,
                         'status_mesin' => 'Maintenance',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Out of Order']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Out of Order'],
+                        ],
                     ],
                 ],
             ],
@@ -82,8 +82,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 22,
                         'status_mesin' => 'Active',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 22, 'status_port' => 'Charging']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 22, 'status_port' => 'Charging'],
+                        ],
                     ],
                     [
                         'kode_perangkat' => 'CHG-02',
@@ -91,8 +91,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 22,
                         'status_mesin' => 'Active',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 22, 'status_port' => 'Charging']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'ccs2', 'tipe_charging' => 'DC', 'daya_maks_kw' => 22, 'status_port' => 'Charging'],
+                        ],
                     ],
                 ],
             ],
@@ -113,8 +113,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 22,
                         'status_mesin' => 'Maintenance',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Out of Order']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'type_2', 'tipe_charging' => 'AC', 'daya_maks_kw' => 22, 'status_port' => 'Out of Order'],
+                        ],
                     ],
                     [
                         'kode_perangkat' => 'CHG-02',
@@ -122,8 +122,8 @@ class StationSeeder extends Seeder
                         'kap_tot_kw' => 60,
                         'status_mesin' => 'Offline',
                         'ports' => [
-                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'chademo', 'tipe_charging' => 'DC', 'daya_maks_kw' => 60, 'status_port' => 'Out of Order']
-                        ]
+                            ['nomor_port' => 'Port 1', 'tipe_konektor' => 'chademo', 'tipe_charging' => 'DC', 'daya_maks_kw' => 60, 'status_port' => 'Out of Order'],
+                        ],
                     ],
                 ],
             ],

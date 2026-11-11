@@ -1,0 +1,32 @@
+# VCS
+.git
+.gitignore
+
+# Dependencies
+**/node_modules
+**/vendor
+**/.pnpm-store
+
+# Laravel
+backend/.env
+backend/storage/logs
+backend/storage/framework/cache
+backend/storage/framework/sessions
+backend/storage/framework/views
+backend/bootstrap/cache/*.php
+
+# Frontend build
+frontend/dist
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+# Misc
+*.log
+docker-compose.override.yml
+
+# Laravel Vite
+public/hot

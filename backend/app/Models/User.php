@@ -34,6 +34,11 @@ class User extends Authenticatable
         return $this->hasOne(UserProfile::class, 'id_user', 'id_user');
     }
 
+    public function dompet()
+    {
+        return $this->hasOne(Dompet::class, 'id_user', 'id_user');
+    }
+
     public function vehicles()
     {
         return $this->hasMany(Vehicle::class, 'id_user', 'id_user'); // sesuaikan nama model/tabel kendaraan kamu

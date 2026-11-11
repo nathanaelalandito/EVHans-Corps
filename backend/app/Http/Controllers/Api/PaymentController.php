@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ChargingSession;
 use App\Models\Payment;
+use App\Models\Port;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -94,6 +96,8 @@ class PaymentController extends Controller
             'total' => $payment->total_bayar,
             'status' => $this->paymentStatusLabel($payment->status_pembayaran),
             'status_pembayaran' => $payment->status_pembayaran,
+            'status_sesi' => $session?->status,
+            'kegagalan' => $this->presentFailure($session),
             'metode_pembayaran' => $payment->method?->nama_metode,
         ];
     }
@@ -134,7 +138,7 @@ class PaymentController extends Controller
             'kendaraan' => $session ? [
                 'nama' => "{$session->vehicle->merek} {$session->vehicle->model}",
                 'nomor_polisi' => $session->vehicle->nomor_polisi,
-                'tipe_konektor' => \App\Models\Port::CONNECTOR_LABELS[$session->vehicle->tipe_konektor] ?? $session->vehicle->tipe_konektor,
+                'tipe_konektor' => Port::CONNECTOR_LABELS[$session->vehicle->tipe_konektor] ?? $session->vehicle->tipe_konektor,
             ] : null,
             'energi_kwh' => $session ? (float) $session->total_energi_kwh : 0,
             'tarif_per_kwh' => $session?->tarif?->harga_per_kwh ?? 0,
@@ -147,6 +151,8 @@ class PaymentController extends Controller
             'metode_pembayaran' => $payment->method?->nama_metode,
             'status' => $this->paymentStatusLabel($payment->status_pembayaran),
             'status_pembayaran' => $payment->status_pembayaran,
+            'status_sesi' => $session?->status,
+            'kegagalan' => $this->presentFailure($session),
             'referensi_gateway' => $payment->referensi_gateway,
             'refund' => $payment->refund ? [
                 'nominal' => $payment->refund->nominal,
@@ -156,6 +162,22 @@ class PaymentController extends Controller
             'waktu_mulai' => $session?->waktu_mulai?->toISOString(),
             'waktu_selesai' => $session?->waktu_selesai?->toISOString(),
             'waktu_pembayaran' => $payment->waktu_pembayaran?->toISOString(),
+        ];
+    }
+
+    /** Ringkasan penyebab gangguan (null jika sesi selesai normal). */
+    private function presentFailure(?ChargingSession $session): ?array
+    {
+        if (! $session || (! $session->kegagalan_kategori && ! $session->kegagalan_catatan)) {
+            return null;
+        }
+
+        return [
+            'kategori' => $session->kegagalan_kategori,
+            'label' => ChargingSession::KATEGORI_GANGGUAN[$session->kegagalan_kategori] ?? 'Gangguan lain',
+            'sumber' => $session->kegagalan_sumber,
+            'catatan' => $session->kegagalan_catatan,
+            'deteksi_otomatis' => (bool) $session->deteksi_otomatis,
         ];
     }
 

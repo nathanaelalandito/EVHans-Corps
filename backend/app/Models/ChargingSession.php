@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Charger;
 
 class ChargingSession extends Model
 {
@@ -14,7 +13,9 @@ class ChargingSession extends Model
     public const AKTIF = ['Pending', 'Berlangsung'];
 
     protected $table = 'charging_session';
+
     protected $primaryKey = 'id_session';
+
     protected $guarded = [];
 
     protected $casts = [
@@ -27,6 +28,16 @@ class ChargingSession extends Model
         'saldo_hold' => 'integer',
         'soc_awal' => 'integer',
         'soc_akhir' => 'integer',
+        'deteksi_otomatis' => 'boolean',
+        'heartbeat_terakhir' => 'datetime',
+    ];
+
+    /** Kategori penyebab gangguan yang dilaporkan driver. */
+    public const KATEGORI_GANGGUAN = [
+        'listrik' => 'Listrik padam',
+        'perangkat' => 'Kerusakan perangkat',
+        'konektor' => 'Masalah konektor',
+        'lainnya' => 'Gangguan lain',
     ];
 
     public function user()
@@ -64,5 +75,17 @@ class ChargingSession extends Model
     public function estimasiBiaya(): int
     {
         return (int) $this->estimasi_biaya_charging + (int) $this->estimasi_biaya_parkir;
+    }
+
+    /** Apakah sesi berjalan tapi tidak ada heartbeat dalam batas waktu tertentu. */
+    public function heartbeatIsStale(int $timeoutSeconds): bool
+    {
+        if ($this->status !== 'Berlangsung') {
+            return false;
+        }
+
+        $lastBeat = $this->heartbeat_terakhir ?? $this->waktu_mulai;
+
+        return $lastBeat !== null && $lastBeat->lt(now()->subSeconds($timeoutSeconds));
     }
 }

@@ -50,14 +50,14 @@ class OperatorController extends Controller
         $activeCharging = (clone $portQuery)->whereRaw('LOWER(ports.status_port) = ?', ['charging'])->count();
         $errorPorts     = (clone $portQuery)->whereIn(DB::raw('LOWER(ports.status_port)'), ['out of order', 'maintenance'])->count();
 
-        // 2. PENDAPATAN HARI INI REAL DARI TABEL TRANSAKSI (JIKA ADA)
-        $revenueToday = 0;
-        if (Schema::hasTable('transaksi')) {
-            $revenueToday = DB::table('transaksi')
-                ->where('id_location', $idLocation)
-                ->whereDate('created_at', Carbon::today())
-                ->sum('total_biaya') ?? 0;
-        }
+        // 2. PENDAPATAN HARI INI REAL DARI TABEL PAYMENT & CHARGING_SESSION
+        $revenueToday = DB::table('payment')
+            ->join('charging_session', 'payment.id_session', '=', 'charging_session.id_session')
+            ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
+            ->where('charger.id_location', $idLocation)
+            ->where('payment.status_pembayaran', 'Sukses')
+            ->whereDate('payment.waktu_pembayaran', Carbon::today())
+            ->sum('payment.total_bayar') ?? 0;
 
         // 3. LOG PERINGATAN KRITIS REAL DARI TABEL 'error_log'
         $criticalAlerts = [];
@@ -489,8 +489,23 @@ class OperatorController extends Controller
 
         $query = DB::table('charging_session')
             ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('ports', 'charging_session.id_port', '=', 'ports.id_port')
+            ->leftJoin('users', 'charging_session.id_user', '=', 'users.id_user')
+            ->leftJoin('user_profile', 'users.id_user', '=', 'user_profile.id_user')
+            ->leftJoin('vehicle', 'charging_session.id_vehicle', '=', 'vehicle.id_vehicle')
+            ->leftJoin('payment', 'charging_session.id_session', '=', 'payment.id_session')
             ->where('charger.id_location', $assignment->id_location)
-            ->select('charging_session.*', 'charger.kode_perangkat');
+            ->select(
+                'charging_session.*',
+                'charger.kode_perangkat',
+                'ports.nomor_port',
+                'ports.tipe_konektor',
+                'user_profile.nama_lengkap as nama_user',
+                'vehicle.model as kendaraan',
+                'vehicle.nomor_polisi',
+                'payment.total_bayar',
+                'payment.status_pembayaran'
+            );
 
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $start = Carbon::parse($request->start_date)->startOfDay();
@@ -559,17 +574,26 @@ class OperatorController extends Controller
             ->orderBy('error_log.created_at', 'desc')
             ->get();
 
-        // B. Gangguan Transaksi (dari tabel transaksi yang gagal/pending timeout)
-        $transactionErrors = [];
-        if (Schema::hasTable('transaksi')) {
-            $transactionErrors = DB::table('transaksi')
-                ->where('id_location', $assignment->id_location)
-                ->whereIn('status_transaksi', ['Gagal', 'Timeout', 'Failed'])
-                ->select('id_transaksi', 'kode_transaksi', 'total_biaya', 'metode_pembayaran', 'keterangan', 'created_at')
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->get();
-        }
+        // B. Gangguan Transaksi (dari tabel charging_session yang gagal/dibatalkan atau payment gagal)
+        $transactionErrors = DB::table('charging_session')
+            ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('payment', 'charging_session.id_session', '=', 'payment.id_session')
+            ->where('charger.id_location', $assignment->id_location)
+            ->where(function ($q) {
+                $q->whereIn('charging_session.status', ['Gagal', 'Dibatalkan', 'gagal', 'dibatalkan'])
+                  ->orWhere('payment.status_pembayaran', 'Gagal');
+            })
+            ->select(
+                'charging_session.id_session as id_transaksi',
+                DB::raw("CONCAT('SES-', charging_session.id_session) as kode_transaksi"),
+                DB::raw("COALESCE(payment.total_bayar, charging_session.saldo_hold, 0) as total_biaya"),
+                DB::raw("'Dompet Digital' as metode_pembayaran"),
+                DB::raw("CONCAT('Sesi status: ', charging_session.status) as keterangan"),
+                'charging_session.created_at'
+            )
+            ->orderBy('charging_session.created_at', 'desc')
+            ->limit(10)
+            ->get();
 
         return response()->json([
             'status' => 'success',

@@ -47,6 +47,14 @@ export default function ChargerDetail({
         status_port: 'Available'
     });
 
+    // Modal Ubah Tarif Stasiun (FR26: Operator & Admin memiliki wewenang final ubah tarif)
+    const [showTarifModal, setShowTarifModal] = useState(false);
+    const [tarifForm, setTarifForm] = useState({
+        harga_per_kwh: '',
+        biaya_minimum: '',
+        biaya_parkir_pjam: '',
+    });
+
     // STATE LENGKAP UNTUK OVERLAY NOTIFIKASI & PENGATURAN
     const [showNotifModal, setShowNotifModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -178,6 +186,36 @@ export default function ChargerDetail({
             fetchDetail();
         } catch (err) {
             alert(`Gagal reboot port: ${err.response?.data?.message || err.message}`);
+        }
+    };
+
+    // Modal Ubah Tarif Stasiun (FR26)
+    const handleOpenEditTarif = () => {
+        setTarifForm({
+            harga_per_kwh: activeTarif?.harga_per_kwh || 2466,
+            biaya_minimum: activeTarif?.biaya_minimum || 15000,
+            biaya_parkir_pjam: activeTarif?.biaya_parkir_pjam || 5000,
+        });
+        setShowTarifModal(true);
+    };
+
+    const handleTarifSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const token = getStoredToken();
+            const idLoc = activeCharger.id_location;
+            await axios.post(`http://127.0.0.1:8000/api/operations/stations/${idLoc}/tarifs`, {
+                harga_per_kwh: Number(tarifForm.harga_per_kwh),
+                biaya_minimum: Number(tarifForm.biaya_minimum),
+                biaya_parkir_pjam: Number(tarifForm.biaya_parkir_pjam),
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Tarif stasiun berhasil diperbarui.');
+            setShowTarifModal(false);
+            fetchDetail();
+        } catch (err) {
+            alert(`Gagal menyimpan tarif: ${err.response?.data?.message || err.message}`);
         }
     };
 
@@ -381,8 +419,18 @@ export default function ChargerDetail({
                             </div>
 
                             {activeTarif && (
-                                <div style={{ fontSize: '0.85rem', color: '#1b5e20', background: '#f1f8f2', padding: '8px 12px', borderRadius: '6px' }}>
-                                    <FaCalendarAlt /> Periode Tarif Aktif: <strong>{formatDate(activeTarif.periode_mulai)} s/d {formatDate(activeTarif.periode_berakhir)}</strong>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#1b5e20', background: '#f1f8f2', padding: '8px 12px', borderRadius: '6px' }}>
+                                    <div>
+                                        <FaCalendarAlt /> Periode Tarif Aktif: <strong>{formatDate(activeTarif.periode_mulai)} s/d {formatDate(activeTarif.periode_berakhir)}</strong>
+                                    </div>
+                                    <button 
+                                        className="cm-btn" 
+                                        type="button"
+                                        style={{ background: '#1b5e20', color: '#fff', padding: '4px 10px', fontSize: '0.8rem', width: 'auto' }}
+                                        onClick={handleOpenEditTarif}
+                                    >
+                                        <FaEdit /> Ubah Tarif Stasiun
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -555,6 +603,59 @@ export default function ChargerDetail({
                             <div className="cm-modal-actions">
                                 <button type="button" className="cm-btn-secondary" onClick={() => setShowPortModal(false)}>Batal</button>
                                 <button type="submit" className="cm-btn-primary">{isEditingPort ? 'Simpan Perubahan' : 'Tambah Port'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL FORM UBAH TARIF STASIUN (FR26) --- */}
+            {showTarifModal && (
+                <div className="cm-modal-overlay">
+                    <div className="cm-modal-card">
+                        <div className="cm-modal-header">
+                            <h3>Ubah Tarif Stasiun SPKLU</h3>
+                            <button className="cm-close-modal" onClick={() => setShowTarifModal(false)}><FaTimes /></button>
+                        </div>
+                        <form onSubmit={handleTarifSubmit} className="cm-form">
+                            <div className="cm-form-group">
+                                <label>Tarif Daya Listrik (Rp / kWh)</label>
+                                <input 
+                                    type="number" 
+                                    value={tarifForm.harga_per_kwh} 
+                                    onChange={(e) => setTarifForm({...tarifForm, harga_per_kwh: e.target.value})} 
+                                    required 
+                                    min="100"
+                                />
+                            </div>
+                            <div className="cm-form-row">
+                                <div className="cm-form-group">
+                                    <label>Biaya Minimum (Rp)</label>
+                                    <input 
+                                        type="number" 
+                                        value={tarifForm.biaya_minimum} 
+                                        onChange={(e) => setTarifForm({...tarifForm, biaya_minimum: e.target.value})} 
+                                        required 
+                                        min="0"
+                                    />
+                                </div>
+                                <div className="cm-form-group">
+                                    <label>Tarif Parkir (Rp / jam)</label>
+                                    <input 
+                                        type="number" 
+                                        value={tarifForm.biaya_parkir_pjam} 
+                                        onChange={(e) => setTarifForm({...tarifForm, biaya_parkir_pjam: e.target.value})} 
+                                        required 
+                                        min="0"
+                                    />
+                                </div>
+                            </div>
+                            <p style={{ fontSize: '0.82rem', color: '#6b7280', margin: '4px 0 12px' }}>
+                                Sesuai PRD, operator dan admin memiliki wewenang final untuk memperbarui tarif stasiun.
+                            </p>
+                            <div className="cm-modal-actions">
+                                <button type="button" className="cm-btn-secondary" onClick={() => setShowTarifModal(false)}>Batal</button>
+                                <button type="submit" className="cm-btn-primary">Simpan Tarif Baru</button>
                             </div>
                         </form>
                     </div>

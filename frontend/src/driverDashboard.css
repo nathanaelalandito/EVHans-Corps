@@ -3952,3 +3952,339 @@
         margin-right: auto;
     }
 }
+
+.issue-note-input {
+    width: 100%;
+    border: 1.5px solid #dfe3d2;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #223423;
+    margin-bottom: 16px;
+    background: #f9faf3;
+    font-family: 'Outfit', sans-serif;
+    resize: vertical;
+}
+
+.issue-note-input:focus {
+    outline: none;
+    border-color: #2e7d32;
+    background: #ffffff;
+}
+
+.invoice-failure-box {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fbe6e6;
+    border: 1px solid #f3c7c7;
+    color: #8f2f2f;
+}
+
+.invoice-failure-box strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.invoice-failure-box p {
+    margin: 0 0 4px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.invoice-failure-box span {
+    font-size: 11.5px;
+    color: #a84a4a;
+}
+
+
+/* EV Charging Failure Modal (redesign) */
+.evfail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+    animation: evfailFadeIn 0.2s ease both;
+}
+
+.evfail-modal {
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    animation: evfailScaleIn 0.22s ease both;
+}
+
+.evfail-header {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.evfail-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #FEF3C7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.evfail-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1E293B;
+    line-height: 1.3;
+}
+
+.evfail-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1.5;
+}
+
+.evfail-subtitle--body {
+    margin-bottom: 14px;
+}
+
+.evfail-alert {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 18px;
+}
+
+.evfail-alert svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.evfail-alert strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #92400E;
+    margin-bottom: 2px;
+}
+
+.evfail-alert span {
+    display: block;
+    font-size: 12.5px;
+    color: #78350F;
+    line-height: 1.5;
+}
+
+.evfail-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 18px;
+}
+
+.evfail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.evfail-row--final {
+    padding-top: 10px;
+    border-top: 1px solid #E2E8F0;
+    margin-top: 2px;
+}
+
+.evfail-label {
+    font-size: 13px;
+    color: #64748B;
+    font-weight: 500;
+}
+
+.evfail-label--form {
+    display: block;
+    margin-bottom: 8px;
+    margin-top: 4px;
+}
+
+.evfail-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1E293B;
+}
+
+.evfail-value--final {
+    font-size: 18px;
+    color: #14532D;
+}
+
+.evfail-value--refund {
+    color: #16A34A;
+}
+
+.evfail-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.evfail-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease;
+}
+
+.evfail-btn:active {
+    transform: translateY(1px);
+}
+
+.evfail-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.evfail-btn--primary {
+    background: #16A34A;
+    color: #ffffff;
+}
+
+.evfail-btn--primary:hover {
+    background: #15803D;
+}
+
+.evfail-btn--secondary {
+    background: #F1F5F9;
+    color: #334155;
+}
+
+.evfail-btn--secondary:hover {
+    background: #E2E8F0;
+}
+
+.evfail-category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.evfail-category {
+    border: 1.5px solid #E2E8F0;
+    background: #F8FAFC;
+    color: #334155;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.evfail-category.is-active {
+    border-color: #16A34A;
+    background: #ECFDF5;
+    color: #14532D;
+    font-weight: 600;
+}
+
+.evfail-textarea {
+    width: 100%;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 12px;
+    background: #F8FAFC;
+    color: #1E293B;
+    font-family: inherit;
+    font-size: 13.5px;
+    padding: 12px;
+    resize: vertical;
+    margin-bottom: 14px;
+}
+
+.evfail-textarea:focus {
+    outline: none;
+    border-color: #16A34A;
+    background: #ffffff;
+}
+
+.evfail-error {
+    color: #DC2626;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+@keyframes evfailFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes evfailScaleIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 480px) {
+    .evfail-modal {
+        padding: 20px;
+        border-radius: 18px;
+    }
+    .evfail-actions {
+        flex-direction: column-reverse;
+    }
+    .evfail-btn {
+        width: 100%;
+    }
+    .evfail-category-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+.home-balance-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.home-balance-eye {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    background: #F8FAFC;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.home-balance-eye:hover {
+    background: #ECFDF5;
+    color: #14532D;
+}

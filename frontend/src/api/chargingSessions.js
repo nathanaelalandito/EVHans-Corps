@@ -20,6 +20,11 @@ export async function interruptChargingSession(id, payload = {}) {
     return data.data ?? data;
 }
 
+export async function reportChargingIssue(id, payload = {}) {
+    const { data } = await api.post(`/charging-sessions/${id}/report`, payload);
+    return data.data ?? data;
+}
+
 export async function getActiveChargingSession() {
     const { data } = await api.get('/charging-sessions/active');
     return data.data ?? null;
