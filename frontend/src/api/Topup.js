@@ -5,8 +5,8 @@ export const getTopupMethods = async () => {
   const res = await client.get('/topup/methods');
   return res.data.data;
 };
-export const createTopup = async ({ method, amount }) => {
-  const res = await client.post('/topup', { method, amount });
+export const createTopup = async ({ method, amount, pin }) => {
+  const res = await client.post('/topup', { method, amount, pin });
   return res.data.data;
 };
 export const getTopup = async (reference) => {

@@ -9,7 +9,6 @@ import {
     createPin,
     changePin as changePinApi,
     disablePin as disablePinApi,
-    verifyPin,
     resetPin,
 } from './api/wallet';
 
@@ -52,24 +51,20 @@ function statusLabel(status) {
 }
 
 export default function DompetDigital({ onBack }) {
-    // Inisialisasi langsung dari cache modul supaya layar PIN/buat-PIN
-    // tampil seketika; data fresh tetap di-refresh di latar belakang.
-    const [status, setStatus] = useState(() => {
-        const w = getCachedWallet();
-        if (!w) return 'loading'; // cache kosong: tetap tunjukkan loading dulu
-        return w.pin_sudah_diset ? 'unlock' : 'createPin';
-    });
+    // Tanpa gate PIN: saldo + riwayat langsung tampil saat halaman dibuka.
+    // PIN tetap dipakai backend untuk konfirmasi charging (lihat
+    // ChargingSessionController), bukan untuk sekadar melihat dompet.
+    const [status, setStatus] = useState('wallet'); // 'wallet' | 'managePin' | 'topup'
     const [wallet, setWallet] = useState(() => getCachedWallet() || null);
     const [transactions, setTransactions] = useState(() => getCachedTransactions() || []);
 
-    const [pinInput, setPinInput] = useState('');
     const [pinSubmitting, setPinSubmitting] = useState(false);
     const [pinError, setPinError] = useState('');
 
     const [pinNewInput, setPinNewInput] = useState('');
     const [pinConfirmInput, setPinConfirmInput] = useState('');
     const [pinOldInput, setPinOldInput] = useState('');
-    const [pinManagerMode, setPinManagerMode] = useState(null); // null | change | disable | reset
+    const [pinManagerMode, setPinManagerMode] = useState(null); // null | create | change | disable | reset
     const [passwordInput, setPasswordInput] = useState('');
 
     // Sembunyikan/lihat saldo (ikut pengaturan di kartu saldo beranda).
@@ -91,18 +86,11 @@ export default function DompetDigital({ onBack }) {
 
     useEffect(() => {
         let cancelled = false;
-        getWallet()
-            .then((data) => {
+        Promise.all([getWallet(), getTransactions()])
+            .then(([w, trx]) => {
                 if (cancelled) return;
-                setWallet((prev) => ({ ...(prev || {}), ...data }));
-                // Jangan menimpa status 'wallet'/'managePin' bila user sudah
-                // berada di dalam dompet saat refresh selesai.
-                setStatus((current) => {
-                    if (current === 'loading' || current === 'unlock' || current === 'createPin') {
-                        return data.pin_sudah_diset ? 'unlock' : 'createPin';
-                    }
-                    return current;
-                });
+                setWallet(w);
+                setTransactions(trx.transactions || []);
             })
             .catch(() => onBack());
         return () => {
@@ -130,35 +118,6 @@ export default function DompetDigital({ onBack }) {
         setStatus('wallet');
     };
 
-    const handleVerifyPin = async (e) => {
-        e.preventDefault();
-        setPinSubmitting(true);
-        setPinError('');
-
-        if (pinInput.length !== 6) {
-            setPinError('PIN harus terdiri dari 6 digit angka.');
-            setPinSubmitting(false);
-            return;
-        }
-
-        try {
-            await verifyPin(pinInput);
-            // Satu request saja: /wallet/transactions juga membawa saldo terbaru
-            // (dev server single-threaded — menghemat 1 round-trip ~500ms).
-            const data = await getTransactions();
-            setTransactions(data.transactions || []);
-            setWallet((prev) => ({
-                ...(prev || getCachedWallet() || {}),
-                saldo: data.saldo,
-            }));
-            setStatus('wallet');
-        } catch (err) {
-            setPinError(extractErrorMessage(err, 'PIN salah. Coba lagi.'));
-        } finally {
-            setPinSubmitting(false);
-        }
-    };
-
     const handleCreatePin = async (e) => {
         e.preventDefault();
         setPinSubmitting(true);
@@ -177,9 +136,12 @@ export default function DompetDigital({ onBack }) {
 
         try {
             await createPin(pinNewInput, pinConfirmInput);
-            setPinInput('');
+            const data = await getWallet();
+            setWallet(data);
+            setPinNewInput('');
+            setPinConfirmInput('');
             setPinError('');
-            setStatus('unlock');
+            setPinManagerMode(null);
         } catch (err) {
             setPinError(extractErrorMessage(err, 'Gagal membuat PIN. Coba lagi.'));
         } finally {
@@ -241,7 +203,7 @@ export default function DompetDigital({ onBack }) {
             await disablePinApi(pinOldInput);
             const data = await getWallet();
             setWallet(data);
-            setStatus('createPin');
+            setPinManagerMode(null);
         } catch (err) {
             setPinError(extractErrorMessage(err, 'Gagal menonaktifkan PIN. Coba lagi.'));
         } finally {
@@ -276,12 +238,7 @@ export default function DompetDigital({ onBack }) {
             setPinNewInput('');
             setPinConfirmInput('');
             setPinError('');
-            if (status === 'resetPin') {
-                setStatus('unlock');
-            } else {
-                setPinManagerMode(null);
-                setStatus('wallet');
-            }
+            setPinManagerMode(null);
         } catch (err) {
             setPinError(extractErrorMessage(err, 'Gagal mereset PIN. Coba lagi.'));
         } finally {
@@ -301,191 +258,6 @@ export default function DompetDigital({ onBack }) {
             <span className="dmp-header-spacer" />
         </div>
     );
-
-    if (status === 'loading') {
-        return (
-            <div className="dmp-container">
-                {renderHeader('Dompet Digital', true)}
-                <div className="dmp-loading">Memuat…</div>
-            </div>
-        );
-    }
-
-    if (status === 'createPin') {
-        return (
-            <div className="dmp-container">
-                {renderHeader('Dompet Digital', true)}
-                <div className="dmp-lock-card">
-                    <div className="dmp-lock-icon">🔒</div>
-                    <h2 className="dmp-lock-title">Buat PIN Dompet</h2>
-                    <p className="dmp-lock-desc">
-                        Sebelum membuka dompet digital, kamu perlu membuat PIN 6 digit untuk
-                        melindungi saldo dan transaksimu.
-                    </p>
-
-                    {pinError && <p className="dmp-form-error">{pinError}</p>}
-
-                    <form className="dmp-form" onSubmit={handleCreatePin}>
-                        <label className="dmp-label" htmlFor="dmp-pin-new">PIN Baru</label>
-                        <input
-                            id="dmp-pin-new"
-                            className="dmp-input"
-                            type="password"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            maxLength={6}
-                            placeholder="••••••"
-                            value={pinNewInput}
-                            onChange={handleDigits(setPinNewInput)}
-                        />
-
-                        <label className="dmp-label" htmlFor="dmp-pin-confirm">Konfirmasi PIN Baru</label>
-                        <input
-                            id="dmp-pin-confirm"
-                            className="dmp-input"
-                            type="password"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            maxLength={6}
-                            placeholder="••••••"
-                            value={pinConfirmInput}
-                            onChange={handleDigits(setPinConfirmInput)}
-                        />
-
-                        <button type="submit" className="dmp-btn-primary" disabled={pinSubmitting}>
-                            {pinSubmitting ? 'Menyimpan…' : 'Buat PIN'}
-                        </button>
-                    </form>
-
-                    <button className="dmp-text-btn" onClick={onBack}>← Kembali ke beranda</button>
-                </div>
-            </div>
-        );
-    }
-
-    if (status === 'unlock') {
-        return (
-            <div className="dmp-container">
-                {renderHeader('Dompet Digital', true)}
-                <div className="dmp-lock-card">
-                    <div className="dmp-lock-icon">🔐</div>
-                    <h2 className="dmp-lock-title">Masukkan PIN Dompet</h2>
-                    <p className="dmp-lock-desc">
-                        Masukkan PIN 6 digit untuk membuka dompet digitalmu.
-                    </p>
-
-                    {wallet?.terkunci && (
-                        <div className="dmp-locked-banner">
-                            Dompet terkunci sementara karena terlalu banyak percobaan PIN salah.{' '}
-                            {wallet.terkunci_sampai
-                                ? `Coba lagi setelah ${formatWaktu(wallet.terkunci_sampai)}.`
-                                : 'Coba lagi nanti.'}
-                        </div>
-                    )}
-
-                    {pinError && <p className="dmp-form-error">{pinError}</p>}
-
-                    <form className="dmp-form" onSubmit={handleVerifyPin}>
-                        <label className="dmp-label" htmlFor="dmp-pin">PIN Dompet</label>
-                        <input
-                            id="dmp-pin"
-                            className="dmp-input"
-                            type="password"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            maxLength={6}
-                            placeholder="••••••"
-                            value={pinInput}
-                            onChange={handleDigits(setPinInput)}
-                            disabled={Boolean(wallet?.terkunci)}
-                        />
-
-                        <button
-                            type="submit"
-                            className="dmp-btn-primary"
-                            disabled={pinSubmitting || wallet?.terkunci}
-                        >
-                            {pinSubmitting ? 'Memeriksa…' : 'Buka Dompet'}
-                        </button>
-                    </form>
-
-                    <button
-                        type="button"
-                        className="dmp-link-btn"
-                        onClick={() => { setPinError(''); setPasswordInput(''); setPinNewInput(''); setPinConfirmInput(''); setStatus('resetPin'); }}
-                    >
-                        Lupa PIN? Reset di sini
-                    </button>
-
-                    <button className="dmp-link-btn" onClick={() => onBack()}>← Kembali ke beranda</button>
-                </div>
-            </div>
-        );
-    }
-
-    if (status === 'resetPin') {
-        return (
-            <div className="dmp-container">
-                {renderHeader('Dompet Digital', true)}
-                <div className="dmp-lock-card">
-                    <div className="dmp-lock-icon">🔑</div>
-                    <h2 className="dmp-lock-title">Reset PIN Dompet</h2>
-                    <p className="dmp-lock-desc">
-                        Verifikasi identitasmu dengan password akun, lalu tentukan PIN baru.
-                    </p>
-
-                    {pinError && <p className="dmp-form-error">{pinError}</p>}
-
-                    <form className="dmp-form" onSubmit={handleResetPin}>
-                        <label className="dmp-label" htmlFor="dmp-reset-password">Password Akun</label>
-                        <input
-                            id="dmp-reset-password"
-                            className="dmp-input"
-                            type="password"
-                            autoComplete="current-password"
-                            placeholder="••••••••"
-                            value={passwordInput}
-                            onChange={(e) => setPasswordInput(e.target.value)}
-                        />
-
-                        <label className="dmp-label" htmlFor="dmp-reset-pin-new">PIN Baru</label>
-                        <input
-                            id="dmp-reset-pin-new"
-                            className="dmp-input"
-                            type="password"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            maxLength={6}
-                            placeholder="••••••"
-                            value={pinNewInput}
-                            onChange={handleDigits(setPinNewInput)}
-                        />
-
-                        <label className="dmp-label" htmlFor="dmp-reset-pin-confirm">Konfirmasi PIN Baru</label>
-                        <input
-                            id="dmp-reset-pin-confirm"
-                            className="dmp-input"
-                            type="password"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            maxLength={6}
-                            placeholder="••••••"
-                            value={pinConfirmInput}
-                            onChange={handleDigits(setPinConfirmInput)}
-                        />
-
-                        <button type="submit" className="dmp-btn-primary" disabled={pinSubmitting}>
-                            {pinSubmitting ? 'Menyimpan…' : 'Reset PIN'}
-                        </button>
-                    </form>
-
-                    <button className="dmp-link-btn" onClick={() => { setPinError(''); setStatus('unlock'); }}>
-                        ← Kembali ke PIN
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     if (status === 'managePin') {
         const backToWallet = () => {
@@ -507,7 +279,22 @@ export default function DompetDigital({ onBack }) {
                 <div className="dmp-manage-card">
                     {pinError && <p className="dmp-form-error">{pinError}</p>}
 
-                    {pinManagerMode === null && (
+                    {/* Belum punya PIN -> langsung form buat PIN */}
+                    {!wallet?.pin_sudah_diset && pinManagerMode === null && (
+                        <button
+                            className="dmp-menu-item"
+                            onClick={() => {
+                                setPinError('');
+                                setPinManagerMode('create');
+                            }}
+                        >
+                            <span className="dmp-menu-icon">🔒</span>
+                            <span className="dmp-menu-label">Buat PIN Dompet</span>
+                            <span className="dmp-menu-arrow">›</span>
+                        </button>
+                    )}
+
+                    {wallet?.pin_sudah_diset && pinManagerMode === null && (
                         <>
                             <div className="dmp-pin-status">
                                 <span className="dmp-pin-status-icon">🔒</span>
@@ -554,6 +341,45 @@ export default function DompetDigital({ onBack }) {
                                 <span className="dmp-menu-arrow">›</span>
                             </button>
                         </>
+                    )}
+
+                    {pinManagerMode === 'create' && (
+                        <form className="dmp-form" onSubmit={handleCreatePin}>
+                            <p className="dmp-form-desc">
+                                Buat PIN 6 digit untuk konfirmasi top up dan pembayaran dari saldo
+                                dompetmu.
+                            </p>
+                            <label className="dmp-label" htmlFor="dmp-pin-new">PIN Baru</label>
+                            <input
+                                id="dmp-pin-new"
+                                className="dmp-input"
+                                type="password"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                maxLength={6}
+                                placeholder="••••••"
+                                value={pinNewInput}
+                                onChange={handleDigits(setPinNewInput)}
+                            />
+                            <label className="dmp-label" htmlFor="dmp-pin-confirm">Konfirmasi PIN Baru</label>
+                            <input
+                                id="dmp-pin-confirm"
+                                className="dmp-input"
+                                type="password"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                maxLength={6}
+                                placeholder="••••••"
+                                value={pinConfirmInput}
+                                onChange={handleDigits(setPinConfirmInput)}
+                            />
+                            <button type="submit" className="dmp-btn-primary" disabled={pinSubmitting}>
+                                {pinSubmitting ? 'Menyimpan…' : 'Simpan PIN'}
+                            </button>
+                            <button type="button" className="dmp-text-btn" onClick={backToWallet}>
+                                ← Kembali
+                            </button>
+                        </form>
                     )}
 
                     {pinManagerMode === 'change' && (

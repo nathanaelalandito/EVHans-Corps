@@ -47,6 +47,17 @@ const DUMMY_STATS = {
     pengeluaran_bulan_ini: 356000,
 };
 
+// Riwayat transaksi singkat untuk dashboard. DUMMY — ganti dengan data
+// dari API (mis. riwayat dompet/pembayaran) bila endpoint-nya sudah ada.
+// status: 'Sukses' | 'Diproses' | 'Gagal'
+const DUMMY_TRANSACTIONS = [
+    { id: 1, judul: 'EVCharge Hub – UKDW', waktu: '03 Nov 2026, 21:38', keterangan: '24.5 kWh', nominal: 59350, status: 'Sukses' },
+    { id: 2, judul: 'Top Up Dompet Digital', waktu: '03 Nov 2026, 21:37', keterangan: 'Mandiri', nominal: 200000, status: 'Sukses' },
+    { id: 3, judul: 'EVCharge Hub – Malioboro Mall', waktu: '01 Nov 2026, 18:10', keterangan: '18.2 kWh', nominal: 45500, status: 'Sukses' },
+];
+
+const TX_TONE = { Sukses: 'ok', Diproses: 'warn', Gagal: 'danger' };
+
 // Posisi jatuh (fallback) dipakai HANYA jika browser menolak/tidak
 // mendukung akses lokasi. Posisi asli diambil live lewat
 // navigator.geolocation di bawah.
@@ -131,12 +142,33 @@ function capitalize(str) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+const EyeIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+         aria-hidden="true">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
+const EyeOffIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+         aria-hidden="true">
+        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+        <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+);
+
 export default function DriverDashboard({
     user: authUser,
     onLogout,
     onNavigateToVehicles,
     onNavigateToHelp,
     onNavigateToWallet,
+    onNavigateToRiwayat,
     onNavigateToTopUp
 }) {
     // Data profil dari login (nama dsb). Saldo TIDAK diambil dari sini —
@@ -207,7 +239,7 @@ export default function DriverDashboard({
         fetchWallet();
     }, []);
 
-      // --- Profil Driver (data asli dari backend, mengikuti ProfileDriverResource) ---
+    // --- Profil Driver (data asli dari backend, mengikuti ProfileDriverResource) ---
     const [profile, setProfile] = useState(null);
     const [profileLoading, setProfileLoading] = useState(true);
     const [profileError, setProfileError] = useState('');
@@ -229,22 +261,23 @@ export default function DriverDashboard({
     useEffect(() => {
         fetchProfile();
     }, []);
-        // --- Edit Profil ---
+
+    // --- Edit Profil ---
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [editForm, setEditForm] = useState({ nama_lengkap: '', nomor_telepon: '', tanggal_lahir: '', alamat: '', email: '' });
     const [editError, setEditError] = useState('');
     const [editSubmitting, setEditSubmitting] = useState(false);
 
     const startEditProfile = () => {
-    setEditForm({
-        nama_lengkap: profile?.nama_lengkap ?? '',
-        nomor_telepon: profile?.nomor_telepon ?? '',
-        tanggal_lahir: profile?.tanggal_lahir ?? '',
-        alamat: profile?.alamat ?? '',
-        email: profile?.email ?? '',
-    });
-    setEditError('');
-    setIsEditingProfile(true);
+        setEditForm({
+            nama_lengkap: profile?.nama_lengkap ?? '',
+            nomor_telepon: profile?.nomor_telepon ?? '',
+            tanggal_lahir: profile?.tanggal_lahir ?? '',
+            alamat: profile?.alamat ?? '',
+            email: profile?.email ?? '',
+        });
+        setEditError('');
+        setIsEditingProfile(true);
     };
 
     const cancelEditProfile = () => {
@@ -270,7 +303,8 @@ export default function DriverDashboard({
             setEditSubmitting(false);
         }
     };
-           const openProfileScreen = () => {
+
+    const openProfileScreen = () => {
         setShowSettings(false);       // tutup panel pengaturan
         setSettingsScreen('menu');
         setIsEditingProfile(false);
@@ -524,12 +558,12 @@ export default function DriverDashboard({
     // Timer sesi charging berjalan — di production, energi_kwh & waktu
     // sebaiknya di-refresh dari data yang dikirim Perangkat Charger (FR19).
     useEffect(() => {
-    if (!activeSession || sessionEnded) return;
-    const tick = () => setElapsed(Date.now() - activeSession.waktu_mulai);
-    tick();
-    const interval = setInterval(tick, 1000 * 30);
-    return () => clearInterval(interval);
-}, [activeSession, sessionEnded]);
+        if (!activeSession || sessionEnded) return;
+        const tick = () => setElapsed(Date.now() - activeSession.waktu_mulai);
+        tick();
+        const interval = setInterval(tick, 1000 * 30);
+        return () => clearInterval(interval);
+    }, [activeSession, sessionEnded]);
 
     // ---------------------------------------------------------------
     // Peta disembunyikan lewat CSS (display:none) saat view === 'home',
@@ -555,22 +589,22 @@ export default function DriverDashboard({
     const activeSessionId = activeSession?.id_session;
     const activeSessionFull = activeSession?.sudah_penuh;
     useEffect(() => {
-    if (!activeSessionId || activeSessionFull || sessionEnded) return;
-    let cancelled = false;
-    const poll = () => {
-        getActiveSession()
-            .then((session) => {
-                if (cancelled || !session || session.id_session !== activeSessionId) return;
-                setActiveSession(session);
-            })
-            .catch(() => {});
-    };
-    const interval = setInterval(poll, 3000);
-    return () => {
-        cancelled = true;
-        clearInterval(interval);
-    };
-}, [activeSessionId, activeSessionFull, sessionEnded]);
+        if (!activeSessionId || activeSessionFull || sessionEnded) return;
+        let cancelled = false;
+        const poll = () => {
+            getActiveSession()
+                .then((session) => {
+                    if (cancelled || !session || session.id_session !== activeSessionId) return;
+                    setActiveSession(session);
+                })
+                .catch(() => {});
+        };
+        const interval = setInterval(poll, 3000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [activeSessionId, activeSessionFull, sessionEnded]);
 
     const sessionProgressPct =
         activeSession && activeSession.target_kwh > 0
@@ -673,8 +707,6 @@ export default function DriverDashboard({
         setPinFormMode(null);
         setSettingsScreen('menu');
     };
-
-    
 
     const handlePinDigitsChange = (setter) => (e) => {
         const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -852,16 +884,6 @@ export default function DriverDashboard({
         }
     };
 
-    const cycleVehicle = () => {
-        if (vehicles.length === 0) {
-            onNavigateToVehicles();
-            return;
-        }
-        const idx = vehicles.findIndex((v) => v.id_vehicle === activeVehicleId);
-        const next = vehicles[(idx + 1) % vehicles.length];
-        setActiveVehicleId(next.id_vehicle);
-    };
-
     // Membuka layar peta dari dashboard. Jika sebuah station diberikan,
     // peta akan otomatis fly-to & membuka popup station tersebut begitu
     // ukurannya selesai dihitung ulang (lihat effect di atas).
@@ -880,15 +902,25 @@ export default function DriverDashboard({
 
     const firstName = user.nama.split(' ')[0];
 
+    // Konektor kendaraan aktif (label seperti "CCS2") untuk teks di kartu pencarian.
+    const vehicleConnector = activeVehicle ? konektorLabel(activeVehicle.tipe_konektor) : null;
+    const matchingStationCount = vehicleConnector
+        ? stations.filter((s) => s.tipe_konektor.includes(vehicleConnector)).length
+        : filteredStations.length;
+
     return (
         <div className="app-shell">
             {/* ============================================================
                 LAYAR 1 — DASHBOARD HOME (tampilan awal, bukan peta)
                ============================================================ */}
             <div className={`home-screen ${view === 'home' ? 'is-active' : 'is-hidden'}`}>
+                {/* ---------------- Header: sapaan, saldo, kendaraan ---------------- */}
                 <header className="home-header">
                     <div className="home-header-top">
-                        <span />
+                        <div>
+                            <p className="home-greeting-text">{getGreeting()}, {firstName} 👋</p>
+                            <p className="home-greeting-sub">Siap cari charger terdekat hari ini.</p>
+                        </div>
                         <div className="home-header-actions">
                             <button
                                 className="home-icon-btn"
@@ -908,71 +940,95 @@ export default function DriverDashboard({
                         </div>
                     </div>
 
-                    <div className="home-greeting-block">
-                        <p className="home-greeting-text">{getGreeting()}, {firstName} 👋</p>
-                        <button
-                            className="home-vehicle-pill"
-                            onClick={cycleVehicle}
-                            title={vehicles.length > 1 ? 'Ketuk untuk ganti kendaraan' : undefined}
+                    <div className="home-header-summary">
+                        {/* Panel saldo — klik membuka halaman dompet */}
+                        <div
+                            className="home-balance-panel"
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Buka dompet digital"
+                            onClick={onNavigateToWallet}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onNavigateToWallet();
+                                }
+                            }}
                         >
-                            <span className="home-vehicle-pill-icon">🚗</span>
-                            <span className="home-vehicle-pill-text">
-                                {activeVehicle
-                                    ? `${activeVehicle.model} · ${activeVehicle.nomor_polisi}`
-                                    : vehiclesLoading
-                                        ? 'Memuat kendaraan…'
-                                        : '+ Tambah kendaraan'}
-                            </span>
-                            {vehicles.length > 1 && <span className="home-vehicle-pill-swap">⇄</span>}
-                        </button>
+                            <div className="home-balance-info">
+                                <p className="home-wallet-label">Saldo Dompet</p>
+                                <div className="home-balance-value-row">
+                                    <p className="home-wallet-value">
+                                        {walletLoading
+                                            ? '...'
+                                            : hideWalletSaldo
+                                                ? 'Rp ••••••'
+                                                : formatRupiah(wallet?.saldo_tersedia ?? wallet?.saldo ?? 0)}
+                                    </p>
+                                    <button
+                                        className="home-wallet-eye"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleHideWalletSaldo();
+                                        }}
+                                        aria-label={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                                        title={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                                    >
+                                        {hideWalletSaldo ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
+                            </div>
+                            <button
+                                className="home-wallet-topup"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onNavigateToTopUp();
+                                }}
+                            >
+                                + Top Up
+                            </button>
+                        </div>
+
+                        {/* Panel kendaraan aktif — dropdown pilih kendaraan */}
+                        <div className="home-vehicle-panel">
+                            <div className="home-vehicle-panel-head">
+                                <span className="home-vehicle-pill-icon">🚗</span>
+                                Kendaraan Aktif
+                            </div>
+
+                            {vehiclesLoading && (
+                                <button className="home-vehicle-add-btn" disabled>Memuat kendaraan…</button>
+                            )}
+
+                            {!vehiclesLoading && vehiclesError && (
+                                <button className="home-vehicle-retry" onClick={() => fetchVehicles()}>
+                                    {vehiclesError} Coba lagi
+                                </button>
+                            )}
+
+                            {!vehiclesLoading && !vehiclesError && vehicles.length === 0 && (
+                                <button className="home-vehicle-add-btn" onClick={onNavigateToVehicles}>
+                                    + Tambah kendaraan
+                                </button>
+                            )}
+
+                            {!vehiclesLoading && !vehiclesError && vehicles.length > 0 && (
+                                <select
+                                    className="home-vehicle-select"
+                                    value={activeVehicleId ?? ''}
+                                    onChange={(e) => setActiveVehicleId(Number(e.target.value))}
+                                    aria-label="Pilih kendaraan aktif"
+                                >
+                                    {vehicles.map((v) => (
+                                        <option key={v.id_vehicle} value={v.id_vehicle}>
+                                            {v.model} · {v.nomor_polisi}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
                     </div>
                 </header>
-
-                <div
-                    className="home-wallet-card"
-                    role="button"
-                    tabIndex={0}
-                    onClick={onNavigateToWallet}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onNavigateToWallet();
-                        }
-                    }}
-                    aria-label="Buka dompet digital"
-                >
-                    <div className="home-wallet-info">
-                        <p className="home-wallet-label">Saldo Dompet</p>
-                    <p className="home-wallet-value">
-                        {walletLoading
-                            ? '...'
-                            : hideWalletSaldo
-                                ? 'Rp ••••••'
-                                : formatRupiah(wallet?.saldo_tersedia ?? wallet?.saldo ?? 0)}
-                    </p>
-                    </div>
-                        <button
-                        className="home-wallet-eye"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            toggleHideWalletSaldo();
-                        }}
-                        aria-label={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
-                        title={hideWalletSaldo ? 'Tampilkan saldo' : 'Sembunyikan saldo'}>
-                        {hideWalletSaldo ? '🙈' : '👁️'}
-                    </button>
-                    <button
-                        className="home-wallet-topup"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigateToTopUp();
-                        }}
-                    >
-                        + Top Up
-                    </button>
-                    <span className="home-wallet-arrow" aria-hidden="true">›</span>
-                </div>
-
 
                 <main className="home-content">
                     {showNotif && activeSession && (
@@ -989,13 +1045,14 @@ export default function DriverDashboard({
                         </div>
                     )}
 
+                    {/* Sesi charging aktif */}
                     {activeSession && (
                         <section className="home-session-card">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title home-session-title">Sesi Charging Berlangsung</span>
-                              <span className="dash-status-badge ok">
-                                ● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Penuh' : activeSession.status}
-                            </span>
+                                <span className="dash-status-badge ok">
+                                    ● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Penuh' : activeSession.status}
+                                </span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}</p>
 
@@ -1021,31 +1078,50 @@ export default function DriverDashboard({
                                 </div>
                             </div>
                             <div className="home-session-actions">
-                            <button className="dash-btn-navigate home-session-map-btn" onClick={goToActiveSessionOnMap}>
-                                🗺️ Lihat di Peta
-                            </button>
-                            <button
-                                className={`dash-btn-stop ${sessionEnded ? 'done' : ''}`}
-                                onClick={sessionEnded ? finishSession : handleStopSession}
-                                disabled={stoppingSession}
-                            >
-                                {stoppingSession ? 'Menghentikan…' : sessionEnded ? 'Selesai' : 'Hentikan Sesi Charging'}
-                            </button>
-                        </div>
-                        {sessionEnded && <StrukDigital data={strukData} />}
+                                <button className="dash-btn-navigate home-session-map-btn" onClick={goToActiveSessionOnMap}>
+                                    🗺️ Lihat di Peta
+                                </button>
+                                <button
+                                    className={`dash-btn-stop ${sessionEnded ? 'done' : ''}`}
+                                    onClick={sessionEnded ? finishSession : handleStopSession}
+                                    disabled={stoppingSession}
+                                >
+                                    {stoppingSession ? 'Menghentikan…' : sessionEnded ? 'Selesai' : 'Hentikan Sesi Charging'}
+                                </button>
+                            </div>
+                            {sessionEnded && <StrukDigital data={strukData} />}
                         </section>
                     )}
-                    
 
-                    <button className="home-cta-map" onClick={() => goToMap()}>
-                        <span className="home-cta-icon">🗺️</span>
-                        <span className="home-cta-text">
-                            <span className="home-cta-title">Cari Charging Station</span>
-                            <span className="home-cta-sub">{filteredStations.length} station di sekitar Anda</span>
-                        </span>
-                        <span className="home-cta-arrow">→</span>
-                    </button>
+                    {/* Kartu pencarian: tombol ke peta + chip filter konektor */}
+                    <section className="home-search-card">
+                        <button className="home-cta-map" onClick={() => goToMap()}>
+                            <span className="home-cta-icon">🗺️</span>
+                            <span className="home-cta-text">
+                                <span className="home-cta-title">Cari Charging Station</span>
+                                <span className="home-cta-sub">
+                                    {vehicleConnector
+                                        ? `${matchingStationCount} station cocok untuk ${vehicleConnector}`
+                                        : `${filteredStations.length} station di sekitar Anda`}
+                                </span>
+                            </span>
+                            <span className="home-cta-arrow">→</span>
+                        </button>
 
+                        <div className="home-search-filters">
+                            {CONNECTOR_FILTERS.map((f) => (
+                                <button
+                                    key={f}
+                                    className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
+                                    onClick={() => setConnectorFilter(f)}
+                                >
+                                    {f}
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Statistik bulan ini */}
                     <section className="home-stats-row">
                         <div className="home-stat-card">
                             <p className="home-stat-value">{DUMMY_STATS.sesi_bulan_ini}</p>
@@ -1061,22 +1137,10 @@ export default function DriverDashboard({
                         </div>
                     </section>
 
+                    {/* Station terdekat (grid 2 kolom) */}
                     <section className="home-section">
-                        <div className="home-section-title-row">
-                            <h3 className="home-section-title">Station Terdekat</h3>
-                            <button className="dash-link-btn" onClick={() => goToMap()}>Lihat di Peta →</button>
-                        </div>
-
-                        <div className="home-filters-inline">
-                            {CONNECTOR_FILTERS.map((f) => (
-                                <button
-                                    key={f}
-                                    className={`mapdash-filter-chip ${connectorFilter === f ? 'active' : ''}`}
-                                    onClick={() => setConnectorFilter(f)}
-                                >
-                                    {f}
-                                </button>
-                            ))}
+                        <div className="home-station-summary">
+                            <span>{filteredStations.length} station terdekat</span>
                         </div>
 
                         <div className="mapdash-station-scroll home-station-scroll">
@@ -1105,49 +1169,39 @@ export default function DriverDashboard({
                         </div>
                     </section>
 
+                    {/* Riwayat transaksi */}
                     <section className="home-section">
                         <div className="home-section-title-row">
-                            <h3 className="home-section-title">Kendaraan Saya</h3>
+                            <h3 className="home-section-title">Riwayat Transaksi</h3>
+                            <span className="home-section-caption">{DUMMY_TRANSACTIONS.length} transaksi terakhir</span>
                         </div>
-                        <div className="home-vehicle-list">
-                            {vehiclesLoading && <p className="dash-empty">Memuat kendaraan…</p>}
-                            {!vehiclesLoading && vehiclesError && (
-                                <p className="dash-empty">
-                                    {vehiclesError}{' '}
-                                    <button className="dash-link-btn" onClick={() => fetchVehicles()}>Coba lagi</button>
-                                </p>
-                            )}
-                            {!vehiclesLoading && !vehiclesError && vehicles.length === 0 && (
-                                <p className="dash-empty">
-                                    Belum ada kendaraan.{' '}
-                                    <button className="dash-link-btn" onClick={onNavigateToVehicles}>Tambah kendaraan</button>
-                                </p>
-                            )}
-                            {vehicles.map((v) => (
-                                <button
-                                    key={v.id_vehicle}
-                                    className={`home-vehicle-item ${v.id_vehicle === activeVehicleId ? 'active' : ''}`}
-                                    onClick={() => setActiveVehicleId(v.id_vehicle)}
-                                >
-                                    <span className="home-vehicle-item-avatar">🚗</span>
-                                    <span className="home-vehicle-item-info">
-                                        <span className="home-vehicle-item-name">{v.merek} {v.model}</span>
-                                        <span className="home-vehicle-item-plate">{v.nomor_polisi} · {konektorLabel(v.tipe_konektor)}</span>
+
+                        <div className="transaction-list">
+                            {DUMMY_TRANSACTIONS.map((tx) => (
+                                <button key={tx.id} className="transaction-item" onClick={onNavigateToRiwayat}>
+                                    <span className="transaction-main">
+                                        <span className="transaction-icon">🧾</span>
+                                        <span style={{ minWidth: 0 }}>
+                                            <p className="transaction-location">{tx.judul}</p>
+                                            <p className="transaction-meta">{tx.waktu} · {tx.keterangan}</p>
+                                        </span>
                                     </span>
-                                    {v.id_vehicle === activeVehicleId && <span className="home-vehicle-item-check">✓</span>}
+                                    <span className="transaction-side">
+                                        <strong>{formatRupiah(tx.nominal)}</strong>
+                                        <span className={`dash-status-badge ${TX_TONE[tx.status] || 'warn'}`}>{tx.status}</span>
+                                    </span>
                                 </button>
                             ))}
+                            {DUMMY_TRANSACTIONS.length === 0 && <p className="dash-empty">Belum ada transaksi.</p>}
                         </div>
                     </section>
-                </main> 
-                 </div>  {/* <-- tambahkan: penutup home-screen */}
-            
+                </main>
+            </div>
 
             {/* ============================================================
                 LAYAR 2 — PETA (dibuka saat driver menekan "Cari Charging
                 Station" atau salah satu kartu station dari dashboard)
                ============================================================ */}
-               
             <div className={`mapdash-container ${view === 'map' ? 'is-active' : 'is-hidden'}`}>
                 <div ref={mapNodeRef} className="mapdash-map" />
 
@@ -1301,7 +1355,7 @@ export default function DriverDashboard({
                 </button>
 
                 {/* Bottom sheet */}
-               <div className={`mapdash-sheet ${sheetExpanded || activeSession ? 'expanded' : ''}`}>
+                <div className={`mapdash-sheet ${sheetExpanded || activeSession ? 'expanded' : ''}`}>
                     <button
                         className="mapdash-sheet-handle"
                         onClick={() => setSheetExpanded((v) => !v)}
@@ -1312,7 +1366,7 @@ export default function DriverDashboard({
                         <div className="mapdash-session">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title">Sesi Charging Berlangsung</span>
-                               <span className="dash-status-badge ok">
+                                <span className="dash-status-badge ok">
                                     ● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Penuh' : activeSession.status}
                                 </span>
                             </div>
@@ -1348,8 +1402,8 @@ export default function DriverDashboard({
                             </button>
 
                             {sessionEnded && <StrukDigital data={strukData} />}
-                            </div>
-                            ) : null}
+                        </div>
+                    ) : null}
                     {activeSession ? null : (
                         <>
                             <div className="mapdash-sheet-title-row">
@@ -1428,7 +1482,7 @@ export default function DriverDashboard({
                 </div>
             </div>
 
-                        {/* ============================================================
+            {/* ============================================================
                 LAYAR 3 — PROFIL DRIVER (halaman penuh)
                ============================================================ */}
             <div className={`profile-screen ${view === 'profile' ? 'is-active' : 'is-hidden'}`}>
@@ -1638,15 +1692,15 @@ export default function DriverDashboard({
                                 </div>
 
                                 <button className="settings-profile" onClick={openProfileScreen}>
-                                        <span className="settings-profile-avatar">👤</span>
-                                        <div className="settings-profile-info">
-                                            <p className="settings-profile-name">
-                                                {profile?.nama_lengkap ?? user.nama}
-                                            </p>
-                                            <p className="settings-profile-sub">Lihat & edit profil</p>
-                                        </div>
-                                        <span className="settings-menu-arrow">›</span>
-                                    </button>
+                                    <span className="settings-profile-avatar">👤</span>
+                                    <div className="settings-profile-info">
+                                        <p className="settings-profile-name">
+                                            {profile?.nama_lengkap ?? user.nama}
+                                        </p>
+                                        <p className="settings-profile-sub">Lihat & edit profil</p>
+                                    </div>
+                                    <span className="settings-menu-arrow">›</span>
+                                </button>
 
                                 <div className="settings-menu">
                                     <button className="settings-menu-item" onClick={onNavigateToVehicles}>
@@ -1654,9 +1708,9 @@ export default function DriverDashboard({
                                         <span className="settings-menu-label">Kendaraan Saya</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
-                                    <button className="settings-menu-item">
-                                        <span className="settings-menu-icon">💳</span>
-                                        <span className="settings-menu-label">Metode Pembayaran</span>
+                                    <button className="settings-menu-item" onClick={onNavigateToRiwayat}>
+                                        <span className="settings-menu-icon">🧾</span>
+                                        <span className="settings-menu-label">Riwayat Transaksi</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
                                     <button className="settings-menu-item" onClick={openPinManager}>
@@ -1667,11 +1721,6 @@ export default function DriverDashboard({
                                                 {hasPin ? 'PIN aktif' : 'Belum diatur'}
                                             </span>
                                         </span>
-                                        <span className="settings-menu-arrow">›</span>
-                                    </button>
-                                    <button className="settings-menu-item">
-                                        <span className="settings-menu-icon">🧾</span>
-                                        <span className="settings-menu-label">Riwayat Transaksi</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
                                     <button className="settings-menu-item">
@@ -1904,8 +1953,9 @@ export default function DriverDashboard({
                                 )}
                             </div>
                         )}
-                                                {/* ------------------------------------------------
-                            LAYAR PROFIL DRIVER
+
+                        {/* ------------------------------------------------
+                            LAYAR PROFIL DRIVER (versi ringkas di panel)
                            ------------------------------------------------ */}
                         {settingsScreen === 'profile' && (
                             <div className="settings-subscreen">
@@ -1991,7 +2041,6 @@ export default function DriverDashboard({
                                 )}
                             </div>
                         )}
-
                     </div>
                 </div>
             )}

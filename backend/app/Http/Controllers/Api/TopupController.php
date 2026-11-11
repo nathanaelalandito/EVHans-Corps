@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ChecksWalletPin;
 use App\Http\Controllers\Controller;
+use App\Models\Dompet;
 use App\Models\Topup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,8 @@ use Illuminate\Validation\Rule;
  */
 class TopupController extends Controller
 {
+    use ChecksWalletPin;
+
     private const MIN_AMOUNT   = 10000;
     private const MAX_AMOUNT   = 5000000;
     private const EXPIRY_HOURS = 24;
@@ -55,13 +59,14 @@ class TopupController extends Controller
         ]);
     }
 
-    /** POST /api/topup  { method: id_metode, amount } */
+    /** POST /api/topup  { method: id_metode, amount, pin? } */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'method' => ['required', 'integer',
                 Rule::exists('metode_pembayaran', 'id_metode')->where('status_metode', 'aktif')],
             'amount' => ['required', 'integer', 'min:' . self::MIN_AMOUNT, 'max:' . self::MAX_AMOUNT],
+            'pin' => ['nullable', 'digits:6'],
         ]);
 
         $metode = DB::table('metode_pembayaran')->where('id_metode', $validated['method'])->first();
@@ -69,6 +74,23 @@ class TopupController extends Controller
 
         if ($dompet->status_dompet !== 'aktif') {
             return response()->json(['success' => false, 'message' => 'Dompet Anda sedang nonaktif.'], 422);
+        }
+
+        // PIN dompet wajib dikonfirmasi sebelum top up — tapi hanya bila
+        // PIN memang sudah diset. Pemeriksaan ulang di server ini yang
+        // menentukan, bukan cuma validasi di frontend.
+        $walletModel = Dompet::find($dompet->id_wallet);
+        if ($walletModel && $walletModel->hasPin()) {
+            if (empty($validated['pin'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Masukkan PIN dompet untuk melanjutkan top up.',
+                ], 422);
+            }
+
+            if ($pinError = $this->checkWalletPin($walletModel, $validated['pin'], 'PIN dompet salah.')) {
+                return $pinError;
+            }
         }
 
         // Nomor telepon driver: dompet -> user_profile

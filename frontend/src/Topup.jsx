@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTopup, getTopup, getTopupMethods, simulatePayTopup } from './api/Topup';
+import { getCachedWallet, getWallet, verifyPin } from './api/wallet';
 import './topup.css';
 
 // Logo metode pembayaran (folder: src/assets/payment foto)
@@ -99,6 +100,20 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
   const [copied, setCopied] = useState(false);
   const pollRef = useRef(null);
 
+  // PIN dompet wajib dikonfirmasi sebelum top up (server memeriksa ulang).
+  const [wallet, setWallet] = useState(() => getCachedWallet() || null);
+  const [pin, setPin] = useState('');
+
+  useEffect(() => {
+    getWallet()
+      .then(setWallet)
+      .catch(() => { /* biarkan form tampil, error muncul saat submit */ });
+  }, []);
+
+  const hasPin = !!wallet?.pin_sudah_diset;
+  const locked = !!wallet?.terkunci;
+  const needPin = hasPin && !locked;
+
   useEffect(() => {
     getTopupMethods()
       .then((d) => {
@@ -138,9 +153,21 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
 
   const handleCreate = async () => {
     setError('');
+
+    if (needPin && pin.length !== 6) {
+      setError('Masukkan PIN dompet 6 digit untuk melanjutkan top up.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const data = await createTopup({ method, amount });
+      // PIN diverifikasi server di endpoint verify, lalu diperiksa ulang
+      // saat top up dibuat — jadi tidak bisa dilewati dari sisi klien.
+      if (needPin) {
+        await verifyPin(pin);
+        setPin('');
+      }
+      const data = await createTopup({ method, amount, pin: needPin ? pin : undefined });
       setTopup(data);
       setNow(Date.now());
       setStep('pay');
@@ -175,6 +202,7 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
   const restart = () => {
     setTopup(null);
     setError('');
+    setPin('');
     setStep('select');
   };
 
@@ -347,11 +375,43 @@ export default function TopUp({ phoneNumber, onBack, onDone }) {
         </ul>
       </section>
 
+      {locked && (
+        <p className="tu-error" role="alert">
+          Dompet terkunci sementara karena terlalu banyak percobaan PIN salah.{' '}
+          {wallet?.terkunci_sampai
+            ? `Coba lagi setelah ${new Date(wallet.terkunci_sampai).toLocaleString('id-ID', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              })}.`
+            : 'Coba lagi nanti.'}
+        </p>
+      )}
+
+      {needPin && (
+        <section className="tu-card">
+          <h2>PIN Dompet</h2>
+          <p className="tu-muted">
+            Masukkan PIN 6 digit untuk mengonfirmasi top up saldo.
+          </p>
+          <input
+            className="tu-input"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            placeholder="••••••"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            aria-label="PIN dompet"
+          />
+        </section>
+      )}
+
       {error && <p className="tu-error" role="alert">{error}</p>}
 
       <button
         className="tu-btn"
-        disabled={!method || !amountValid || loading}
+        disabled={!method || !amountValid || loading || locked || (needPin && pin.length !== 6)}
         onClick={handleCreate}
       >
         {loading ? 'Memproses…' : 'Lanjut Bayar'}

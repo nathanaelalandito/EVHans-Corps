@@ -9,6 +9,7 @@ import DompetDigital from './DompetDigital';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
 import { clearWalletCache } from './api/wallet';
 import TopUp from './Topup';
+import RiwayatTransaksi from './RiwayatTransaksi';
 
 export default function App() {
     // Kalau sudah ada token tersimpan (login sebelumnya), langsung ke dashboard.
@@ -34,7 +35,7 @@ export default function App() {
             {currentPage === 'welcome' && (
                 <Welcome
                     onNavigateToRegister={() => setCurrentPage('register')}
-                    onNavigateToLogin={() => setCurrentPage('login')}
+                    onLoginSuccess={handleLoginSuccess}
                 />
             )}
             {currentPage === 'register' && (
@@ -57,6 +58,7 @@ export default function App() {
                         onNavigateToHelp={() => setCurrentPage('help')}
                         onNavigateToWallet={() => setCurrentPage('wallet')}
                         onNavigateToTopUp={() => setCurrentPage('topup')}
+                        onNavigateToRiwayat={() => setCurrentPage('riwayat')}
                 />
             )}
             {currentPage === 'wallet' && (
@@ -67,6 +69,9 @@ export default function App() {
                 onBack={() => setCurrentPage('dashboard')}
                 onDone={() => setCurrentPage('dashboard')}
             />
+            )}
+            {currentPage === 'riwayat' && (
+                <RiwayatTransaksi onBack={() => setCurrentPage('dashboard')} />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />
