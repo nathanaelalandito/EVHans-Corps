@@ -35,15 +35,9 @@ class AuthController extends Controller
         DB::beginTransaction();
 
         try {
-            $email = $request->email;
-            $prefix = 'DRV'; // Default untuk user biasa / driver
-
-            // Tentukan prefix berdasarkan domain email
-            if (str_ends_with($email, '@admin.ac.id')) {
-                $prefix = 'ADM';
-            } elseif (str_ends_with($email, '@ops.ac.id')) {
-                $prefix = 'OPS';
-            }
+            // Registrasi publik hanya membuat akun Driver. Akun Admin dan Operator
+            // dikelola melalui proses administrasi yang terpisah.
+            $prefix = 'DRV';
 
             // Generate ID otomatis (ADM, OPS, DRV) - format char(13)
             $lastUser = User::where('id_user', 'LIKE', "{$prefix}%")
@@ -59,14 +53,12 @@ class AuthController extends Controller
             $paddedNumber = str_pad($nextNumber, 10, '0', STR_PAD_LEFT);
             $customId = "{$prefix}{$paddedNumber}";
 
-            $peran = $prefix === 'ADM' ? 'admin' : ($prefix === 'OPS' ? 'operator' : 'driver');
-
             // 2. Simpan ke tabel Users
             $user = User::create([
                 'id_user' => $customId,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'peran' => $peran,
+                'peran' => 'driver',
                 'status_akun' => 'Aktif',
             ]);
 

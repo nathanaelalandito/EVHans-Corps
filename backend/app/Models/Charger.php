@@ -16,7 +16,7 @@ class Charger extends Model
     protected $primaryKey = 'id_charger';
 
     protected $fillable = [
-        'id_location', 'kode_perangkat', 'merek_model', 'kap_total_kw', 'status_mesin',
+        'id_location', 'kode_perangkat', 'merek_model', 'kap_tot_kw', 'status_mesin',
     ];
 
     /** Daftar port atau konektor fisik yang tersedia pada unit charger ini. */

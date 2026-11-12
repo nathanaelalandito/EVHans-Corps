@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 class UserSeeder extends Seeder
 {
@@ -81,7 +80,7 @@ class UserSeeder extends Seeder
         $counter = 1;
 
         foreach ($users as $data) {
-            // Tentukan prefix berdasarkan domain email (sama seperti logic kamu)
+            // Gunakan prefix sesuai role untuk akun dummy yang belum tersimpan.
             $prefix = 'DRV';
             if (str_ends_with($data['email'], '@admin.ac.id')) {
                 $prefix = 'ADM';
@@ -89,29 +88,35 @@ class UserSeeder extends Seeder
                 $prefix = 'OPS';
             }
 
-            // Generate id_user 13 karakter: prefix (3) + nomor urut (10 digit)
-            $idUser = $prefix . str_pad($counter, 10, '0', STR_PAD_LEFT);
+            // Pertahankan ID akun yang sudah ada agar relasi demo tidak berubah.
+            $existingUser = DB::table('users')->where('email', $data['email'])->first();
+            $idUser = $existingUser?->id_user ?? $prefix.str_pad($counter, 10, '0', STR_PAD_LEFT);
+            $now = Carbon::now();
 
-            DB::table('users')->insert([
-                'id_user' => $idUser,
-                'email' => $data['email'],
-                'email_verified_at' => Carbon::now(),
-                'password' => Hash::make('password123'), // password default untuk semua dummy
-                'peran' => $data['peran'],
-                'status_akun' => $data['status_akun'],
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]);
+            DB::table('users')->updateOrInsert(
+                ['email' => $data['email']],
+                [
+                    'id_user' => $idUser,
+                    'email_verified_at' => $existingUser?->email_verified_at ?? $now,
+                    'password' => Hash::make('password123'),
+                    'peran' => $data['peran'],
+                    'status_akun' => $data['status_akun'],
+                    'updated_at' => $now,
+                    'created_at' => $existingUser?->created_at ?? $now,
+                ],
+            );
 
-            DB::table('user_profile')->insert([
-                'id_user' => $idUser,
-                'nama_lengkap' => $data['nama_lengkap'],
-                'nomor_telepon' => $data['nomor_telepon'],
-                'alamat' => $data['alamat'],
-                'tanggal_lahir' => $data['tanggal_lahir'],
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]);
+            DB::table('user_profile')->updateOrInsert(
+                ['id_user' => $idUser],
+                [
+                    'nama_lengkap' => $data['nama_lengkap'],
+                    'nomor_telepon' => $data['nomor_telepon'],
+                    'alamat' => $data['alamat'],
+                    'tanggal_lahir' => $data['tanggal_lahir'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            );
 
             $counter++;
         }

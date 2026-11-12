@@ -251,8 +251,7 @@ class ChargingFlowController extends Controller
             // Rumus sama dengan calculateEstimate(), tapi memakai energi & durasi aktual.
             $kwh = (float) $sim['energi_kwh'];
             $biayaCharging = max((int) round($kwh * (int) $tarif->harga_per_kwh), (int) $tarif->biaya_minimum);
-            $jamParkir = max(1, (int) ceil($sim['durasi_detik'] / 3600));
-            $biayaParkir = $jamParkir * (int) $tarif->biaya_parkir_pjam;
+            $biayaParkir = (int) $tarif->biaya_parkir_flat;
 
             $total = $biayaCharging + $biayaParkir;
             // Tidak boleh melebihi dana yang di-hold (kalau ada hold).
@@ -403,7 +402,7 @@ class ChargingFlowController extends Controller
     /**
      * Estimasi biaya (dokumen no. 24–26):
      *  - biaya charging = kWh × tarif/kWh, minimal biaya minimum
-     *  - biaya parkir   = tarif parkir × jam berjalan (dibulatkan ke atas, min. 1 jam)
+     *  - biaya parkir   = biaya flat sekali untuk setiap sesi
      *  - durasi         = kWh ÷ daya port (kW); durasi nyata tergantung mobil
      */
     /** Menghitung biaya target memakai daya charger dan tarif lokasi. */
@@ -417,9 +416,7 @@ class ChargingFlowController extends Controller
         $biayaMinimum = (int) $tarif->biaya_minimum;
         $biayaCharging = max((int) round($kwh * $hargaPerKwh), $biayaMinimum);
 
-        $jamParkir = max(1, (int) ceil($durasiMenit / 60));
-        $parkirPerJam = (int) $tarif->biaya_parkir_pjam;
-        $biayaParkir = $jamParkir * $parkirPerJam;
+        $biayaParkir = (int) $tarif->biaya_parkir_flat;
 
         return [
             'target_kwh' => $kwh,
@@ -428,8 +425,7 @@ class ChargingFlowController extends Controller
             'harga_per_kwh' => $hargaPerKwh,
             'biaya_minimum' => $biayaMinimum,
             'biaya_charging' => $biayaCharging,
-            'jam_parkir' => $jamParkir,
-            'biaya_parkir_per_jam' => $parkirPerJam,
+            'biaya_parkir_flat' => $biayaParkir,
             'biaya_parkir' => $biayaParkir,
             'total' => $biayaCharging + $biayaParkir,
         ];
@@ -556,7 +552,7 @@ class ChargingFlowController extends Controller
             'waktu_mulai' => $s->waktu_mulai?->toIso8601String(),
             'waktu_selesai' => $s->waktu_selesai?->toIso8601String(),
             'tarif_per_kwh' => $s->tarif?->harga_per_kwh,
-            'biaya_parkir_per_jam' => $s->tarif?->biaya_parkir_pjam,
+            'biaya_parkir_flat' => $s->tarif?->biaya_parkir_flat,
         ];
     }
 

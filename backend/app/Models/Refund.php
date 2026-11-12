@@ -1,11 +1,10 @@
-<?php
+<?php 
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Model catatan pengembalian dana yang dikaitkan dengan sebuah transaksi. */
 class Refund extends Model
 {
     protected $table = 'refund';
@@ -24,7 +23,6 @@ class Refund extends Model
         'waktu_execute' => 'datetime',
     ];
 
-    /** Transaksi asal yang menjadi dasar pencatatan refund. */
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'id_payment', 'id_payment');

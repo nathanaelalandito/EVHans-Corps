@@ -3,6 +3,12 @@
 // Fungsi melempar error axios apa adanya kalau gagal.
 import api from './client';
 
+/** Mengambil aturan radius kedatangan yang berlaku pada validasi backend. */
+export async function getChargingSettings() {
+    const { data } = await api.get('/charging-settings');
+    return data.data ?? data;
+}
+
 // Bentuk respons API -> bentuk `activeSession` yang dipakai DriverDashboard.
 /** Menormalkan respons sesi backend ke bentuk yang dipakai dashboard driver. */
 export function toDashboardSession(s) {
@@ -22,7 +28,7 @@ export function toDashboardSession(s) {
         biaya_berjalan: s.biaya_berjalan ?? null,
         saldo_hold: s.saldo_hold ?? 0,
         tarif_per_kwh: s.tarif_per_kwh ?? 0,
-        biaya_parkir: s.biaya_parkir_per_jam ?? 0,
+        biaya_parkir: s.biaya_parkir_flat ?? 0,
         soc_awal: s.soc_awal ?? null,
         id_payment: s.id_payment ?? null,
         waktu_mulai: new Date(s.waktu_mulai).getTime(),

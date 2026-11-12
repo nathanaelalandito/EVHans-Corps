@@ -11,6 +11,7 @@ const STATUS_LOKASI = { Aktif: 'Aktif', Maintenance: 'Dalam Perawatan', Nonaktif
 function toDashboardStation(s) {
     return {
         id_location: s.id_location,
+        kode_station: s.kode_station,
         nama_lokasi: s.nama_lokasi,
         alamat: s.alamat,
         lat: s.lat ?? s.latitude,       // Menangani kedua kemungkinan nama key
@@ -20,11 +21,10 @@ function toDashboardStation(s) {
         charger_total: s.charger_total,
         tipe_konektor: (s.tipe_konektor ?? []).map(konektorLabel),
         daya_kw_max: s.daya_kw_max,
-        tarif_per_kwh: s.tarif?.harga_per_kwh ?? null,
+        tarif_per_kwh: s.tarif?.harga_per_kwh ?? s.tarif_per_kwh ?? null,
         jam_buka: s.jam_operasional?.buka ?? s.jam_buka,
         jam_tutup: s.jam_operasional?.tutup ?? s.jam_tutup,
         jarak_km: s.jarak_km,
-        rating: s.rating,
         biaya_parkir: s.biaya_parkir ?? 0,
         // Daftar charger + port (dipakai pemilih port di daftar station).
         chargers: s.chargers ?? [],
@@ -32,8 +32,9 @@ function toDashboardStation(s) {
 }
 
 /** Mengambil station dan menormalkan tiap record untuk peta/daftar driver. */
-export async function getStations() {
-    const { data } = await api.get('/stations');
+export async function getStations(position = null) {
+    const params = position ? { lat: position.lat, lng: position.lng } : {};
+    const { data } = await api.get('/stations', { params });
     return (data.data ?? data).map(toDashboardStation);
 }
 

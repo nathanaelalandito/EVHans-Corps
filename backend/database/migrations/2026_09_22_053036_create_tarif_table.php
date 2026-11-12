@@ -19,7 +19,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
             $table->integer('harga_per_kwh');
             $table->integer('biaya_minimum');
-            $table->integer('biaya_parkir_pjam');
+            $table->integer('biaya_parkir_flat');
             $table->datetime('periode_mulai');
             $table->datetime('periode_berakhir');
             $table->timestamps();

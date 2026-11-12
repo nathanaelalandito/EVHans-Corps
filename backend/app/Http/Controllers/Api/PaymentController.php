@@ -18,7 +18,6 @@ class PaymentController extends Controller
     {
         $payments = Payment::with([
             'method',
-            'refund',
             'session.charger.location',
             'session.port',
             'session.vehicle',
@@ -40,7 +39,6 @@ class PaymentController extends Controller
     {
         $payment = Payment::with([
             'method',
-            'refund',
             'session.charger.location',
             'session.port',
             'session.vehicle',
@@ -112,6 +110,7 @@ class PaymentController extends Controller
                 'id_payment' => $payment->id_payment,
                 'jenis_pembayaran' => 'topup',
                 'nama_lokasi' => 'Top Up Dompet Digital',
+                'kode_station' => null,
                 'kode_charger' => '-',
                 'metode_pembayaran' => $payment->method?->nama_metode,
                 'biaya_aktual' => $payment->total_bayar,
@@ -135,9 +134,13 @@ class PaymentController extends Controller
             'id_session' => $session?->id_session,
             'jenis_pembayaran' => 'charging',
             'nama_lokasi' => $session?->charger?->location?->nama_lokasi ?? 'Charging EV',
+            'kode_station' => $session?->charger?->location?->kode_station,
             'alamat' => $session?->charger?->location?->alamat,
             'kode_charger' => $session?->charger?->kode_perangkat,
             'nomor_port' => $session?->port?->nomor_port,
+            'tipe_konektor_port' => $session?->port
+                ? (Port::CONNECTOR_LABELS[$session->port->tipe_konektor] ?? $session->port->tipe_konektor)
+                : null,
             'kendaraan' => $session ? [
                 'nama' => "{$session->vehicle->merek} {$session->vehicle->model}",
                 'nomor_polisi' => $session->vehicle->nomor_polisi,
@@ -150,16 +153,11 @@ class PaymentController extends Controller
             'biaya_aktual' => $payment->total_bayar,
             'saldo_hold' => $session?->saldo_hold ?? 0,
             'jumlah_hold' => $session?->saldo_hold ?? 0,
-            'selisih_dikembalikan' => $payment->refund?->nominal ?? 0,
+            'selisih_dikembalikan' => $session ? max(0, (int) $session->saldo_hold - (int) $payment->total_bayar) : 0,
             'metode_pembayaran' => $payment->method?->nama_metode,
             'status' => $this->paymentStatusLabel($payment->status_pembayaran),
             'status_pembayaran' => $payment->status_pembayaran,
             'referensi_gateway' => $payment->referensi_gateway,
-            'refund' => $payment->refund ? [
-                'nominal' => $payment->refund->nominal,
-                'status' => $payment->refund->status_refund,
-                'waktu_execute' => $payment->refund->waktu_execute?->toISOString(),
-            ] : null,
             'waktu_mulai' => $session?->waktu_mulai?->toISOString(),
             'waktu_selesai' => $session?->waktu_selesai?->toISOString(),
             'waktu_pembayaran' => $payment->waktu_pembayaran?->toISOString(),

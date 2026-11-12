@@ -2,8 +2,8 @@
 
 return [
     // Jarak maksimum (meter) driver dari station agar boleh memulai sesi charging.
-    // Harus sama dengan ARRIVAL_RADIUS_M di frontend (src/api/station.js).
-    'arrival_radius_m' => (int) env('CHARGING_ARRIVAL_RADIUS_M', 200),
+    // Radius default yang disepakati untuk prototipe: 1 km.
+    'arrival_radius_m' => (int) env('CHARGING_ARRIVAL_RADIUS_M', 1000),
 
     // Set CHARGING_REQUIRE_ARRIVAL=false di .env HANYA untuk pengembangan
     // (mis. menguji dari laptop yang jauh dari station seeder).

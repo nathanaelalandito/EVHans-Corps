@@ -85,7 +85,8 @@ export default function ProfilOps({
         setProcessingId(alertItem.id);
         try {
             const token = getStoredToken();
-            await axios.post(`http://127.0.0.1:8000/api/operator/charger/${idCharger}/reboot`, {}, {
+            const reason = alertItem.message || `Tindak lanjut gangguan pada ${kode}`;
+            await axios.post(`http://127.0.0.1:8000/api/operator/charger/${idCharger}/reboot`, { alasan: `Tindak lanjut laporan: ${reason}`.slice(0, 500) }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

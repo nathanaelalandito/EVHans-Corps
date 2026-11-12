@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { FaMapMarkerAlt } from 'react-icons/fa';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FaMapMarkerAlt, FaRedoAlt } from 'react-icons/fa';
 import api from './api/client';
 import './operatorStationPicker.css';
 
@@ -10,11 +10,17 @@ import './operatorStationPicker.css';
 export default function OperatorStationPicker({ onStationChange }) {
     const [stations, setStations] = useState([]);
     const [activeId, setActiveId] = useState(() => localStorage.getItem('ev_active_station_id') || '');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const onStationChangeRef = useRef(onStationChange);
+    onStationChangeRef.current = onStationChange;
 
-    useEffect(() => {
-        let mounted = true;
-        api.get('/operator/stations').then(({ data }) => {
-            if (!mounted) return;
+    /** Memuat station yang ditugaskan dan memulihkan pilihan terakhir yang masih valid. */
+    const loadStations = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const { data } = await api.get('/operator/stations');
             const list = data.data || [];
             setStations(list);
             const saved = localStorage.getItem('ev_active_station_id');
@@ -23,11 +29,23 @@ export default function OperatorStationPicker({ onStationChange }) {
             if (nextId) {
                 localStorage.setItem('ev_active_station_id', String(nextId));
                 setActiveId(String(nextId));
+                if (!allowed) onStationChangeRef.current?.(String(nextId));
+            } else {
+                localStorage.removeItem('ev_active_station_id');
+                setActiveId('');
             }
-        }).catch(() => mounted && setStations([]));
-        return () => { mounted = false; };
+        } catch {
+            setError('Daftar station belum dapat dimuat.');
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
+    useEffect(() => {
+        loadStations();
+    }, [loadStations]);
+
+    /** Menyimpan pilihan station dan meminta dashboard memuat konteks station baru. */
     const selectStation = event => {
         const nextId = event.target.value;
         localStorage.setItem('ev_active_station_id', nextId);
@@ -35,6 +53,16 @@ export default function OperatorStationPicker({ onStationChange }) {
         onStationChange?.(nextId);
     };
 
-    if (stations.length < 2) return null;
-    return <label className="operator-station-picker"><FaMapMarkerAlt /><span>Station aktif</span><select value={activeId} onChange={selectStation}>{stations.map(station => <option key={station.id_location} value={station.id_location}>{station.nama_lokasi}</option>)}</select></label>;
+    if (loading) return <div className="operator-station-picker is-state" role="status"><FaMapMarkerAlt aria-hidden="true" /><span>Memuat station…</span></div>;
+    if (error) return <button className="operator-station-picker is-state is-error" type="button" onClick={loadStations}><FaRedoAlt aria-hidden="true" /><span>{error} Coba lagi</span></button>;
+    if (!stations.length) return <div className="operator-station-picker is-state" role="status"><FaMapMarkerAlt aria-hidden="true" /><span>Belum ada station tugas</span></div>;
+    return <label className="operator-station-picker">
+        <FaMapMarkerAlt aria-hidden="true" />
+        <span>Station aktif</span>
+        {stations.length === 1
+            ? <strong>{stations[0].kode_station} · {stations[0].nama_lokasi}</strong>
+            : <select aria-label="Pilih station aktif" value={activeId} onChange={selectStation}>
+                {stations.map(station => <option key={station.id_location} value={station.id_location}>{station.kode_station} · {station.nama_lokasi}</option>)}
+            </select>}
+    </label>;
 }

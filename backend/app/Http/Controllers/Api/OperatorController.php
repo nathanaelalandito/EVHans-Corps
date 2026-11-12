@@ -3,10 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\ChargingSession;
+use App\Models\Location;
+use App\Models\Tarif;
+use App\Services\TariffScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 /** Mengatur dashboard operator, unit/port charger, laporan, dan notifikasi station. */
 class OperatorController extends Controller
@@ -38,7 +44,7 @@ class OperatorController extends Controller
             ->join('location', 'station_operators.id_location', '=', 'location.id_location')
             ->where('station_operators.id_user', $request->user()->id_user)
             ->orderBy('station_operators.id_station_operator')
-            ->select('location.id_location', 'location.nama_lokasi', 'location.alamat')
+            ->select('location.id_location', 'location.kode_station', 'location.nama_lokasi', 'location.alamat')
             ->get();
 
         return response()->json(['status' => 'success', 'data' => $stations]);
@@ -48,19 +54,70 @@ class OperatorController extends Controller
     public function getActiveTarif(Request $request)
     {
         $assignment = $this->getOperatorAssignment($request->user());
-        if (! $assignment) return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
-        $tarif = DB::table('tarif')->where('id_location', $assignment->id_location)->latest('periode_mulai')->first();
-        return response()->json(['status' => 'success', 'data' => $tarif]);
+        if (! $assignment) {
+            return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
+        }
+        $tarifs = Tarif::where('id_location', $assignment->id_location)->orderBy('periode_mulai')->get();
+        $activeTariff = $tarifs->first(fn (Tarif $tarif): bool => $tarif->periode_mulai->lessThanOrEqualTo(now()) && $tarif->periode_berakhir->greaterThan(now())
+        );
+        $scheduledTariffs = $tarifs->filter(fn (Tarif $tarif): bool => $tarif->periode_mulai->isFuture())->values();
+
+        return response()->json(['status' => 'success', 'data' => ['active' => $activeTariff, 'scheduled' => $scheduledTariffs]]);
     }
 
     /** Menyimpan periode tarif baru untuk station aktif setelah validasi penugasan. */
     public function storeTarif(Request $request)
     {
         $assignment = $this->getOperatorAssignment($request->user());
-        if (! $assignment) return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
-        $data = $request->validate(['harga_per_kwh' => 'required|integer|min:100', 'biaya_minimum' => 'required|integer|min:0', 'biaya_parkir_pjam' => 'required|integer|min:0']);
-        $id = DB::table('tarif')->insertGetId($data + ['id_location' => $assignment->id_location, 'periode_mulai' => now(), 'periode_berakhir' => now()->addYear(), 'created_at' => now(), 'updated_at' => now()]);
-        return response()->json(['status' => 'success', 'message' => 'Tarif station aktif berhasil disimpan.', 'data' => ['id_tarif' => $id]], 201);
+        if (! $assignment) {
+            return response()->json(['message' => 'Station aktif tidak ditemukan dalam penugasan operator.'], 403);
+        }
+        $data = $request->validate([
+            'harga_per_kwh' => 'required|integer|min:100',
+            'biaya_minimum' => 'sometimes|nullable|integer|min:0',
+            'biaya_parkir_flat' => 'required|integer|min:0',
+            'mode' => 'required|in:immediate,scheduled',
+            'effective_at' => 'required_if:mode,scheduled|date|after:now',
+        ]);
+        $data['biaya_minimum'] = (int) ($data['biaya_minimum'] ?? 0);
+        $tariff = app(TariffScheduleService::class)->create(
+            Location::findOrFail($assignment->id_location),
+            $request->user(),
+            $data
+        );
+
+        return response()->json(['status' => 'success', 'message' => 'Tarif berhasil disimpan.', 'data' => $tariff], 201);
+    }
+
+    /** Mengubah jadwal tarif selama station masih termasuk penugasan Operator. */
+    public function rescheduleTarif(Request $request, string $tarif)
+    {
+        $assignment = $this->getOperatorAssignment($request->user());
+        $scheduledTariff = Tarif::where('id_tarif', $tarif)
+            ->where('id_location', $assignment?->id_location)
+            ->firstOrFail();
+        $data = $request->validate([
+            'harga_per_kwh' => 'required|integer|min:100',
+            'biaya_minimum' => 'sometimes|nullable|integer|min:0',
+            'biaya_parkir_flat' => 'required|integer|min:0',
+            'effective_at' => 'required|date|after:now',
+        ]);
+        $data['biaya_minimum'] = (int) ($data['biaya_minimum'] ?? $scheduledTariff->biaya_minimum ?? 0);
+        $updatedTariff = app(TariffScheduleService::class)->reschedule($scheduledTariff, $request->user(), $data);
+
+        return response()->json(['status' => 'success', 'message' => 'Jadwal tarif berhasil diperbarui.', 'data' => $updatedTariff]);
+    }
+
+    /** Membatalkan jadwal tarif yang belum berlaku pada station aktif Operator. */
+    public function cancelTarif(Request $request, string $tarif)
+    {
+        $assignment = $this->getOperatorAssignment($request->user());
+        $scheduledTariff = Tarif::where('id_tarif', $tarif)
+            ->where('id_location', $assignment?->id_location)
+            ->firstOrFail();
+        app(TariffScheduleService::class)->cancelScheduled($scheduledTariff, $request->user());
+
+        return response()->json(['status' => 'success', 'message' => 'Jadwal tarif berhasil dibatalkan.']);
     }
 
     /**
@@ -78,6 +135,7 @@ class OperatorController extends Controller
         }
 
         $idLocation = $assignment->id_location;
+        $station = Location::select('id_location', 'nama_lokasi', 'alamat')->find($idLocation);
 
         // 1. STATISTIK CHARGER & PORT DARI DATABASE
         $activeCharge = DB::table('charger')
@@ -89,9 +147,20 @@ class OperatorController extends Controller
             ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
             ->where('charger.id_location', $idLocation);
 
-        $availablePorts = (clone $portQuery)->whereRaw('LOWER(ports.status_port) = ?', ['available'])->count();
+        $availablePorts = (clone $portQuery)
+            ->whereRaw('LOWER(ports.status_port) = ?', ['available'])
+            ->whereRaw('LOWER(charger.status_mesin) = ?', ['active'])
+            ->count();
         $activeCharging = (clone $portQuery)->whereRaw('LOWER(ports.status_port) = ?', ['charging'])->count();
-        $errorPorts = (clone $portQuery)->whereIn(DB::raw('LOWER(ports.status_port)'), ['out of order', 'maintenance'])->count();
+        $errorPorts = (clone $portQuery)
+            ->where(function ($query) {
+                $query->whereIn(DB::raw('LOWER(ports.status_port)'), ['out of order', 'maintenance'])
+                    ->orWhere(function ($inactiveCharger) {
+                        $inactiveCharger->whereRaw('LOWER(charger.status_mesin) <> ?', ['active'])
+                            ->whereRaw('LOWER(ports.status_port) <> ?', ['charging']);
+                    });
+            })
+            ->count();
 
         // 2. PENDAPATAN HARI INI REAL DARI TABEL PAYMENT & CHARGING_SESSION
         $revenueToday = DB::table('payment')
@@ -154,6 +223,8 @@ class OperatorController extends Controller
 
             $activeSessions[] = [
                 'id' => $cp->id_port,
+                'id_session' => $cp->id_session,
+                'id_port' => $cp->id_port,
                 'port' => $cp->kode_perangkat.' - Port '.($cp->nomor_port ?? $cp->id_port),
                 'type' => ($cp->tipe_konektor ?? 'Konektor').' ('.$mode.')',
                 'vehicle' => trim(($cp->vehicle_model ?? '').' '.($cp->nomor_polisi ?? '')) ?: 'Sesi aktif',
@@ -166,6 +237,7 @@ class OperatorController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
+                'station' => $station,
                 'stats' => [
                     'activeCharging' => $activeCharging,
                     'availablePorts' => $availablePorts,
@@ -256,12 +328,24 @@ class OperatorController extends Controller
             return response()->json(['message' => 'Mesin charger tidak ditemukan atau di luar wilayah penugasan.'], 404);
         }
 
-        $request->validate([
+        $data = $request->validate([
             'kode_perangkat' => 'sometimes|string|max:12|unique:charger,kode_perangkat,'.$id.',id_charger',
             'merek_model' => 'sometimes|string|max:100',
             'kap_tot_kw' => 'sometimes|numeric',
             'status_mesin' => 'sometimes|in:Active,Maintenance,Offline',
         ]);
+
+        if (($data['status_mesin'] ?? $charger->status_mesin) !== $charger->status_mesin) {
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'id_location' => $charger->id_location,
+                'aksi' => 'ubah_status_charger',
+                'entitas' => 'charger',
+                'id_entitas' => (string) $charger->id_charger,
+                'data_sebelum' => ['status' => $charger->status_mesin],
+                'data_sesudah' => ['status' => $data['status_mesin']],
+            ]);
+        }
 
         DB::table('charger')->where('id_charger', $id)->update([
             'kode_perangkat' => $request->input('kode_perangkat', $charger->kode_perangkat),
@@ -336,27 +420,59 @@ class OperatorController extends Controller
         return $this->updateChargerStatus($request, $id, 'Maintenance', 'Perangkat berhasil direboot dan dialihkan ke mode maintenance.');
     }
 
-    /** Memeriksa akses dan sesi aktif sebelum mengubah status unit charger. */
+    /** Menyelesaikan sesi aktif beserta hold sebelum mengubah status unit charger. */
     private function updateChargerStatus(Request $request, $id, string $status, string $successMessage)
     {
+        $reason = $request->validate([
+            'alasan' => ['required', 'string', 'min:5', 'max:500'],
+        ])['alasan'];
+
         $assignment = $this->getOperatorAssignment($request->user());
         if (! $assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
 
-        $updated = DB::table('charger')
-            ->where('id_charger', $id)
-            ->where('id_location', $assignment->id_location)
-            ->update([
+        $charger = DB::table('charger')->where('id_charger', $id)->where('id_location', $assignment->id_location)->first();
+        if (! $charger) {
+            return response()->json(['message' => 'Charger tidak ditemukan atau di luar station penugasan.'], 404);
+        }
+
+        DB::transaction(function () use ($request, $id, $status, $charger, $assignment, $reason): void {
+            $sessions = $reason === null ? collect() : ChargingSession::where('id_charger', $id)
+                ->where('status', 'Berlangsung')
+                ->lockForUpdate()
+                ->get();
+            foreach ($sessions as $session) {
+                $settlement = app(ChargingSessionController::class)->stopByOperator($request, $session);
+                if ($settlement->getStatusCode() >= 400) {
+                    throw ValidationException::withMessages([
+                        'sesi' => $settlement->getData()->message ?? 'Sesi aktif tidak dapat diselesaikan.',
+                    ]);
+                }
+            }
+
+            DB::table('charger')->where('id_charger', $id)->where('id_location', $assignment->id_location)->update([
                 'status_mesin' => $status,
                 'updated_at' => now(),
             ]);
+            if ($charger->status_mesin !== $status) {
+                AuditLog::create([
+                    'id_user' => $request->user()->id_user,
+                    'id_location' => $assignment->id_location,
+                    'aksi' => 'ubah_status_charger',
+                    'entitas' => 'charger',
+                    'id_entitas' => (string) $id,
+                    'data_sebelum' => ['status' => $charger->status_mesin],
+                    'data_sesudah' => ['status' => $status],
+                    'alasan' => $reason,
+                ]);
+            }
+        });
 
-        if (! $updated) {
-            return response()->json(['message' => 'Mesin charger tidak ditemukan atau di luar wilayah penugasan.'], 404);
-        }
-
-        return response()->json(['status' => 'success', 'message' => $successMessage]);
+        return response()->json([
+            'status' => 'success',
+            'message' => $successMessage.($reason ? ' Jika ada sesi aktif, biaya aktual diselesaikan dan sisa saldo hold dikembalikan.' : ''),
+        ]);
     }
 
     /** Menghapus unit charger setelah memeriksa kepemilikan lingkup operator. */
@@ -415,7 +531,6 @@ class OperatorController extends Controller
             'tipe_konektor' => 'required|string|max:50',
             'tipe_charging' => 'required|string|max:50',
             'daya_maks_kw' => 'required|numeric',
-            'status_port' => 'sometimes|in:Available,Charging,Reserved,Out of Order',
         ]);
 
         $assignment = $this->getOperatorAssignment($request->user());
@@ -438,7 +553,7 @@ class OperatorController extends Controller
             'tipe_konektor' => $request->tipe_konektor,
             'tipe_charging' => $request->tipe_charging,
             'daya_maks_kw' => $request->daya_maks_kw,
-            'status_port' => $request->input('status_port', 'Available'),
+            'status_port' => 'Available',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -450,7 +565,7 @@ class OperatorController extends Controller
         ], 201);
     }
 
-    /** Mengubah konektor, daya, atau status port setelah pemeriksaan akses. */
+    /** Mengubah spesifikasi port tanpa mengizinkan perubahan manual saat sesi berlangsung. */
     public function updatePort(Request $request, $id)
     {
         $assignment = $this->getOperatorAssignment($request->user());
@@ -474,7 +589,6 @@ class OperatorController extends Controller
             'tipe_konektor' => 'sometimes|string|max:50',
             'tipe_charging' => 'sometimes|string|max:50',
             'daya_maks_kw' => 'sometimes|numeric',
-            'status_port' => 'sometimes|in:Available,Charging,Reserved,Out of Order',
         ]);
 
         DB::table('ports')->where('id_port', $id)->update([
@@ -482,7 +596,6 @@ class OperatorController extends Controller
             'tipe_konektor' => $request->input('tipe_konektor', $port->tipe_konektor),
             'tipe_charging' => $request->input('tipe_charging', $port->tipe_charging),
             'daya_maks_kw' => $request->input('daya_maks_kw', $port->daya_maks_kw),
-            'status_port' => $request->input('status_port', $port->status_port),
             'updated_at' => now(),
         ]);
 
@@ -507,9 +620,13 @@ class OperatorController extends Controller
         return $this->updatePortStatus($request, $id, 'Out of Order', 'Port berhasil direboot.');
     }
 
-    /** Menjalankan perubahan status port dengan validasi akses dan sesi aktif. */
+    /** Menyelesaikan sesi aktif pada port sebelum mengubah status operasionalnya. */
     private function updatePortStatus(Request $request, $id, string $status, string $message)
     {
+        $reason = $request->validate([
+            'alasan' => ['required', 'string', 'min:5', 'max:500'],
+        ])['alasan'];
+
         $assignment = $this->getOperatorAssignment($request->user());
         if (! $assignment) {
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
@@ -519,19 +636,49 @@ class OperatorController extends Controller
             ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
             ->where('ports.id_port', $id)
             ->where('charger.id_location', $assignment->id_location)
-            ->select('ports.id_port')
+            ->select('ports.id_port', 'ports.status_port', 'charger.id_location')
             ->first();
 
         if (! $port) {
             return response()->json(['message' => 'Port tidak ditemukan atau di luar wilayah penugasan.'], 404);
         }
 
-        DB::table('ports')->where('id_port', $id)->update([
-            'status_port' => $status,
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($request, $id, $status, $assignment, $port, $reason): void {
+            $session = ChargingSession::where('id_port', $id)
+                ->where('status', 'Berlangsung')
+                ->lockForUpdate()
+                ->first();
+            if ($session) {
+                $settlement = app(ChargingSessionController::class)->stopByOperator($request, $session);
+                if ($settlement->getStatusCode() >= 400) {
+                    throw ValidationException::withMessages([
+                        'sesi' => $settlement->getData()->message ?? 'Sesi aktif tidak dapat diselesaikan.',
+                    ]);
+                }
+            }
 
-        return response()->json(['status' => 'success', 'message' => $message]);
+            DB::table('ports')->where('id_port', $id)->update([
+                'status_port' => $status,
+                'updated_at' => now(),
+            ]);
+            if ($port->status_port !== $status) {
+                AuditLog::create([
+                    'id_user' => $request->user()->id_user,
+                    'id_location' => $assignment->id_location,
+                    'aksi' => 'ubah_status_port',
+                    'entitas' => 'port',
+                    'id_entitas' => (string) $id,
+                    'data_sebelum' => ['status' => $port->status_port],
+                    'data_sesudah' => ['status' => $status],
+                    'alasan' => $reason,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $message.($reason ? ' Sesi aktif diselesaikan dan saldo hold direkonsiliasi.' : ''),
+        ]);
     }
 
     /** Menghapus port setelah memastikan port berada pada station operator. */
@@ -661,6 +808,7 @@ class OperatorController extends Controller
             ['id_user' => $request->user()->id_user],
             $data + ['updated_at' => now(), 'created_at' => now()]
         );
+
         return response()->json(['status' => 'success', 'message' => 'Informasi akun berhasil diperbarui.']);
     }
 
@@ -727,24 +875,56 @@ class OperatorController extends Controller
     /** Mencatat tindakan operator atas laporan gangguan charger. */
     public function handleMalfunctionAction(Request $request, $idCharger, $idLog)
     {
+        $reason = $request->validate([
+            'alasan' => ['required', 'string', 'min:5', 'max:500'],
+        ])['alasan'];
         $assignment = $this->getOperatorAssignment($request->user());
+        if (! $assignment) {
+            return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
+        }
 
-        // 1. Ubah status mesin charger menjadi 'Maintenance'
-        DB::table('charger')
+        $charger = DB::table('charger')
             ->where('id_charger', $idCharger)
             ->where('id_location', $assignment->id_location)
-            ->update([
-                'status_mesin' => 'Maintenance',
-                'updated_at' => now(),
-            ]);
-
-        // 2. Perbarui status penanganan di error_log
-        DB::table('error_log')
+            ->first();
+        $errorLog = DB::table('error_log')
             ->where('id_log', $idLog)
-            ->update([
+            ->where('id_charger', $idCharger)
+            ->first();
+        if (! $charger || ! $errorLog) {
+            return response()->json(['message' => 'Laporan gangguan tidak ditemukan pada station penugasan.'], 404);
+        }
+
+        // Settlement sesi dan perubahan status berjalan dalam satu transaksi.
+        DB::transaction(function () use ($request, $assignment, $charger, $errorLog, $idCharger, $idLog, $reason): void {
+            $statusResponse = $this->updateChargerStatus(
+                $request,
+                $idCharger,
+                'Maintenance',
+                'Status unit charger berhasil dialihkan ke mode Maintenance.'
+            );
+            if ($statusResponse->getStatusCode() >= 400) {
+                throw ValidationException::withMessages([
+                    'status' => $statusResponse->getData()->message ?? 'Status charger tidak dapat diperbarui.',
+                ]);
+            }
+
+            // Perbarui status laporan gangguan dan rekam konteks tindak lanjut.
+            DB::table('error_log')->where('id_log', $idLog)->update([
                 'status_tanganan' => 'Sedang Ditangani',
                 'updated_at' => now(),
             ]);
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'id_location' => $assignment->id_location,
+                'aksi' => 'tangani_gangguan_charger',
+                'entitas' => 'charger',
+                'id_entitas' => (string) $idCharger,
+                'data_sebelum' => ['status' => $charger->status_mesin, 'status_laporan' => $errorLog->status_tanganan],
+                'data_sesudah' => ['status' => 'Maintenance', 'status_laporan' => 'Sedang Ditangani'],
+                'alasan' => $reason,
+            ]);
+        });
 
         return response()->json([
             'status' => 'success',

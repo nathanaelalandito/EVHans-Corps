@@ -22,7 +22,7 @@ class DompetPinController extends Controller
     /**
      * Batas percobaan PIN salah sebelum dompet dikunci sementara.
      */
-    protected int $maxAttempt = 5;
+    protected int $maxAttempt = 3;
 
     /**
      * Lama waktu kunci (menit) setelah percobaan salah melebihi batas.

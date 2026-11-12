@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /** Model transaksi keuangan untuk sesi charging atau pengisian saldo. */
 class Payment extends Model
@@ -38,11 +37,5 @@ class Payment extends Model
     public function topup(): HasOne
     {
         return $this->hasOne(Topup::class, 'id_payment', 'id_payment');
-    }
-
-    /** Data refund yang dikaitkan ke transaksi pada implementasi saat ini. */
-    public function refund(): HasOne
-    {
-        return $this->hasOne(Refund::class, 'id_payment', 'id_payment');
     }
 }

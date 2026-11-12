@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FiBarChart2, FiCheck, FiZap } from 'react-icons/fi';
 import './startCharging.css';
 import { getStationDetail, konektorLabel, sameConnector } from './api/station';
 import { prepareCharging, estimateCharging, startCharging } from './api/charging';
@@ -265,7 +266,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                             {step === 'ready' ? 'Charging berjalan' : `Langkah ${stepNo} dari 6`}
                         </span>
                         <h2 className="sd-title">{titles[step]}</h2>
-                        <p className="sd-address">{station.nama_lokasi}</p>
+                        <p className="sd-address">{station.kode_station} · {station.nama_lokasi}</p>
                     </div>
                     <button className="sd-close" onClick={handleClose} disabled={busy} aria-label="Tutup">
                         ✕
@@ -464,7 +465,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                                     <dt>
                                         Biaya parkir
                                         <small>
-                                            {estimate.jam_parkir} jam × {rupiah(estimate.biaya_parkir_per_jam)}
+                                            Biaya flat {rupiah(estimate.biaya_parkir_flat)}
                                         </small>
                                     </dt>
                                     <dd>{rupiah(estimate.biaya_parkir)}</dd>
@@ -519,7 +520,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                     {/* Ready */}
                     {step === 'ready' && session && (
                         <div className="sc-plug">
-                            <div className="sc-plug-icon" aria-hidden="true">⚡</div>
+                            <div className="sc-plug-icon" aria-hidden="true"><FiZap /></div>
                             <h3 className="sc-plug-title">Sesi charging dimulai</h3>
                             <p className="sc-soc-big">{session.soc_awal ?? '-'}%</p>
                             <p className="sd-muted">
@@ -545,7 +546,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                                 Kembali
                             </button>
                             <button className="sd-primary sc-submit" onClick={handlePlugged} disabled={busy}>
-                                {busy ? 'Memeriksa…' : '✅ Kabel sudah terpasang'}
+                                {busy ? 'Memeriksa…' : <><FiCheck aria-hidden="true" /> Kabel sudah terpasang</>}
                             </button>
                         </>
                     )}
@@ -560,7 +561,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                                 Kembali
                             </button>
                             <button className="sd-primary sc-submit" onClick={handleCalculate} disabled={!kwhValid || busy}>
-                                {busy ? 'Menghitung…' : '🧮 Hitung Estimasi'}
+                                {busy ? 'Menghitung…' : <><FiBarChart2 aria-hidden="true" /> Hitung Estimasi</>}
                             </button>
                         </>
                     )}
@@ -584,7 +585,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                                 Kembali
                             </button>
                             <button className="sd-primary sc-submit" onClick={handleStart} disabled={!pinValid || busy}>
-                                {busy ? 'Memulai…' : '⚡ Mulai Charging'}
+                                {busy ? 'Memulai…' : <><FiZap aria-hidden="true" /> Mulai Charging</>}
                             </button>
                         </>
                     )}

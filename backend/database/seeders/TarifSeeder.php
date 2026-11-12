@@ -17,7 +17,7 @@ class TarifSeeder extends Seeder
                 'id_location'        => 2,
                 'harga_per_kwh'      => 2466,        // Tarif resmi curah SPKLU PLN (Rp/kWh)
                 'biaya_minimum'      => 15000,       // Minimum transaksi charge
-                'biaya_parkir_pjam'  => 5000,        // Biaya parkir per jam di stasiun
+                'biaya_parkir_flat'  => 5000,        // Biaya parkir flat per sesi di stasiun
                 'periode_mulai'      => Carbon::now()->startOfYear(), // Berlaku sejak awal tahun
                 'periode_berakhir'   => Carbon::now()->endOfYear(),   // Berlaku sampai akhir tahun
                 'created_at'         => now(),

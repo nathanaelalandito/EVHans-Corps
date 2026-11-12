@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
 trait ChecksWalletPin
 {
     /** Batas percobaan PIN salah sebelum dompet dikunci sementara. */
-    protected int $maxAttempt = 5;
+    protected int $maxAttempt = 3;
 
     /** Lama waktu kunci (menit) setelah percobaan salah melebihi batas. */
     protected int $lockMinutes = 15;

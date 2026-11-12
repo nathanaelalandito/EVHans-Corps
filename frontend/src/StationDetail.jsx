@@ -125,6 +125,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
                 <header className="sd-head">
                     <div className="sd-head-text">
                         <span className={`sd-badge ${badgeTone}`}>{badgeText}</span>
+                        <small className="sd-station-code">{station.kode_station}</small>
                         <h2 className="sd-title">{station.nama_lokasi}</h2>
                         <p className="sd-address">{station.alamat}</p>
                     </div>
@@ -164,11 +165,11 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
                             </div>
                             <div>
                                 <dt>Biaya minimum</dt>
-                                <dd>{detail ? rupiah(detail.tarif?.biaya_minimum) : placeholder}</dd>
+                                <dd>{detail ? (Number(detail.tarif?.biaya_minimum ?? 0) > 0 ? rupiah(detail.tarif.biaya_minimum) : 'Tidak ada') : placeholder}</dd>
                             </div>
                             <div>
-                                <dt>Parkir / jam</dt>
-                                <dd>{detail ? rupiah(detail.tarif?.biaya_parkir_per_jam) : placeholder}</dd>
+                                <dt>Parkir flat / sesi</dt>
+                                <dd>{detail ? rupiah(detail.tarif?.biaya_parkir_flat) : placeholder}</dd>
                             </div>
                         </dl>
                     )}

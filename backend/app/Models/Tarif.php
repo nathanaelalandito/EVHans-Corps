@@ -19,7 +19,7 @@ class Tarif extends Model
         'id_location',
         'harga_per_kwh',
         'biaya_minimum',
-        'biaya_parkir_pjam',
+        'biaya_parkir_flat',
         'periode_mulai',
         'periode_berakhir',
     ];
@@ -27,7 +27,7 @@ class Tarif extends Model
     protected $casts = [
         'harga_per_kwh' => 'integer',
         'biaya_minimum' => 'integer',
-        'biaya_parkir_pjam' => 'integer',
+        'biaya_parkir_flat' => 'integer',
         'periode_mulai' => 'datetime',
         'periode_berakhir' => 'datetime',
     ];
@@ -48,14 +48,14 @@ class Tarif extends Model
         $now = Carbon::now();
 
         return $query->where('periode_mulai', '<=', $now)
-            ->where('periode_berakhir', '>=', $now);
+            ->where('periode_berakhir', '>', $now);
     }
 
     /**
      * Rincian biaya untuk sejumlah kWh pada port berdaya $powerKw:
      *  - biaya charging = kWh x tarif/kWh, minimal biaya minimum
      *  - durasi         = kWh / daya port (kW)
-     *  - biaya parkir   = tarif parkir x jam berjalan (dibulatkan ke atas, min. 1 jam)
+     *  - biaya parkir   = biaya flat sekali untuk setiap sesi
      * Dipakai bersama oleh estimasi (start), penyelesaian sesi, dan invoice.
      */
     /** Menghitung estimasi biaya energi dan parkir untuk jumlah energi tertentu. */
@@ -67,8 +67,7 @@ class Tarif extends Model
 
         $chargingCost = max((int) round($kwh * $this->harga_per_kwh), (int) $this->biaya_minimum);
 
-        $parkingHours = max(1, (int) ceil($durationMinutes / 60));
-        $parkingCost = $parkingHours * (int) $this->biaya_parkir_pjam;
+        $parkingCost = (int) $this->biaya_parkir_flat;
 
         return [
             'target_kwh' => $kwh,
@@ -77,8 +76,7 @@ class Tarif extends Model
             'harga_per_kwh' => (int) $this->harga_per_kwh,
             'biaya_minimum' => (int) $this->biaya_minimum,
             'biaya_charging' => $chargingCost,
-            'jam_parkir' => $parkingHours,
-            'biaya_parkir_per_jam' => (int) $this->biaya_parkir_pjam,
+            'biaya_parkir_flat' => (int) $this->biaya_parkir_flat,
             'biaya_parkir' => $parkingCost,
             'total' => $chargingCost + $parkingCost,
         ];
