@@ -1,0 +1,541 @@
+/* --- RESET & BASE LAYOUT --- */
+.rep-layout-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #fefae0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+/* --- HEADER --- */
+.rep-header {
+    height: 90px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.rep-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.rep-logo-box {
+    width: 60px;
+    height: 60px;
+    display: flex ;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0 ;
+}
+
+.rep-logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.rep-welcome-text h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1b5e20;
+    margin: 0 ;
+}
+
+.rep-welcome-text p {
+    font-size: 0.85rem;
+    color: #4e8550; 
+    margin: 2px 0 0 0;
+}
+
+.rep-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.rep-icon-btn {
+    background: #f1f8f4;
+    border: 1px solid #c8e6c9;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2e7d32;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.rep-icon-btn:hover {
+    background: #e8f5e9;
+    color: #1b5e20;
+}
+
+.rep-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #d32f2f;
+    color: white;
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    border-radius: 10px;
+    font-weight: bold;
+}
+
+/* --- BODY WRAPPER --- */
+.rep-body-wrapper {
+    display: flex;
+    flex: 1;
+    height: calc(100vh - 90px);
+    overflow: hidden;
+}
+
+/* --- SIDEBAR --- */
+.rep-sidebar {
+    width: 260px;
+    min-width: 260px;
+    background-color: #1b5e20;
+    color: #e8f5e9;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 0;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.rep-menu-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.rep-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    border-left: 4px solid transparent;
+}
+
+.rep-menu-item:hover {
+    background-color: #2e7d32!important;
+    color: #ffffff!important;
+}
+
+.rep-menu-item.active {
+    background-color: #76c457!important;
+    color: #1b5e20!important;
+    font-weight: 600!important;
+    border-left-color: #ffffff!important;
+}
+
+.rep-menu-icon {
+    font-size: 1.1rem!important;
+}
+
+.rep-sidebar-footer {
+    padding: 0 20px;
+}
+
+.rep-logout-btn {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffcdd2;
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.2s;
+}
+
+.rep-logout-btn:hover {
+    background: rgba(211, 47, 47, 0.2);
+    color: #ffebee;
+}
+
+
+/* Main Content Area */
+.rep-main-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.rep-dashboard-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.rep-dash-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.rep-dash-title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.rep-dash-title p {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 4px 0 0 0;
+}
+
+.rep-refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.rep-refresh-btn:hover {
+    background: #f9fafb;
+}
+
+.rep-refresh-btn.success {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+
+.rep-refresh-btn.success:hover {
+    background: #059669;
+}
+
+/* Filter & Table Section */
+.tr-filter-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tr-filter-wrapper {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tr-search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 250px;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+.tr-search-box input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    color: #1f2937;
+}
+
+.tr-select-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+.tr-select-box select {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    color: #1f2937;
+    cursor: pointer;
+}
+
+.rep-table-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rep-table-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+.rep-table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.rep-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 14px;
+}
+
+.rep-data-table th {
+    background-color: #f8fafc;
+    color: #4b5563;
+    font-weight: 600;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.rep-data-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #1f2937;
+}
+
+.rep-data-table tr:hover {
+    background-color: #f9fafb;
+}
+
+.rep-sub-text {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.uppercase {
+    text-transform: uppercase;
+}
+
+/* Status Badges */
+.rep-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.rep-status-badge.completed {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.rep-status-badge.failed {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.rep-status-badge.active {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.rep-empty-row {
+    text-align: center;
+    padding: 30px !important;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* ========================================================
+   MODAL OVERLAY NOTIFIKASI & PENGATURAN (PREFIX REP)
+   ======================================================== */
+   .rep-modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+}
+
+.rep-modal-dialog {
+    background: #ffffff;
+    width: 92%;
+    max-width: 520px;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+    overflow: hidden;
+}
+
+.rep-modal-dialog.settings-box {
+    max-width: 440px;
+}
+
+.rep-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #fbfdfb;
+    border-bottom: 1px solid #e0e0e0;
+}
+.rep-modal-head h3 { margin: 0; font-size: 1.15rem; color: #1b5e20; }
+.rep-modal-head p { margin: 2px 0 0 0; font-size: 0.8rem; color: #4e8550; }
+
+.rep-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    color: #64748b;
+    cursor: pointer;
+}
+
+/* Tabs Notifikasi */
+.rep-notif-tabs {
+    display: flex;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.rep-tab-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-bottom: 3px solid transparent;
+}
+
+.rep-tab-btn.active {
+    background: #ffffff;
+    color: #1b5e20;
+    border-bottom-color: #1b5e20;
+}
+
+.rep-modal-body {
+    padding: 16px 20px;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+/* Kartu Item Notifikasi */
+.rep-notif-card {
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+    border: 1px solid transparent;
+}
+.rep-notif-card.danger { background: #fef2f2; border-color: #fecaca; }
+.rep-notif-card.warning { background: #fffbeb; border-color: #fde68a; }
+
+.rep-notif-title-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.rep-notif-badge-danger { color: #dc2626; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+.rep-notif-badge-warning { color: #d97706; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+.rep-notif-time { font-size: 0.75rem; color: #94a3b8; }
+.rep-notif-text { margin: 4px 0 10px 0; font-size: 0.88rem; color: #1e293b; line-height: 1.4; }
+.rep-info-note { font-size: 0.75rem; color: #64748b; font-style: italic; }
+
+.rep-notif-footer-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.rep-btn-action-maintenance {
+    background: #dc2626;
+    color: white;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+}
+.rep-btn-action-maintenance:hover { background: #b91c1c; }
+
+.rep-btn-action-link {
+    background: none;
+    border: none;
+    color: #0284c7;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.rep-notif-empty {
+    text-align: center;
+    padding: 30px;
+    color: #64748b;
+}
+
+/* Pengaturan Items */
+.rep-setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.rep-setting-item strong { font-size: 0.9rem; color: #1e293b; }
+.rep-setting-item p { margin: 2px 0 0 0; font-size: 0.78rem; color: #64748b; }
+.rep-setting-item select { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; }

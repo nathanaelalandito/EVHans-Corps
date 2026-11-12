@@ -1,0 +1,368 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
+
+/* Palet mengikuti dashboard & Kelola Kendaraan: hijau #1b4d2e / #2e7d32,
+   krem #eef0df, aksen mint #eaf7e5, garis krem #eee6c9. */
+
+.bt-page {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: #eef0df;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    color: #1b1f16;
+}
+
+@keyframes btFadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------- Header hijau melengkung ---------------- */
+.bt-header {
+    background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
+    border-radius: 0 0 28px 28px;
+    animation: btFadeUp 0.4s ease both;
+}
+
+.bt-header-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.bt-back-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.bt-back-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.bt-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    color: #ffffff;
+    margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.bt-header-spacer {
+    width: 38px;
+    flex-shrink: 0;
+}
+
+.bt-header-sub {
+    margin: 14px 0 0;
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+/* ---------------- Pencarian ---------------- */
+.bt-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
+    padding: 0 14px;
+    margin: -28px 16px 0;
+    position: relative;
+    z-index: 2;
+    animation: btFadeUp 0.4s ease 0.05s both;
+}
+
+.bt-search:focus-within {
+    outline: 2px solid #2e7d32;
+    outline-offset: 1px;
+}
+
+.bt-search-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.bt-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    color: #1b1f16;
+    padding: 15px 0;
+}
+
+.bt-search-input::placeholder {
+    color: #8a8f7c;
+}
+
+.bt-search-clear {
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: #eef0df;
+    color: #55603f;
+    font-size: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* ---------------- Konten ---------------- */
+.bt-content {
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 18px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+    animation: btFadeUp 0.4s ease 0.1s both;
+}
+
+.bt-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+}
+
+.bt-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.bt-chip {
+    flex-shrink: 0;
+    border: 1px solid #eee6c9;
+    background: #ffffff;
+    color: #3b4a2c;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.bt-chip:hover {
+    border-color: #2e7d32;
+}
+
+.bt-chip-active {
+    background: #1b4d2e;
+    border-color: #1b4d2e;
+    color: #ffffff;
+}
+
+.bt-section-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1b4d2e;
+    margin: 22px 0 10px;
+}
+
+/* ---------------- FAQ (accordion) ---------------- */
+.bt-faq-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bt-faq {
+    background: #ffffff;
+    border: 1px solid #eee6c9;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.bt-faq-open {
+    border-color: #2e7d32;
+    box-shadow: 0 6px 16px rgba(27, 77, 46, 0.1);
+}
+
+.bt-faq-q {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 16px;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1b1f16;
+    text-align: left;
+    cursor: pointer;
+}
+
+.bt-faq-q:focus-visible,
+.bt-contact-card:focus-visible,
+.bt-chip:focus-visible,
+.bt-back-btn:focus-visible {
+    outline: 2px solid #2e7d32;
+    outline-offset: 2px;
+}
+
+.bt-faq-caret {
+    font-size: 20px;
+    line-height: 1;
+    color: #2e7d32;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.bt-faq-open .bt-faq-caret {
+    transform: rotate(90deg);
+}
+
+.bt-faq-a {
+    padding: 0 16px 16px;
+    animation: btFadeUp 0.2s ease both;
+}
+
+.bt-faq-a p {
+    margin: 8px 0 0;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #3b4a2c;
+}
+
+.bt-faq-tag {
+    display: inline-block;
+    background: #eaf7e5;
+    color: #1b4d2e;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+}
+
+/* ---------------- Kosong ---------------- */
+.bt-empty {
+    text-align: center;
+    background: #ffffff;
+    border: 1px dashed #d9d2b0;
+    border-radius: 16px;
+    padding: 28px 20px;
+}
+
+.bt-empty-icon {
+    font-size: 30px;
+}
+
+.bt-empty-title {
+    margin: 8px 0 4px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1b1f16;
+    overflow-wrap: anywhere;
+}
+
+.bt-empty-text {
+    margin: 0;
+    font-size: 13px;
+    color: #55603f;
+    line-height: 1.5;
+}
+
+/* ---------------- Kontak ---------------- */
+.bt-contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bt-contact-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #eee6c9;
+    border-radius: 16px;
+    padding: 13px 16px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.bt-contact-card:hover {
+    border-color: #2e7d32;
+    transform: translateY(-1px);
+}
+
+.bt-contact-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #eaf7e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.bt-contact-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.bt-contact-label {
+    font-size: 12px;
+    color: #6b7259;
+}
+
+.bt-contact-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1b1f16;
+    overflow-wrap: anywhere;
+}
+
+.bt-contact-hours {
+    margin: 12px 4px 0;
+    font-size: 12.5px;
+    color: #55603f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bt-header,
+    .bt-search,
+    .bt-content,
+    .bt-faq-a {
+        animation: none;
+    }
+    .bt-faq-caret,
+    .bt-contact-card {
+        transition: none;
+    }
+}

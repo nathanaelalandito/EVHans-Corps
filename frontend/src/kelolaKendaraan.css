@@ -1,0 +1,802 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
+
+/* Palet mengikuti dashboard: hijau #1b4d2e / #2e7d32, krem #eef0df,
+   aksen mint #eaf7e5, garis krem #eee6c9. */
+
+.kk-page {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: #eef0df;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    color: #1b1f16;
+}
+
+@keyframes kkFadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kkShimmer {
+    0% { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
+}
+
+@keyframes kkSheetUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* ---------------- Header hijau melengkung ---------------- */
+.kk-header {
+    background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
+    border-radius: 0 0 28px 28px;
+    animation: kkFadeUp 0.4s ease both;
+}
+
+.kk-header-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.kk-back-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.kk-back-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.kk-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 19px;
+    color: #ffffff;
+    margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.kk-header-spacer {
+    width: 38px;
+    flex-shrink: 0;
+}
+
+.kk-header-sub {
+    margin: 14px 0 0;
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+/* ---------------- Kartu ringkasan ---------------- */
+.kk-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
+    padding: 14px 16px;
+    margin: -40px 16px 0;
+    position: relative;
+    z-index: 2;
+    animation: kkFadeUp 0.4s ease 0.05s both;
+}
+
+.kk-summary-main {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.kk-summary-count {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1;
+    color: #1b4d2e;
+}
+
+.kk-summary-label {
+    font-size: 12.5px;
+    color: #8a927a;
+    font-weight: 500;
+}
+
+.kk-summary-types {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.kk-summary-none {
+    font-size: 12px;
+    color: #a8ae9a;
+}
+
+.kk-chip {
+    background: #eaf7e5;
+    color: #2e7d32;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+/* ---------------- Content ---------------- */
+.kk-content {
+    flex: 1;
+    padding: 22px 16px 110px;
+}
+
+.kk-section-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 15.5px;
+    color: #1b4d2e;
+    margin: 0 0 12px 2px;
+}
+
+/* ---------------- Error & empty state ---------------- */
+.kk-state {
+    text-align: center;
+    color: #8a927a;
+    padding: 40px 16px;
+    font-size: 14px;
+}
+
+.kk-state-icon {
+    font-size: 34px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.kk-state-error p {
+    color: #b3261e;
+    margin: 0 0 14px;
+}
+
+.kk-retry-btn {
+    border: none;
+    background: #1b4d2e;
+    color: #ffffff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+}
+
+.kk-retry-btn:hover {
+    background: #163f26;
+}
+
+.kk-empty {
+    text-align: center;
+    background: #ffffff;
+    border: 1.5px dashed #d9dfc4;
+    border-radius: 22px;
+    padding: 40px 24px 32px;
+    animation: kkFadeUp 0.4s ease 0.1s both;
+}
+
+.kk-empty-icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: #eaf7e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin: 0 auto 14px;
+}
+
+.kk-empty-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 17px;
+    color: #1b4d2e;
+    margin: 0 0 6px;
+}
+
+.kk-empty-sub {
+    font-size: 13.5px;
+    color: #8a927a;
+    margin: 0 0 20px;
+    line-height: 1.55;
+}
+
+.kk-empty-cta {
+    border: none;
+    background: #1b4d2e;
+    color: #ffffff;
+    padding: 13px 26px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(27, 77, 46, 0.22);
+}
+
+.kk-empty-cta:hover {
+    background: #163f26;
+}
+
+/* ---------------- List & cards ---------------- */
+.kk-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kk-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #ffffff;
+    border: 1.5px solid #eee6c9;
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+    animation: kkFadeUp 0.35s ease both;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.kk-card:hover {
+    border-color: #cfe6c8;
+    box-shadow: 0 8px 22px rgba(27, 77, 46, 0.12);
+}
+
+.kk-card-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: #eaf7e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    flex-shrink: 0;
+}
+
+.kk-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.kk-card-name {
+    font-weight: 700;
+    font-size: 14.5px;
+    color: #1b1f16;
+    margin: 0 0 7px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kk-card-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Plat nomor bergaya pelat kendaraan */
+.kk-plate {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    color: #1b1f16;
+    background: #fffdf0;
+    border: 1.5px solid #1b1f16;
+    border-radius: 6px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+
+.kk-plate-lg {
+    font-size: 18px;
+    padding: 5px 14px;
+    border-width: 2px;
+    border-radius: 8px;
+}
+
+.kk-card-badge {
+    display: inline-block;
+    background: #eaf7e5;
+    color: #2e7d32;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.kk-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.kk-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: #f4f5ec;
+    color: #1b4d2e;
+    font-size: 14.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.kk-icon-btn:hover {
+    background: #eaf7e5;
+}
+
+.kk-icon-btn:active {
+    transform: scale(0.92);
+}
+
+.kk-icon-btn-danger {
+    color: #b3261e;
+}
+
+.kk-icon-btn-danger:hover {
+    background: #fbe9e7;
+}
+
+/* ---------------- Skeleton loading ---------------- */
+.kk-skeleton {
+    box-shadow: none;
+    animation: none;
+}
+
+.kk-sk {
+    display: block;
+    background: linear-gradient(90deg, #f0f1e6 0px, #f9faf2 100px, #f0f1e6 200px);
+    background-size: 200px 100%;
+    background-repeat: no-repeat;
+    background-color: #f0f1e6;
+    animation: kkShimmer 1.3s ease infinite;
+}
+
+.kk-sk-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.kk-sk-lines {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.kk-sk-line {
+    height: 12px;
+    border-radius: 6px;
+    width: 70%;
+}
+
+.kk-sk-short {
+    width: 45%;
+}
+
+/* ---------------- FAB ---------------- */
+.kk-fab {
+    position: fixed;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(150deg, #1b4d2e, #2e7d32);
+    color: #ffffff;
+    border: none;
+    padding: 15px 24px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 12px 28px rgba(27, 77, 46, 0.32);
+    cursor: pointer;
+    width: calc(100% - 32px);
+    max-width: 360px;
+    justify-content: center;
+    z-index: 10;
+    transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.kk-fab:hover {
+    filter: brightness(1.08);
+}
+
+.kk-fab:active {
+    transform: translateX(-50%) scale(0.98);
+}
+
+.kk-fab-plus {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* ---------------- Toast ---------------- */
+.kk-toast {
+    position: fixed;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: fit-content;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #163d24;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 11px 18px;
+    border-radius: 999px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    z-index: 80;
+    animation: kkFadeUp 0.25s ease both;
+    white-space: nowrap;
+}
+
+.kk-toast-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #4caf50;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+/* ---------------- Overlay sheet (form & confirm) ---------------- */
+.kk-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 25, 15, 0.48);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+}
+
+.kk-overlay-center {
+    align-items: center;
+}
+
+.kk-sheet {
+    width: 100%;
+    max-width: 460px;
+    background: #fffdf5;
+    border-radius: 26px 26px 0 0;
+    padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 92vh;
+    overflow-y: auto;
+    animation: kkSheetUp 0.28s ease both;
+}
+
+.kk-sheet-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: #cfd4c2;
+    margin: 4px auto 0;
+}
+
+.kk-sheet-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: #1b4d2e;
+    margin: 0;
+}
+
+/* Pratinjau plat */
+.kk-plate-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: #eaf7e5;
+    border-radius: 16px;
+    padding: 16px 12px;
+}
+
+.kk-plate-preview-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #2e7d32;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kk-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.kk-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    color: #556052;
+    font-weight: 600;
+    min-width: 0;
+}
+
+.kk-field input[type='text'] {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14.5px;
+    color: #1b1f16;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1.5px solid #e0e3d4;
+    background: #ffffff;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kk-field input[type='text']:focus {
+    border-color: #2e7d32;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.14);
+}
+
+/* Pilihan konektor berupa kartu */
+.kk-fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.kk-fieldset legend {
+    padding: 0;
+    margin-bottom: 6px;
+}
+
+.kk-konektor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.kk-konektor {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: #ffffff;
+    border: 1.5px solid #e0e3d4;
+    border-radius: 14px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kk-konektor:hover {
+    border-color: #b9d8b1;
+}
+
+.kk-konektor input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.kk-konektor.is-selected {
+    border-color: #2e7d32;
+    background: #eaf7e5;
+}
+
+.kk-konektor:focus-within {
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.18);
+}
+
+.kk-konektor-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1b1f16;
+}
+
+.kk-konektor-hint {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #8a927a;
+}
+
+.kk-konektor.is-selected .kk-konektor-name::after {
+    content: ' ✓';
+    color: #2e7d32;
+}
+
+.kk-form-error {
+    color: #b3261e;
+    background: #fbe9e7;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin: 0;
+}
+
+.kk-sheet-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.kk-btn-secondary,
+.kk-btn-primary,
+.kk-btn-danger {
+    flex: 1;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 16px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.kk-btn-secondary {
+    background: #f4f5ec;
+    color: #1b4d2e;
+}
+
+.kk-btn-secondary:hover {
+    background: #e7e9db;
+}
+
+.kk-btn-primary {
+    background: #1b4d2e;
+    color: #ffffff;
+}
+
+.kk-btn-primary:hover {
+    background: #163f26;
+}
+
+.kk-btn-danger {
+    background: #b3261e;
+    color: #ffffff;
+}
+
+.kk-btn-danger:hover {
+    background: #8f1e18;
+}
+
+.kk-btn-primary:disabled,
+.kk-btn-secondary:disabled,
+.kk-btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ---------------- Confirm delete ---------------- */
+.kk-confirm {
+    width: 100%;
+    max-width: 360px;
+    background: #fffdf5;
+    border-radius: 22px;
+    padding: 24px 20px 20px;
+    margin: 0 16px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+    animation: kkSheetUp 0.25s ease both;
+}
+
+.kk-confirm-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #fbe9e7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin: 0 auto 12px;
+}
+
+.kk-confirm-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 17px;
+    color: #1b1f16;
+    margin: 0 0 6px;
+}
+
+.kk-confirm-sub {
+    font-size: 13px;
+    color: #8a927a;
+    line-height: 1.55;
+    margin: 0 0 16px;
+}
+
+.kk-confirm .kk-form-error {
+    margin-bottom: 12px;
+    text-align: left;
+}
+
+/* ---------------- Layar lebar ---------------- */
+@media (min-width: 480px) {
+    .kk-overlay {
+        align-items: center;
+    }
+
+    .kk-sheet {
+        border-radius: 26px;
+    }
+}
+
+@media (min-width: 700px) {
+    .kk-header,
+    .kk-summary,
+    .kk-content {
+        width: 100%;
+        max-width: 640px;
+        margin-left: auto;
+        margin-right: auto;
+        box-sizing: border-box;
+    }
+
+    .kk-summary {
+        margin-top: -40px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kk-page *,
+    .kk-page *::before,
+    .kk-page *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
