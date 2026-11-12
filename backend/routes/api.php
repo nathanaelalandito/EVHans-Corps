@@ -119,4 +119,5 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::get('/operator/notifications', [OperatorController::class, 'getNotifications']);
     Route::post('/operator/malfunction/{idCharger}/{idLog}/accept', [OperatorController::class, 'handleMalfunctionAction']);
+    Route::post('/operator/malfunction/{idCharger}/{idLog}/resolve', [OperatorController::class, 'resolveMalfunctionAction']);
 });

@@ -13,7 +13,9 @@ export default function OperatorStationPicker({ onStationChange }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const onStationChangeRef = useRef(onStationChange);
-    onStationChangeRef.current = onStationChange;
+    useEffect(() => {
+        onStationChangeRef.current = onStationChange;
+    }, [onStationChange]);
 
     /** Memuat station yang ditugaskan dan memulihkan pilihan terakhir yang masih valid. */
     const loadStations = useCallback(async () => {
@@ -42,7 +44,8 @@ export default function OperatorStationPicker({ onStationChange }) {
     }, []);
 
     useEffect(() => {
-        loadStations();
+        const task = window.setTimeout(loadStations, 0);
+        return () => window.clearTimeout(task);
     }, [loadStations]);
 
     /** Menyimpan pilihan station dan meminta dashboard memuat konteks station baru. */
@@ -56,13 +59,18 @@ export default function OperatorStationPicker({ onStationChange }) {
     if (loading) return <div className="operator-station-picker is-state" role="status"><FaMapMarkerAlt aria-hidden="true" /><span>Memuat station…</span></div>;
     if (error) return <button className="operator-station-picker is-state is-error" type="button" onClick={loadStations}><FaRedoAlt aria-hidden="true" /><span>{error} Coba lagi</span></button>;
     if (!stations.length) return <div className="operator-station-picker is-state" role="status"><FaMapMarkerAlt aria-hidden="true" /><span>Belum ada station tugas</span></div>;
+    if (stations.length === 1) {
+        return <div className="operator-station-picker">
+            <FaMapMarkerAlt aria-hidden="true" />
+            <span>Lokasi kerja</span>
+            <strong>{stations[0].kode_station} · {stations[0].nama_lokasi}</strong>
+        </div>;
+    }
     return <label className="operator-station-picker">
         <FaMapMarkerAlt aria-hidden="true" />
         <span>Station aktif</span>
-        {stations.length === 1
-            ? <strong>{stations[0].kode_station} · {stations[0].nama_lokasi}</strong>
-            : <select aria-label="Pilih station aktif" value={activeId} onChange={selectStation}>
-                {stations.map(station => <option key={station.id_location} value={station.id_location}>{station.kode_station} · {station.nama_lokasi}</option>)}
-            </select>}
+        <select aria-label="Pilih station aktif" value={activeId} onChange={selectStation}>
+            {stations.map(station => <option key={station.id_location} value={station.id_location}>{station.kode_station} · {station.nama_lokasi}</option>)}
+        </select>
     </label>;
 }

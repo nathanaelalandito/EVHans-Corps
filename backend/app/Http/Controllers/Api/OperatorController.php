@@ -455,6 +455,15 @@ class OperatorController extends Controller
                 'status_mesin' => $status,
                 'updated_at' => now(),
             ]);
+            if ($status === 'Active') {
+                DB::table('error_log')
+                    ->where('id_charger', $id)
+                    ->where('status_tanganan', '!=', 'Selesai')
+                    ->update([
+                        'status_tanganan' => 'Selesai',
+                        'updated_at' => now(),
+                    ]);
+            }
             if ($charger->status_mesin !== $status) {
                 AuditLog::create([
                     'id_user' => $request->user()->id_user,
@@ -781,11 +790,18 @@ class OperatorController extends Controller
 
         $profile = DB::table('user_profile')->where('id_user', $user->id_user)->first();
 
-        $assignment = DB::table('station_operators')
+        $activeAssignment = $this->getOperatorAssignment($user);
+        $assignmentQuery = DB::table('station_operators')
             ->join('location', 'station_operators.id_location', '=', 'location.id_location')
             ->where('station_operators.id_user', $user->id_user)
-            ->select('station_operators.*', 'location.nama_lokasi', 'location.alamat')
-            ->first();
+            ->orderBy('station_operators.id_station_operator')
+            ->select('station_operators.*', 'location.kode_station', 'location.nama_lokasi', 'location.alamat');
+
+        if ($activeAssignment) {
+            $assignmentQuery->where('station_operators.id_location', $activeAssignment->id_location);
+        }
+
+        $assignment = $assignmentQuery->first();
 
         return response()->json([
             'status' => 'success',
@@ -813,9 +829,9 @@ class OperatorController extends Controller
     }
 
     /**
-     * 1. Mengambil daftar notifikasi malfungsi dan gangguan transaksi
+     * 1. Mengambil daftar notifikasi malfungsi dan aktivitas transaksi stasiun
      */
-    /** Mengambil notifikasi operasional yang relevan dengan station operator. */
+    /** Mengambil notifikasi operasional (gangguan unit & transaksi driver) pada station operator. */
     public function getNotifications(Request $request)
     {
         $assignment = $this->getOperatorAssignment($request->user());
@@ -826,45 +842,125 @@ class OperatorController extends Controller
         // A. Malfungsi Unit (dari tabel error_log)
         $malfunctions = DB::table('error_log')
             ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('charging_session', 'error_log.id_session', '=', 'charging_session.id_session')
+            ->leftJoin('ports', 'charging_session.id_port', '=', 'ports.id_port')
             ->where('charger.id_location', $assignment->id_location)
             ->where('error_log.status_tanganan', '!=', 'Selesai')
             ->select(
                 'error_log.id_log',
                 'error_log.id_charger',
+                'error_log.id_session',
                 'charger.kode_perangkat',
+                'charger.status_mesin',
+                'ports.nomor_port',
+                'error_log.jenis_error',
                 'error_log.desk_mslh as deskripsi',
+                'error_log.status_tanganan',
+                'error_log.waktu_terjadi',
                 'error_log.created_at'
             )
-            ->orderBy('error_log.created_at', 'desc')
-            ->get();
+            ->orderByDesc('error_log.created_at')
+            ->get()
+            ->map(function ($row) {
+                $occurredAt = $row->waktu_terjadi ?? $row->created_at;
 
-        // B. Gangguan Transaksi (dari tabel charging_session yang gagal/dibatalkan atau payment gagal)
-        $transactionErrors = DB::table('charging_session')
-            ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
-            ->leftJoin('payment', 'charging_session.id_session', '=', 'payment.id_session')
-            ->where('charger.id_location', $assignment->id_location)
-            ->where(function ($q) {
-                $q->whereIn('charging_session.status', ['Gagal', 'Dibatalkan', 'gagal', 'dibatalkan'])
-                    ->orWhere('payment.status_pembayaran', 'Gagal');
+                return [
+                    'id_log' => (int) $row->id_log,
+                    'id_charger' => (int) $row->id_charger,
+                    'id_session' => $row->id_session ? (int) $row->id_session : null,
+                    'kode_perangkat' => $row->kode_perangkat,
+                    'status_mesin' => $row->status_mesin,
+                    'nomor_port' => $row->nomor_port,
+                    'jenis_error' => $row->jenis_error,
+                    'deskripsi' => $row->deskripsi,
+                    'status_tanganan' => $row->status_tanganan,
+                    'waktu_terjadi' => $occurredAt ? Carbon::parse($occurredAt)->toIso8601String() : null,
+                    'created_at' => $row->created_at ? Carbon::parse($row->created_at)->toIso8601String() : null,
+                ];
             })
+            ->values();
+
+        // B. Aktivitas Transaksi Driver pada stasiun (mulai, selesai, maupun gagal/dibatalkan)
+        $transactions = DB::table('charging_session')
+            ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('ports', 'charging_session.id_port', '=', 'ports.id_port')
+            ->leftJoin('users', 'charging_session.id_user', '=', 'users.id_user')
+            ->leftJoin('user_profile', 'users.id_user', '=', 'user_profile.id_user')
+            ->leftJoin('vehicle', 'charging_session.id_vehicle', '=', 'vehicle.id_vehicle')
+            ->leftJoin('payment', 'charging_session.id_session', '=', 'payment.id_session')
+            ->leftJoin('metode_pembayaran', 'payment.id_metode', '=', 'metode_pembayaran.id_metode')
+            ->where('charger.id_location', $assignment->id_location)
             ->select(
                 'charging_session.id_session as id_transaksi',
-                DB::raw("CONCAT('SES-', charging_session.id_session) as kode_transaksi"),
-                DB::raw('COALESCE(payment.total_bayar, charging_session.saldo_hold, 0) as total_biaya'),
-                DB::raw("'Dompet Digital' as metode_pembayaran"),
-                DB::raw("CONCAT('Sesi status: ', charging_session.status) as keterangan"),
-                'charging_session.created_at'
+                'charging_session.status as status_sesi',
+                'charging_session.total_energi_kwh',
+                'charging_session.saldo_hold',
+                'charging_session.waktu_mulai',
+                'charging_session.waktu_selesai',
+                'charging_session.created_at',
+                'charging_session.updated_at',
+                'charger.kode_perangkat',
+                'ports.nomor_port',
+                'user_profile.nama_lengkap as nama_driver',
+                'users.email as email_driver',
+                'vehicle.model as kendaraan_model',
+                'vehicle.nomor_polisi',
+                'payment.total_bayar',
+                'payment.status_pembayaran',
+                'payment.waktu_pembayaran',
+                'metode_pembayaran.nama_metode as metode_pembayaran'
             )
-            ->orderBy('charging_session.created_at', 'desc')
-            ->limit(10)
-            ->get();
+            ->orderByRaw('COALESCE(payment.waktu_pembayaran, charging_session.waktu_selesai, charging_session.waktu_mulai, charging_session.created_at) DESC')
+            ->limit(25)
+            ->get()
+            ->map(function ($row) {
+                $statusSesi = (string) ($row->status_sesi ?? 'Pending');
+                $statusPembayaran = $row->status_pembayaran ? (string) $row->status_pembayaran : null;
+                $isIssue = in_array(strtolower($statusSesi), ['gagal', 'dibatalkan'], true) || $statusPembayaran === 'Gagal';
+                $totalBiaya = (int) ($row->total_bayar ?? $row->saldo_hold ?? 0);
+                $energiKwh = round((float) ($row->total_energi_kwh ?? 0), 2);
+                $metode = $row->metode_pembayaran ?? 'Dompet Digital';
+                $driverName = $row->nama_driver ?: ($row->email_driver ?: 'Pengemudi');
+                $vehicleText = trim(($row->kendaraan_model ?? '').' '.($row->nomor_polisi ?? ''));
+                $activityTime = $row->waktu_pembayaran ?? $row->waktu_selesai ?? $row->waktu_mulai ?? $row->created_at;
+
+                if ($isIssue) {
+                    $keterangan = "Sesi {$statusSesi}".($statusPembayaran ? " · Pembayaran: {$statusPembayaran}" : '');
+                } elseif ($statusSesi === 'Berlangsung') {
+                    $keterangan = 'Sesi charging baru dimulai · Dana hold Rp '.number_format($row->saldo_hold ?? $totalBiaya, 0, ',', '.');
+                } elseif ($statusSesi === 'Selesai') {
+                    $keterangan = 'Transaksi selesai ('.number_format($energiKwh, 2, ',', '.').' kWh) · Pembayaran '.($statusPembayaran ?? 'Sukses');
+                } else {
+                    $keterangan = "Status sesi: {$statusSesi}";
+                }
+
+                return [
+                    'id_transaksi' => (int) $row->id_transaksi,
+                    'kode_transaksi' => 'SES-'.$row->id_transaksi,
+                    'status_sesi' => $statusSesi,
+                    'status_pembayaran' => $statusPembayaran,
+                    'is_issue' => $isIssue,
+                    'kode_perangkat' => $row->kode_perangkat,
+                    'nomor_port' => $row->nomor_port,
+                    'nama_driver' => $driverName,
+                    'kendaraan' => $vehicleText ?: null,
+                    'energi_kwh' => $energiKwh,
+                    'total_biaya' => $totalBiaya,
+                    'metode_pembayaran' => $metode,
+                    'keterangan' => $keterangan,
+                    'waktu_aktivitas' => $activityTime ? Carbon::parse($activityTime)->toIso8601String() : null,
+                    'created_at' => $row->created_at ? Carbon::parse($row->created_at)->toIso8601String() : null,
+                ];
+            })
+            ->values();
 
         return response()->json([
             'status' => 'success',
             'data' => [
+                'id_location' => (int) $assignment->id_location,
                 'malfunctions' => $malfunctions,
-                'transactions' => $transactionErrors,
-                'total_unread' => count($malfunctions) + count($transactionErrors),
+                'transactions' => $transactions,
+                'total_unread' => $malfunctions->count() + $transactions->count(),
             ],
         ]);
     }
@@ -929,6 +1025,53 @@ class OperatorController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Status unit charger berhasil dialihkan ke mode Maintenance.',
+        ]);
+    }
+
+    /** Menandai laporan gangguan telah selesai ditangani tanpa memaksa perubahan status unit lain. */
+    public function resolveMalfunctionAction(Request $request, $idCharger, $idLog)
+    {
+        $reason = $request->validate([
+            'alasan' => ['required', 'string', 'min:5', 'max:500'],
+        ])['alasan'];
+        $assignment = $this->getOperatorAssignment($request->user());
+        if (! $assignment) {
+            return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
+        }
+
+        $charger = DB::table('charger')
+            ->where('id_charger', $idCharger)
+            ->where('id_location', $assignment->id_location)
+            ->first();
+        $errorLog = DB::table('error_log')
+            ->where('id_log', $idLog)
+            ->where('id_charger', $idCharger)
+            ->first();
+        if (! $charger || ! $errorLog) {
+            return response()->json(['message' => 'Laporan gangguan tidak ditemukan pada station penugasan.'], 404);
+        }
+
+        DB::transaction(function () use ($request, $assignment, $errorLog, $idCharger, $idLog, $reason): void {
+            DB::table('error_log')->where('id_log', $idLog)->update([
+                'status_tanganan' => 'Selesai',
+                'updated_at' => now(),
+            ]);
+
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'id_location' => $assignment->id_location,
+                'aksi' => 'selesaikan_gangguan_charger',
+                'entitas' => 'charger',
+                'id_entitas' => (string) $idCharger,
+                'data_sebelum' => ['status_laporan' => $errorLog->status_tanganan],
+                'data_sesudah' => ['status_laporan' => 'Selesai'],
+                'alasan' => $reason,
+            ]);
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Laporan gangguan ditandai selesai.',
         ]);
     }
 }

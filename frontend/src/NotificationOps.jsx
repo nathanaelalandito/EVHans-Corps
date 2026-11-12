@@ -1,33 +1,124 @@
-import React, { useState } from 'react';
-import { FaTimes, FaExclamationTriangle, FaReceipt, FaCheck, FaInfoCircle, FaWrench } from 'react-icons/fa';
-import axios from 'axios';
-import { getStoredToken } from './api/auth';
+import { useState } from 'react';
+import {
+    FaBolt,
+    FaCheck,
+    FaCheckCircle,
+    FaExclamationTriangle,
+    FaInfoCircle,
+    FaReceipt,
+    FaTimes,
+    FaWrench,
+} from 'react-icons/fa';
+import {
+    acceptOperatorMalfunction,
+    isTransactionUnread,
+    resolveOperatorMalfunction,
+} from './api/operatorNotifications';
+import './notificationOps.css';
 
-/** Panel notifikasi operator dengan aksi tindak lanjut laporan gangguan. */
-export default function NotificationOverlay({ isOpen, onClose, notifications, onRefreshData }) {
-    const [activeTab, setActiveTab] = useState('malfunction'); // 'malfunction' | 'transaction'
+/** Memformat timestamp ISO/SQL ke jam & tanggal ringkas bahasa Indonesia. */
+function formatNotifTime(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(date);
+}
+
+/** Memformat nominal rupiah. */
+function formatRupiah(value) {
+    return `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+}
+
+/** Menentukan gaya kartu & label status transaksi driver. */
+function getTransactionTone(trx) {
+    if (trx.is_issue) return 'warning';
+    if (trx.status_sesi === 'Berlangsung') return 'info';
+    if (trx.status_sesi === 'Selesai') return 'success';
+    return 'info';
+}
+
+/** Menentukan tab awal agar notifikasi paling relevan langsung terlihat saat dibuka. */
+function resolveDefaultTab(initialTab, malfunctions, transactions) {
+    if (initialTab === 'malfunction' || initialTab === 'transaction') return initialTab;
+    const hasPendingMalfunction = malfunctions.some((item) => item.status_tanganan === 'Menunggu');
+    if (hasPendingMalfunction) return 'malfunction';
+    if (transactions.length > 0) return 'transaction';
+    return malfunctions.length > 0 ? 'malfunction' : 'transaction';
+}
+
+/** Panel pop-up notifikasi operator untuk memantau gangguan perangkat dan transaksi driver. */
+export default function NotificationOverlay({
+    isOpen = true,
+    onClose,
+    notifications,
+    initialTab = null,
+    seenBeforeMs = null,
+    onRefreshData,
+    onNavigateToCharger,
+}) {
+    const { malfunctions = [], transactions = [] } = notifications || {};
+    const [activeTab, setActiveTab] = useState(() => resolveDefaultTab(initialTab, malfunctions, transactions));
+    const [txFilter, setTxFilter] = useState('all'); // 'all' | 'normal' | 'issue'
+    const [pendingAction, setPendingAction] = useState(null); // { mode: 'accept' | 'resolve', item }
+    const [reason, setReason] = useState('');
     const [processingId, setProcessingId] = useState(null);
+    const [feedback, setFeedback] = useState(null);
 
     if (!isOpen) return null;
 
-    const { malfunctions = [], transactions = [] } = notifications || {};
+    const filteredTransactions = transactions.filter((trx) => {
+        if (txFilter === 'issue') return Boolean(trx.is_issue);
+        if (txFilter === 'normal') return !trx.is_issue;
+        return true;
+    });
 
-    // Aksi: Terima Malfungsi -> Ubah Status Charger ke Maintenance
-    /** Menerima laporan gangguan lalu menyegarkan data notifikasi operator. */
-    const handleAcceptMalfunction = async (idCharger, idLog, kodePerangkat) => {
-        if (!window.confirm(`Konfirmasi penanganan: Unit ${kodePerangkat} akan otomatis dialihkan ke status MAINTENANCE?`)) return;
+    const openReasonPrompt = (mode, item) => {
+        setFeedback(null);
+        setPendingAction({ mode, item });
+        setReason(
+            mode === 'accept'
+                ? `Tindak lanjut gangguan ${item.kode_perangkat}: ${item.deskripsi || 'periksa unit'}`.slice(0, 200)
+                : `Unit ${item.kode_perangkat} telah diperiksa dan gangguan selesai ditangani.`.slice(0, 200),
+        );
+    };
 
-        setProcessingId(idLog);
+    const handleSubmitAction = async (event) => {
+        event.preventDefault();
+        if (!pendingAction) return;
+
+        const trimmedReason = reason.trim();
+        if (trimmedReason.length < 5) {
+            setFeedback({ type: 'error', message: 'Alasan tindakan minimal 5 karakter.' });
+            return;
+        }
+
+        const { mode, item } = pendingAction;
+        setProcessingId(item.id_log);
+        setFeedback(null);
+
         try {
-            const token = getStoredToken();
-            await axios.post(`http://127.0.0.1:8000/api/operator/malfunction/${idCharger}/${idLog}/accept`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response =
+                mode === 'accept'
+                    ? await acceptOperatorMalfunction(item.id_charger, item.id_log, trimmedReason)
+                    : await resolveOperatorMalfunction(item.id_charger, item.id_log, trimmedReason);
 
-            alert(`Unit ${kodePerangkat} telah dialihkan ke mode Maintenance.`);
-            if (onRefreshData) onRefreshData(); // Muat ulang data
+            setFeedback({
+                type: 'success',
+                message: response?.message || 'Status gangguan berhasil diperbarui.',
+            });
+            setPendingAction(null);
+            setReason('');
+            if (onRefreshData) await onRefreshData();
         } catch (err) {
-            alert(`Gagal: ${err.response?.data?.message || err.message}`);
+            setFeedback({
+                type: 'error',
+                message: err.response?.data?.message || err.message || 'Gagal memperbarui status gangguan.',
+            });
         } finally {
             setProcessingId(null);
         }
@@ -35,91 +126,258 @@ export default function NotificationOverlay({ isOpen, onClose, notifications, on
 
     return (
         <div className="notif-overlay-backdrop" onClick={onClose}>
-            <div className="notif-card-modal" onClick={(e) => e.stopPropagation()}>
-                {/* Header Modal */}
-                <div className="notif-modal-header">
+            <section
+                className="notif-card-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Pusat Notifikasi Operator"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <header className="notif-modal-header">
                     <div>
-                        <h3>Pemberitahuan Sistem</h3>
-                        <p>Pantau gangguan perangkat dan anomali transaksi stasiun</p>
+                        <p className="notif-eyebrow">PUSAT NOTIFIKASI</p>
+                        <h3>Pemberitahuan Stasiun</h3>
+                        <p>Pantau transaksi driver dan laporan gangguan perangkat secara bersamaan</p>
                     </div>
-                    <button className="notif-close-btn" onClick={onClose}><FaTimes /></button>
-                </div>
-
-                {/* Tab Pemisah Notifikasi */}
-                <div className="notif-tabs">
-                    <button 
-                        className={`notif-tab-item ${activeTab === 'malfunction' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('malfunction')}
-                    >
-                        <FaExclamationTriangle /> Malfungsi Mesin ({malfunctions.length})
+                    <button type="button" className="notif-close-btn" aria-label="Tutup notifikasi" onClick={onClose}>
+                        <FaTimes />
                     </button>
-                    <button 
+                </header>
+
+                <div className="notif-tabs" role="tablist">
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === 'transaction'}
                         className={`notif-tab-item ${activeTab === 'transaction' ? 'active' : ''}`}
                         onClick={() => setActiveTab('transaction')}
                     >
-                        <FaReceipt /> Gangguan Transaksi ({transactions.length})
+                        <FaReceipt />
+                        <span>Transaksi Dilakukan</span>
+                        <span className="notif-tab-count">{transactions.length}</span>
+                    </button>
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === 'malfunction'}
+                        className={`notif-tab-item ${activeTab === 'malfunction' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('malfunction')}
+                    >
+                        <FaExclamationTriangle />
+                        <span>Gangguan Perangkat</span>
+                        <span className="notif-tab-count">{malfunctions.length}</span>
                     </button>
                 </div>
 
-                {/* Konten Notifikasi */}
+                {feedback && (
+                    <div className={`notif-feedback ${feedback.type}`} role="status">
+                        {feedback.message}
+                    </div>
+                )}
+
+                {activeTab === 'transaction' && (
+                    <div className="notif-filter-row" aria-label="Filter transaksi">
+                        <button
+                            type="button"
+                            className={`notif-filter-chip ${txFilter === 'all' ? 'active' : ''}`}
+                            onClick={() => setTxFilter('all')}
+                        >
+                            Semua ({transactions.length})
+                        </button>
+                        <button
+                            type="button"
+                            className={`notif-filter-chip ${txFilter === 'normal' ? 'active' : ''}`}
+                            onClick={() => setTxFilter('normal')}
+                        >
+                            Berjalan &amp; Selesai ({transactions.filter((t) => !t.is_issue).length})
+                        </button>
+                        <button
+                            type="button"
+                            className={`notif-filter-chip ${txFilter === 'issue' ? 'active' : ''}`}
+                            onClick={() => setTxFilter('issue')}
+                        >
+                            Gagal / Batal ({transactions.filter((t) => t.is_issue).length})
+                        </button>
+                    </div>
+                )}
+
                 <div className="notif-content-body">
-                    {/* KATEGORI 1: MALFUNGSI UNIT CHARGER (BISA DI-SET MAINTENANCE) */}
-                    {activeTab === 'malfunction' && (
+                    {activeTab === 'transaction' && (
                         <div className="notif-list">
-                            {malfunctions.length > 0 ? (
-                                malfunctions.map((item) => (
-                                    <div key={item.id_log} className="notif-item-card alert-danger">
-                                        <div className="notif-item-top">
-                                            <span className="notif-tag-danger">
-                                                <FaWrench /> Malfungsi: <strong>{item.kode_perangkat}</strong>
-                                            </span>
-                                            <span className="notif-time">{new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                        <p className="notif-msg-text">{item.deskripsi || 'Terdeteksi anomali suhu / koneksi modul charging.'}</p>
-                                        
-                                        <div className="notif-item-action">
-                                            <button 
-                                                className="btn-set-maintenance"
-                                                onClick={() => handleAcceptMalfunction(item.id_charger, item.id_log, item.kode_perangkat)}
-                                                disabled={processingId === item.id_log}
-                                            >
-                                                <FaCheck /> {processingId === item.id_log ? 'Memproses...' : 'Terima & Set Maintenance'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
+                            {filteredTransactions.length > 0 ? (
+                                filteredTransactions.map((trx) => {
+                                    const tone = getTransactionTone(trx);
+                                    const isUnread = isTransactionUnread(trx, seenBeforeMs);
+
+                                    return (
+                                        <article key={trx.id_transaksi} className={`notif-item-card alert-${tone}`}>
+                                            <div className="notif-item-top">
+                                                <div className="notif-badges-group">
+                                                    <span className={`notif-tag ${tone}`}>
+                                                        {trx.is_issue ? <FaInfoCircle /> : <FaBolt />}
+                                                        <span>{trx.kode_transaksi}</span>
+                                                    </span>
+                                                    <span className={`notif-status-pill ${tone}`}>
+                                                        {trx.status_sesi}
+                                                    </span>
+                                                    {isUnread && <span className="notif-new-pill">Baru</span>}
+                                                </div>
+                                                <span className="notif-time">
+                                                    {formatNotifTime(trx.waktu_aktivitas || trx.created_at)}
+                                                </span>
+                                            </div>
+
+                                            <p className="notif-msg-text">
+                                                <strong>{trx.nama_driver || 'Pengemudi'}</strong>
+                                                {trx.kendaraan ? ` (${trx.kendaraan})` : ''} — {trx.keterangan}
+                                            </p>
+
+                                            <div className="notif-meta-row">
+                                                <span>
+                                                    Unit: <strong>{trx.kode_perangkat || '-'}</strong>
+                                                    {trx.nomor_port ? ` · ${trx.nomor_port}` : ''}
+                                                </span>
+                                                <span>
+                                                    Nominal: <strong>{formatRupiah(trx.total_biaya)}</strong>
+                                                </span>
+                                                <span>
+                                                    Metode: <strong>{trx.metode_pembayaran || 'Dompet Digital'}</strong>
+                                                </span>
+                                                {trx.status_pembayaran && (
+                                                    <span>
+                                                        Pembayaran: <strong>{trx.status_pembayaran}</strong>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </article>
+                                    );
+                                })
                             ) : (
-                                <div className="notif-empty">Semua unit charger beroperasi normal.</div>
+                                <div className="notif-empty">
+                                    <FaReceipt />
+                                    <strong>Belum ada notifikasi transaksi</strong>
+                                    <span>Transaksi pengisian driver pada stasiun ini akan muncul di sini.</span>
+                                </div>
                             )}
                         </div>
                     )}
 
-                    {/* KATEGORI 2: GANGGUAN TRANSAKSI (HANYA TAMPILAN INFORMASI) */}
-                    {activeTab === 'transaction' && (
+                    {activeTab === 'malfunction' && (
                         <div className="notif-list">
-                            {transactions.length > 0 ? (
-                                transactions.map((trx) => (
-                                    <div key={trx.id_transaksi} className="notif-item-card alert-warning">
-                                        <div className="notif-item-top">
-                                            <span className="notif-tag-warning">
-                                                <FaInfoCircle /> {trx.kode_transaksi || 'TRX-ERR'}
-                                            </span>
-                                            <span className="notif-time">{new Date(trx.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                        <p className="notif-msg-text">
-                                            Pembayaran gagal ({trx.metode_pembayaran || 'E-Wallet'} - Rp {Number(trx.total_biaya || 0).toLocaleString('id-ID')}).
-                                            <br/>
-                                            <small style={{ color: '#666' }}>{trx.keterangan || 'Gagal otorisasi / timeout dari payment gateway.'}</small>
-                                        </p>
-                                    </div>
-                                ))
+                            {malfunctions.length > 0 ? (
+                                malfunctions.map((item) => {
+                                    const isPendingForm = pendingAction?.item?.id_log === item.id_log;
+                                    const isHandled = item.status_tanganan === 'Sedang Ditangani';
+
+                                    return (
+                                        <article key={item.id_log} className="notif-item-card alert-danger">
+                                            <div className="notif-item-top">
+                                                <div className="notif-badges-group">
+                                                    <span className="notif-tag danger">
+                                                        <FaWrench />
+                                                        <span>{item.kode_perangkat}</span>
+                                                    </span>
+                                                    <span className={`notif-status-pill ${isHandled ? 'warning' : 'danger'}`}>
+                                                        {item.status_tanganan || 'Menunggu'}
+                                                    </span>
+                                                    {item.nomor_port && (
+                                                        <span className="notif-status-pill">{item.nomor_port}</span>
+                                                    )}
+                                                </div>
+                                                <span className="notif-time">
+                                                    {formatNotifTime(item.waktu_terjadi || item.created_at)}
+                                                </span>
+                                            </div>
+
+                                            <p className="notif-msg-text">
+                                                {item.jenis_error ? <strong>{item.jenis_error}: </strong> : null}
+                                                {item.deskripsi || 'Terdeteksi kendala operasional pada unit charger.'}
+                                            </p>
+
+                                            {!isPendingForm && (
+                                                <div className="notif-item-action">
+                                                    {item.status_mesin !== 'Maintenance' && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn-set-maintenance"
+                                                            onClick={() => openReasonPrompt('accept', item)}
+                                                            disabled={processingId === item.id_log}
+                                                        >
+                                                            <FaWrench /> Terima &amp; Set Maintenance
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        className="btn-resolve-notif"
+                                                        onClick={() => openReasonPrompt('resolve', item)}
+                                                        disabled={processingId === item.id_log}
+                                                    >
+                                                        <FaCheck /> Tandai Selesai
+                                                    </button>
+                                                    {onNavigateToCharger && (
+                                                        <button
+                                                            type="button"
+                                                            className="btn-link-charger"
+                                                            onClick={() => {
+                                                                onClose?.();
+                                                                onNavigateToCharger();
+                                                            }}
+                                                        >
+                                                            Buka Kelola Charger
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {isPendingForm && (
+                                                <form className="notif-reason-box" onSubmit={handleSubmitAction}>
+                                                    <label htmlFor={`notif-reason-${item.id_log}`}>
+                                                        {pendingAction.mode === 'accept'
+                                                            ? 'Alasan pengalihan ke Maintenance'
+                                                            : 'Catatan penyelesaian gangguan'}
+                                                    </label>
+                                                    <textarea
+                                                        id={`notif-reason-${item.id_log}`}
+                                                        value={reason}
+                                                        onChange={(e) => setReason(e.target.value)}
+                                                        minLength={5}
+                                                        maxLength={500}
+                                                        required
+                                                        placeholder="Minimal 5 karakter untuk catatan audit..."
+                                                    />
+                                                    <div className="notif-reason-actions">
+                                                        <button
+                                                            type="button"
+                                                            className="btn-cancel-reason"
+                                                            disabled={processingId === item.id_log}
+                                                            onClick={() => setPendingAction(null)}
+                                                        >
+                                                            Batal
+                                                        </button>
+                                                        <button
+                                                            type="submit"
+                                                            className="btn-resolve-notif"
+                                                            disabled={processingId === item.id_log || reason.trim().length < 5}
+                                                        >
+                                                            {processingId === item.id_log ? 'Memproses...' : 'Konfirmasi'}
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            )}
+                                        </article>
+                                    );
+                                })
                             ) : (
-                                <div className="notif-empty">Tidak ada gangguan transaksi saat ini.</div>
+                                <div className="notif-empty">
+                                    <FaCheckCircle />
+                                    <strong>Semua unit charger beroperasi normal</strong>
+                                    <span>Tidak ada laporan gangguan yang menunggu penanganan.</span>
+                                </div>
                             )}
                         </div>
                     )}
                 </div>
-            </div>
+            </section>
         </div>
     );
 }
