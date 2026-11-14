@@ -14,6 +14,9 @@
     height: 100dvh;
     overflow: hidden;
     font-family: 'Plus Jakarta Sans', sans-serif;
+    /* Samakan warna teks dasar dengan halaman Bantuan & Profil Driver
+       (#1b1f16), bukan hijau default body di index.css (#0e8333). */
+    color: #1b1f16;
     background: #eef0df;
 }
 
@@ -521,6 +524,16 @@
     cursor: pointer;
 }
 
+.dash-btn-stop.done {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #ffffff;
+}
+
+.dash-btn-stop.done:hover {
+    background: #1b4d2e;
+}
+
 .dash-btn-issue {
     width: 100%;
     background: #fff8e8;
@@ -713,7 +726,7 @@
         left: 24px;
         right: auto;
         transform: none;
-        top: 96px;
+        top: 121px; /* di bawah banner notifikasi (70 + 39 + 12) */
         bottom: 24px;
         width: 380px;
         max-width: 380px;
@@ -744,7 +757,7 @@
     }
 
     .mapdash-notif {
-        top: 86px;
+        top: 70px;
         left: 24px;
         right: 24px;
     }
@@ -1278,6 +1291,31 @@
     display: none;
 }
 
+.home-wallet-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.home-wallet-label-row .home-wallet-label {
+    margin-bottom: 0;
+}
+
+.home-wallet-eye {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.home-wallet-eye:hover,
+.home-wallet-eye:focus-visible {
+    opacity: 1;
+}
+
 .home-wallet-label {
     color: rgba(255, 255, 255, 0.72);
 }
@@ -1528,8 +1566,8 @@
 .home-header {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(145deg, #0f371f 0%, #1b5a31 55%, #2f8a39 100%);
-    box-shadow: 0 14px 32px rgba(15, 55, 31, 0.22);
+    background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
+    box-shadow: 0 14px 32px rgba(22, 61, 36, 0.22);
 }
 
 .home-header::after {
@@ -1570,9 +1608,8 @@
 }
 
 .home-wallet-topup {
-    background: #dff7d6;
-    color: #1b5a31;
-    box-shadow: 0 8px 18px rgba(10, 45, 24, 0.16);
+    background: #eaf7e5;
+    color: #2e7d32;
 }
 
 .home-vehicle-select,
@@ -1588,9 +1625,8 @@
 }
 
 .home-cta-map {
-    background: linear-gradient(135deg, #174826 0%, #237534 72%, #36a145 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 14px 30px rgba(27, 77, 46, 0.22);
+    background: linear-gradient(120deg, #1b4d2e, #2e7d32 70%);
+    box-shadow: 0 10px 26px rgba(27, 77, 46, 0.28);
 }
 
 .home-cta-icon {
@@ -1632,7 +1668,7 @@
 }
 
 .dash-link-btn {
-    color: #169447;
+    color: #2e7d32;
     font-size: 13px;
 }
 
@@ -1646,7 +1682,7 @@
 }
 
 .mapdash-filter-chip.active {
-    background: #14552f;
+    background: #1b4d2e;
 }
 
 .home-station-scroll {
@@ -2313,9 +2349,12 @@
     100% { background-position: calc(200px + 100%) 0; }
 }
 
+/* ---------- Header profil ---------- */
+/* Tinggi area hijau disamakan dengan blok hijau dashboard driver
+   (± sepertiga layar). */
 .profile-header {
     background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
-    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 96px;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 224px;
     border-radius: 0 0 28px 28px;
     flex-shrink: 0;
 }
@@ -2752,7 +2791,7 @@
         left: 24px;
         right: auto;
         transform: none;
-        top: 96px;
+        top: 121px; /* di bawah banner notifikasi (70 + 39 + 12) */
         bottom: 24px;
         width: 380px;
         max-width: 380px;
@@ -2783,7 +2822,7 @@
     }
 
     .mapdash-notif {
-        top: 86px;
+        top: 70px;
         left: 24px;
         right: 24px;
     }
@@ -3590,7 +3629,7 @@
     background: none;
     border: none;
     padding: 0;
-    color: #16a34a;
+    color: #2e7d32;
     font: inherit;
     font-weight: 600;
     text-decoration: underline;
@@ -3850,6 +3889,31 @@
 
 .home-wallet-card {
     display: none;
+}
+
+.home-wallet-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.home-wallet-label-row .home-wallet-label {
+    margin-bottom: 0;
+}
+
+.home-wallet-eye {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.home-wallet-eye:hover,
+.home-wallet-eye:focus-visible {
+    opacity: 1;
 }
 
 .home-wallet-label {

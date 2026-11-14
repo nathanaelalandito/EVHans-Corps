@@ -48,7 +48,7 @@ const STATUS_LABEL = {
 };
 
 function statusLabel(status) {
-    return STATUS_LABEL[status] ?? status;
+    return STATUS_LABEL[String(status).toLowerCase()] ?? status;
 }
 
 export default function DompetDigital({ onBack, onNavigateToTopUp }) {
@@ -736,7 +736,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
                 </div>
                 <p className="dmp-balance-value">{hideBalance ? 'Rp ••••••' : formatRupiah(wallet?.saldo ?? 0)}</p>
                 <div className="dmp-balance-meta">
-                    <span className={`dmp-status-badge ${wallet?.status_dompet === 'aktif' ? 'ok' : 'warn'}`}>
+                    <span className={`dmp-status-badge ${String(wallet?.status_dompet).toLowerCase() === 'aktif' ? 'ok' : 'warn'}`}>
                         {statusLabel(wallet?.status_dompet)}
                     </span>
                     {locked && <span className="dmp-status-badge warn">Terkunci sementara</span>}
@@ -744,7 +744,7 @@ export default function DompetDigital({ onBack, onNavigateToTopUp }) {
             </div>
 
             <div className="dmp-actions">
-                   <button className="dmp-action"   onClick={() => setStatus('topup')}disabled={locked || wallet?.status_dompet !== 'aktif'}title="Top Up saldo">
+                   <button className="dmp-action"   onClick={() => setStatus('topup')}disabled={locked || String(wallet?.status_dompet).toLowerCase() !== 'aktif'}title="Top Up saldo">
                          <span className="dmp-action-icon">➕</span>
                         <span className="dmp-action-label">Top Up</span>
                     </button>

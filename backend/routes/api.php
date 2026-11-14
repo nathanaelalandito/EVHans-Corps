@@ -3,12 +3,12 @@
 use App\Http\Controllers\Api\ChargingSessionController;
 use App\Http\Controllers\Api\DompetPinController;
 use App\Http\Controllers\Api\OperationsController;
+use App\Http\Controllers\Api\OperatorController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProfileDriverController;
 use App\Http\Controllers\Api\StationController;
 use App\Http\Controllers\Api\TopupController;
 use App\Http\Controllers\Api\VehicleController;
-use App\Http\Controllers\Api\OperatorController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +24,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanc
 // Kelola PIN dompet (semua butuh login via Sanctum)
 Route::middleware('auth:sanctum')->prefix('wallet')->group(function () {
     Route::get('/', [DompetPinController::class, 'show']);
+    Route::get('/transactions', [DompetPinController::class, 'transactions']);
     Route::post('/topup', [DompetPinController::class, 'topUp']);
     Route::post('/pin', [DompetPinController::class, 'setPin']);
     Route::put('/pin', [DompetPinController::class, 'changePin']);
@@ -43,7 +44,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
     Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy']);
 });
-Route::middleware('auth:sanctum')->group(function (){
+Route::middleware('auth:sanctum')->group(function () {
     Route::get('/stations', [StationController::class, 'index']);
     Route::get('/stations/{id}', [StationController::class, 'show']);
 });
@@ -86,7 +87,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/operator/charger/{id}/stop', [OperatorController::class, 'stopCharger']);
     Route::post('/operator/charger/{id}/reboot', [OperatorController::class, 'rebootCharger']);
     Route::delete('/operator/delchargers/{id}', [OperatorController::class, 'destroyCharger']);
-    
+
     Route::get('/operator/ports', [OperatorController::class, 'getPorts']);
     Route::post('/operator/storeports', [OperatorController::class, 'storePort']);
     Route::put('/operator/ports/{id}', [OperatorController::class, 'updatePort']);

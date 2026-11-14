@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './driverDashboard.css';
-import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi, topUpWallet } from './api/wallet';
+import { getWallet, createPin, changePin as changePinApi, disablePin as disablePinApi } from './api/wallet';
 import { getProfile, updateProfile } from './api/profile';
 import { getVehicles } from './api/vehicle';
 import { getDrivingRoute, googleMapsDirectionsUrl, formatJarak, formatDurasi } from './api/routing';
@@ -12,6 +12,7 @@ import { finishChargingSession, interruptChargingSession } from './api/chargingS
 import { getPaymentDetail, getPaymentHistory } from './api/payments';
 import StationDetail from './StationDetail';
 import StartCharging from './StartCharging';
+import StrukDigital from './StrukDigital';
 
 function extractErrorMessage(error, fallback) {
     const data = error?.response?.data;
@@ -40,7 +41,6 @@ const DUMMY_STATS = {
 const FALLBACK_DRIVER_POSITION = { lat: -7.8014, lng: 110.3644 };
 const DUMMY_ACTIVE_SESSION = null;
 const CONNECTOR_FILTERS = ['Semua', 'CCS2', 'Type 2', 'CHAdeMO'];
-const TOP_UP_METHODS = ['Mandiri', 'OVO', 'BCA', 'BRI', 'BNI'];
 
 function formatRupiah(value) {
     if (value == null) return '-';
@@ -105,7 +105,37 @@ function capitalize(str) {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp }) {
+// Bentuk data invoice dari backend -> bentuk yang dipakai StrukDigital.
+function buildStrukData(inv) {
+    if (!inv) return null;
+    const mulai = inv.waktu_mulai ? new Date(inv.waktu_mulai) : null;
+    const selesai = inv.waktu_selesai ? new Date(inv.waktu_selesai) : null;
+    const durasiMenit =
+        mulai && selesai && !Number.isNaN(selesai - mulai)
+            ? Math.max(0, Math.round((selesai - mulai) / 60000))
+            : null;
+
+    return {
+        id_session: inv.id_session,
+        nama_lokasi: inv.nama_lokasi,
+        kode_charger: inv.kode_charger,
+        kendaraan: {
+            model: inv.kendaraan?.nama,
+            nomor_polisi: inv.kendaraan?.nomor_polisi,
+        },
+        energi_kwh: inv.energi_kwh,
+        tarif_per_kwh: inv.tarif_per_kwh,
+        biaya_charging_aktual: inv.biaya_charging,
+        biaya_parkir_aktual: inv.biaya_parkir,
+        metode_pembayaran: inv.metode_pembayaran,
+        total_bayar: inv.biaya_aktual,
+        durasi_menit: durasiMenit,
+        waktu_mulai: inv.waktu_mulai,
+        waktu_selesai: inv.waktu_selesai,
+    };
+}
+
+export default function DriverDashboard({ user: authUser, onLogout, onNavigateToVehicles, onNavigateToHelp, onNavigateToWallet, onNavigateToTopUp, onNavigateToRiwayat }) {
     const user = {
         nama: authUser?.profile?.nama_lengkap || authUser?.email || DUMMY_USER.nama,
     };
@@ -125,13 +155,11 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
     const [sessionError, setSessionError] = useState('');
     const [stoppingSession, setStoppingSession] = useState(false);
     const [startPortId, setStartPortId] = useState(null); // port yang dipilih dari daftar station
-    const [invoice, setInvoice] = useState(null);
-    const [showTopUp, setShowTopUp] = useState(false);
-    const [topUpAmount, setTopUpAmount] = useState(100000);
-    const [topUpMethod, setTopUpMethod] = useState('Mandiri');
-    const [topUpPin, setTopUpPin] = useState('');
-    const [topUpError, setTopUpError] = useState('');
-    const [topUpSubmitting, setTopUpSubmitting] = useState(false);
+    // Struk digital tampil inline di kartu sesi setelah sesi dihentikan
+    // (senada dengan alur di zip: kartu sesi tetap ada, tombol jadi "Selesai").
+    const [showStruk, setShowStruk] = useState(false);
+    const [strukData, setStrukData] = useState(null);
+    const sessionEnded = showStruk && !!strukData;
     const [transactionHistory, setTransactionHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyError, setHistoryError] = useState('');
@@ -147,6 +175,17 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
 
     const [wallet, setWallet] = useState(null);
     const [walletLoading, setWalletLoading] = useState(true);
+    // Sembunyikan/lihat saldo di kartu saldo beranda (dipakai juga oleh DompetDigital).
+    const [hideBalance, setHideBalance] = useState(
+        () => localStorage.getItem('ev_hide_saldo') === '1'
+    );
+    const toggleHideBalance = () => {
+        setHideBalance((v) => {
+            const next = !v;
+            localStorage.setItem('ev_hide_saldo', next ? '1' : '0');
+            return next;
+        });
+    };
     const fetchWallet = async () => {
         try {
             const data = await getWallet();
@@ -523,14 +562,27 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         fetchTransactionHistory();
     }, []);
 
-    // Sesi selesai / dibatalkan: tampilkan invoice, segarkan saldo, port, dan riwayat.
+    // Sesi selesai / dibatalkan: tampilkan struk + invoice, segarkan saldo,
+    // port, dan riwayat. activeSession sengaja TIDAK dihapus supaya kartu
+    // sesi tetap tampil dan struk muncul di bawah tombol (tombol -> "Selesai").
     const afterSessionSettled = async (settledInvoice) => {
-        setInvoice(settledInvoice);
-        setActiveSession(null);
+        setStrukData(buildStrukData(settledInvoice));
+        setShowStruk(true);
         setShowNotif(false);
+        setSheetExpanded(true); // buka panel supaya struk tidak terpotong
         reloadStations();
         await fetchWallet();
         await fetchTransactionHistory();
+    };
+
+    // Dipanggil saat tombol "Selesai" ditekan setelah struk muncul.
+    const finishSession = () => {
+        setShowStruk(false);
+        setStrukData(null);
+        setActiveSession(null);
+        setShowNotif(false);
+        setSheetExpanded(false);
+        setView('home');
     };
 
     const handleStopSession = async () => {
@@ -571,7 +623,8 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
         setSelectedStationId(null);
         setActiveSession(session);
         setShowNotif(true);
-        setInvoice(null);
+        setShowStruk(false);
+        setStrukData(null);
         setView('home');
         reloadStations();
         fetchWallet(); // saldo tersedia berkurang karena hold
@@ -601,36 +654,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
             });
         } finally {
             setInvoiceLoading(false);
-        }
-    };
-
-    const openTopUpModal = () => {
-        setTopUpAmount(100000);
-        setTopUpMethod('Mandiri');
-        setTopUpPin('');
-        setTopUpError('');
-        setShowTopUp(true);
-    };
-
-    const handleTopUpSubmit = async (e) => {
-        e.preventDefault();
-        setTopUpError('');
-
-        if (hasPin && topUpPin.length !== 6) {
-            setTopUpError('Masukkan PIN Dompet 6 digit untuk top up.');
-            return;
-        }
-
-        setTopUpSubmitting(true);
-        try {
-            await topUpWallet(Number(topUpAmount), topUpMethod, topUpPin);
-            await fetchWallet();
-            await fetchTransactionHistory();
-            setShowTopUp(false);
-        } catch (err) {
-            setTopUpError(extractErrorMessage(err, 'Top up gagal. Coba lagi.'));
-        } finally {
-            setTopUpSubmitting(false);
         }
     };
 
@@ -882,14 +905,52 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     </div>
 
                     <div className="home-header-summary">
-                        <div className="home-balance-panel">
+                        <div
+                            className="home-balance-panel"
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Buka dompet digital"
+                            onClick={onNavigateToWallet}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onNavigateToWallet?.();
+                                }
+                            }}
+                        >
                             <div>
-                                <p className="home-wallet-label">Saldo Dompet</p>
+                                <div className="home-wallet-label-row">
+                                    <p className="home-wallet-label">Saldo Dompet</p>
+                                    <button
+                                        type="button"
+                                        className="home-wallet-eye"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleHideBalance();
+                                        }}
+                                        aria-label={hideBalance ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                                        title={hideBalance ? 'Tampilkan saldo' : 'Sembunyikan saldo'}
+                                    >
+                                        {hideBalance ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
                                 <p className="home-wallet-value">
-                                    {walletLoading ? '...' : formatRupiah(wallet?.saldo ?? 0)}
+                                    {walletLoading
+                                        ? '...'
+                                        : hideBalance
+                                          ? 'Rp ••••••'
+                                          : formatRupiah(wallet?.saldo ?? 0)}
                                 </p>
                             </div>
-                            <button className="home-wallet-topup" onClick={openTopUpModal}>+ Top Up</button>
+                            <button
+                                className="home-wallet-topup"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onNavigateToTopUp?.();
+                                }}
+                            >
+                                + Top Up
+                            </button>
                         </div>
 
                         <div className="home-vehicle-panel">
@@ -920,13 +981,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 </header>
 
                 <main className="home-content">
-                    {showNotif && activeSession && (
-                        <div className="mapdash-notif home-notif">
-                            <span>⚡ Sesi charging Anda di <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.</span>
-                            <button className="mapdash-notif-close" onClick={() => setShowNotif(false)}>✕</button>
-                        </div>
-                    )}
-
                     {false && !activeSession && (
                         <section className="home-session-card">
                             <div className="mapdash-sheet-title-row">
@@ -941,7 +995,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         <section className="home-session-card">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title home-session-title">Sesi Charging Berlangsung</span>
-                                <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
+                                <span className="dash-status-badge ok">● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}{activeSession.soc_sekarang != null ? ` · 🔋 ${activeSession.soc_sekarang}%` : ''}</p>
 
@@ -963,13 +1017,18 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 </div>
                             </div>
                             <div className="home-session-actions">
-                                <button className="dash-btn-stop" onClick={handleStopSession}>
-                                    {activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
+                                <button
+                                    className={`dash-btn-stop ${sessionEnded ? 'done' : ''}`}
+                                    onClick={sessionEnded ? finishSession : handleStopSession}
+                                    disabled={stoppingSession}
+                                >
+                                    {stoppingSession ? 'Menghentikan…' : sessionEnded || activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
                                 </button>
                                 <button className="dash-btn-issue" onClick={handleInterruptSession}>
                                     Laporkan Gangguan
                                 </button>
                             </div>
+                            {sessionEnded && <StrukDigital data={strukData} />}
                         </section>
                     )}
 
@@ -1000,34 +1059,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                             ))}
                         </div>
                     </section>
-
-                    {invoice && (
-                        <section className="home-invoice-card">
-                            <div className="mapdash-sheet-title-row">
-                                <span className="mapdash-sheet-title">Invoice Digital Terakhir</span>
-                                <span className="dash-status-badge ok">{invoice.status}</span>
-                            </div>
-                            <p className="mapdash-session-location">📍 {invoice.nama_lokasi} · {invoice.kode_charger}</p>
-                            <div className="invoice-grid">
-                                <div>
-                                    <span className="invoice-label">Energi Aktual</span>
-                                    <strong>{invoice.energi_kwh} kWh</strong>
-                                </div>
-                                <div>
-                                    <span className="invoice-label">Biaya Aktual</span>
-                                    <strong>{formatRupiah(invoice.biaya_aktual)}</strong>
-                                </div>
-                                <div>
-                                    <span className="invoice-label">Dana Hold</span>
-                                    <strong>{formatRupiah(invoice.jumlah_hold)}</strong>
-                                </div>
-                                <div>
-                                    <span className="invoice-label">Selisih Dikembalikan</span>
-                                    <strong>{formatRupiah(Math.max(0, invoice.jumlah_hold - invoice.biaya_aktual))}</strong>
-                                </div>
-                            </div>
-                        </section>
-                    )}
 
                     <section className="home-stats-row">
                         <div className="home-stat-card">
@@ -1296,7 +1327,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                         <div className="mapdash-session">
                             <div className="mapdash-sheet-title-row">
                                 <span className="mapdash-sheet-title">Sesi Charging Berlangsung</span>
-                                <span className="dash-status-badge ok">● {activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
+                                <span className="dash-status-badge ok">● {sessionEnded ? 'Selesai' : activeSession.sudah_penuh ? 'Baterai Penuh' : activeSession.status}</span>
                             </div>
                             <p className="mapdash-session-location">📍 {activeSession.nama_lokasi} · {activeSession.kode_charger}{activeSession.soc_sekarang != null ? ` · 🔋 ${activeSession.soc_sekarang}%` : ''}</p>
 
@@ -1318,13 +1349,18 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                 </div>
                             </div>
                             <div className="home-session-actions">
-                                <button className="dash-btn-stop" onClick={handleStopSession}>
-                                    {activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
+                                <button
+                                    className={`dash-btn-stop ${sessionEnded ? 'done' : ''}`}
+                                    onClick={sessionEnded ? finishSession : handleStopSession}
+                                    disabled={stoppingSession}
+                                >
+                                    {stoppingSession ? 'Menghentikan…' : sessionEnded || activeSession.sudah_penuh ? 'Selesai' : 'Hentikan Sesi'}
                                 </button>
                                 <button className="dash-btn-issue" onClick={handleInterruptSession}>
                                     Gangguan
                                 </button>
                             </div>
+                            {sessionEnded && <StrukDigital data={strukData} />}
                         </div>
                     ) : (
                         <>
@@ -1436,84 +1472,6 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                 </div>
             </div>
 
-            {showTopUp && (
-                <div className="charge-flow-overlay" onClick={() => setShowTopUp(false)}>
-                    <form className="charge-flow-panel" onSubmit={handleTopUpSubmit} onClick={(e) => e.stopPropagation()}>
-                        <div className="settings-panel-header">
-                            <span className="settings-panel-title">Top Up Dompet Digital</span>
-                            <button type="button" className="mapdash-notif-close" onClick={() => setShowTopUp(false)} aria-label="Tutup top up">
-                                ✕
-                            </button>
-                        </div>
-
-                        <p className="charge-flow-note">
-                            Top up instant untuk prototype. Integrasi payment gateway bisa disambungkan pada tahap berikutnya.
-                        </p>
-
-                        <label className="settings-pin-label" htmlFor="topup-amount">Nominal Top Up</label>
-                        <input
-                            id="topup-amount"
-                            className="topup-amount-input"
-                            type="number"
-                            min="10000"
-                            step="10000"
-                            value={topUpAmount}
-                            onChange={(e) => setTopUpAmount(e.target.value)}
-                        />
-
-                        <div className="topup-quick-row">
-                            {[50000, 100000, 200000].map((amount) => (
-                                <button
-                                    key={amount}
-                                    type="button"
-                                    className={`topup-quick-btn ${Number(topUpAmount) === amount ? 'active' : ''}`}
-                                    onClick={() => setTopUpAmount(amount)}
-                                >
-                                    {formatRupiah(amount)}
-                                </button>
-                            ))}
-                        </div>
-
-                        <label className="settings-pin-label">Metode Pembayaran</label>
-                        <div className="topup-method-grid">
-                            {TOP_UP_METHODS.map((method) => (
-                                <button
-                                    key={method}
-                                    type="button"
-                                    className={`topup-method-btn ${topUpMethod === method ? 'active' : ''}`}
-                                    onClick={() => setTopUpMethod(method)}
-                                >
-                                    {method}
-                                </button>
-                            ))}
-                        </div>
-
-                        {hasPin && (
-                            <>
-                                <label className="settings-pin-label" htmlFor="topup-pin">PIN Dompet</label>
-                                <input
-                                    id="topup-pin"
-                                    className="settings-pin-input"
-                                    type="password"
-                                    inputMode="numeric"
-                                    autoComplete="off"
-                                    maxLength={6}
-                                    placeholder="••••••"
-                                    value={topUpPin}
-                                    onChange={handlePinDigitsChange(setTopUpPin)}
-                                />
-                            </>
-                        )}
-
-                        {topUpError && <p className="settings-pin-error">{topUpError}</p>}
-
-                        <button type="submit" className="settings-pin-submit" disabled={topUpSubmitting}>
-                            {topUpSubmitting ? 'Memproses...' : 'Top Up Sekarang'}
-                        </button>
-                    </form>
-                </div>
-            )}
-
             {(selectedInvoice || invoiceLoading) && (
                 <div className="charge-flow-overlay" onClick={() => setSelectedInvoice(null)}>
                     <div className="charge-flow-panel invoice-detail-panel" onClick={(e) => e.stopPropagation()}>
@@ -1616,6 +1574,10 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                             </div>
                                         </div>
                                     </>
+                                )}
+
+                                {selectedInvoice.id_session && (
+                                    <StrukDigital data={buildStrukData(selectedInvoice)} />
                                 )}
                             </>
                         )}
@@ -1849,9 +1811,9 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                                         <span className="settings-menu-label">Kendaraan Saya</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
-                                    <button className="settings-menu-item">
-                                        <span className="settings-menu-icon">💳</span>
-                                        <span className="settings-menu-label">Metode Pembayaran</span>
+                                    <button className="settings-menu-item" onClick={onNavigateToRiwayat}>
+                                        <span className="settings-menu-icon">🧾</span>
+                                        <span className="settings-menu-label">Riwayat Transaksi</span>
                                         <span className="settings-menu-arrow">›</span>
                                     </button>
                                     <button className="settings-menu-item" onClick={openPinManager}>
@@ -2197,7 +2159,7 @@ export default function DriverDashboard({ user: authUser, onLogout, onNavigateTo
                     onStarted={handleSessionStarted}
                     onTopUp={() => {
                         setShowStartCharging(false);
-                        openTopUpModal();
+                        onNavigateToTopUp?.();
                     }}
                 />
             )}

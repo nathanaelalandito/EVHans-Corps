@@ -895,7 +895,9 @@ class ChargingSessionController extends Controller
             return true;
         }
 
-        $now = now()->format('H:i');
+        // Jam operasional di database memakai waktu WIB, sedangkan app timezone
+        // default UTC — baca jam sekarang eksplisit di Asia/Jakarta.
+        $now = now('Asia/Jakarta')->format('H:i');
 
         return $closeTime > $openTime
             ? ($now >= $openTime && $now < $closeTime)

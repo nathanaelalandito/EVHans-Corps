@@ -621,7 +621,9 @@ class ChargingFlowController extends Controller
             return true;
         }
 
-        $cur = now()->format('H:i');
+        // Jam operasional di database memakai waktu WIB, sedangkan app timezone
+        // default UTC — baca jam sekarang eksplisit di Asia/Jakarta.
+        $cur = now('Asia/Jakarta')->format('H:i');
 
         return $tutup > $buka
             ? ($cur >= $buka && $cur < $tutup)

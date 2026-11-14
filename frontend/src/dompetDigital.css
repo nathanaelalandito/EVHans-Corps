@@ -7,6 +7,13 @@
     padding: 0 16px calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
+/* Lebarkan batas halaman mengikuti lebar konten dashboard (720px),
+   supaya daftar riwayat tidak melebar penuh di layar desktop. */
+.dmp-riwayat-page {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
 /* --- Header hijau melengkung, selaras dengan layar beranda --- */
 .dmp-header {
     display: flex;

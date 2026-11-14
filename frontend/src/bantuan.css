@@ -21,9 +21,12 @@
 }
 
 /* ---------------- Header hijau melengkung ---------------- */
+/* Tinggi area hijau disamakan dengan blok hijau dashboard driver
+   (± sepertiga layar). Kolom pencarian tetap mengintip di atas
+   lengkungan header seperti desain awal. */
 .bt-header {
     background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
-    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 193px;
     border-radius: 0 0 28px 28px;
     animation: btFadeUp 0.4s ease both;
 }

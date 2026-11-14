@@ -7,11 +7,15 @@ import OperatorAdminDashboard from './OperatorAdminDashboard';
 import KelolaKendaraan from './KelolaKendaraan';
 import Bantuan from './Bantuan';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
+import { clearWalletCache } from './api/wallet';
 import OperatorDashboard from './OpsDashboard';
 import ChargerMonitor from './ChargerMonitor';
 import OpsReport from './OpsReport';
 import ProfilOps from './ProfilOps';
 import ChargerDetail from './ChargerDetail';
+import DompetDigital from './DompetDigital';
+import TopUp from './Topup';
+import RiwayatTransaksi from './RiwayatTransaksi';
 
 export default function App() {
     const [user, setUser] = useState(getStoredUser);
@@ -53,6 +57,7 @@ export default function App() {
     const isStaff = ['operator', 'admin'].includes(user?.peran);
 
     const handleLogout = async () => {
+        clearWalletCache();
         await logout().catch(() => {});
         setUser(null);
         setCurrentPage('welcome');
@@ -87,8 +92,23 @@ export default function App() {
                         onLogout={handleLogout}
                         onNavigateToVehicles={() => setCurrentPage('vehicles')}
                         onNavigateToHelp={() => setCurrentPage('help')}
+                        onNavigateToWallet={() => setCurrentPage('wallet')}
+                        onNavigateToTopUp={() => setCurrentPage('topup')}
+                        onNavigateToRiwayat={() => setCurrentPage('riwayat')}
                     />
                 )
+            )}
+            {currentPage === 'wallet' && (
+                <DompetDigital onBack={() => setCurrentPage('dashboard')} />
+            )}
+            {currentPage === 'topup' && (
+                <TopUp
+                    onBack={() => setCurrentPage('dashboard')}
+                    onDone={() => setCurrentPage('dashboard')}
+                />
+            )}
+            {currentPage === 'riwayat' && (
+                <RiwayatTransaksi onBack={() => setCurrentPage('dashboard')} />
             )}
             {currentPage === 'vehicles' && (
                 <KelolaKendaraan onBack={() => setCurrentPage('dashboard')} />
