@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './registrasi.css';
 import { register } from './api/auth';
+import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
 
 /** Form pembuatan akun pengemudi dan data kendaraan awal. */
 export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) {
@@ -108,10 +109,15 @@ export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) 
                     <div className="form-group">
                         <label>Nomor Telepon</label>
                         <input
-                            type="text"
+                            type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel"
                             name="nomor_telepon"
                             value={formData.nomor_telepon}
-                            onChange={handleChange}
+                            onChange={(e) => setFormData({ ...formData, nomor_telepon: normalizePhone(e.target.value) })}
+                            maxLength={PHONE_MAX_DIGITS}
+                            pattern={PHONE_PATTERN}
+                            title={`Hanya angka, maksimal ${PHONE_MAX_DIGITS} digit`}
                             required
                             placeholder="08123456789"
                         />

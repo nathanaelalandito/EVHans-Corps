@@ -1784,3 +1784,25 @@
     break-inside: avoid;
   }
 }
+
+/* PIN Keamanan di panel Pengaturan Driver */
+.settings-menu-badge {
+  padding: 2px var(--ev-space-2, 8px);
+  border-radius: 999px;
+  background: var(--ev-warning-soft);
+  color: var(--ev-warning);
+  font-size: var(--ev-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.settings-pin-cancel.settings-pin-secondary {
+  width: 100%;
+  margin-top: var(--ev-space-3, 12px);
+}
+
+.settings-pin-input.settings-pin-input--text {
+  letter-spacing: normal;
+  text-align: left;
+  font-size: var(--ev-text-sm);
+}

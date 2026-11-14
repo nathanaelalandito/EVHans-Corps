@@ -519,9 +519,11 @@ class OperationsController extends Controller
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'regex:/^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*@ops\.ac\.id$/i', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,13}$/'],
+            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,15}$/'],
             'id_locations' => ['sometimes', 'array'],
             'id_locations.*' => ['integer', 'distinct', 'exists:location,id_location'],
+        ], [
+            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
         ]);
 
         $operator = DB::transaction(function () use ($data, $request): User {

@@ -16,6 +16,7 @@ import {
   FiFileText,
   FiFilter,
   FiHelpCircle,
+  FiLock,
   FiLogOut,
   FiMap,
   FiMapPin,
@@ -56,8 +57,10 @@ import {
 } from "./api/chargingSessions";
 import { getPaymentDetail, getPaymentHistory } from "./api/payments";
 import { createInvoicePdf, invoicePdfName } from "./utils/invoicePdf";
+import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from "./utils/phone";
 import StationDetail from "./StationDetail";
 import StartCharging from "./StartCharging";
+import PinSecuritySettings from "./PinSecuritySettings";
 
 /** Memilih pesan error API yang bisa langsung ditampilkan kepada pengemudi. */
 function extractErrorMessage(error, fallback) {
@@ -312,7 +315,9 @@ export default function DriverDashboard({
 
   /** Membuat handler input untuk memperbarui satu field profil. */
   const handleEditFieldChange = (field) => (e) => {
-    setEditForm((prev) => ({ ...prev, [field]: e.target.value }));
+    const value =
+      field === "nomor_telepon" ? normalizePhone(e.target.value) : e.target.value;
+    setEditForm((prev) => ({ ...prev, [field]: value }));
   };
 
   /** Mengirim perubahan profil lalu memperbarui data dashboard. */
@@ -340,6 +345,12 @@ export default function DriverDashboard({
   /** Menutup tampilan profil dan kembali ke dashboard peta. */
   const closeProfileScreen = () => {
     setSettingsScreen("menu");
+  };
+
+  /** Membuka layar PIN Keamanan dengan status PIN terbaru dari server. */
+  const openPinScreen = () => {
+    setSettingsScreen("pin");
+    fetchWallet();
   };
 
   /** Membuka panel pengaturan selalu dari menu utama. */
@@ -2612,6 +2623,9 @@ export default function DriverDashboard({
                   inputMode="numeric"
                   value={editForm.nomor_telepon}
                   onChange={handleEditFieldChange("nomor_telepon")}
+                  maxLength={PHONE_MAX_DIGITS}
+                  pattern={PHONE_PATTERN}
+                  title={`Hanya angka, maksimal ${PHONE_MAX_DIGITS} digit`}
                   autoComplete="tel"
                 />
               </div>
@@ -2728,6 +2742,21 @@ export default function DriverDashboard({
                   </button>
                   <button
                     className="settings-menu-item"
+                    onClick={openPinScreen}
+                  >
+                    <span className="settings-menu-icon">
+                      <FiLock aria-hidden="true" />
+                    </span>
+                    <span className="settings-menu-label">PIN Keamanan</span>
+                    {wallet && !wallet.pin_sudah_diset && (
+                      <span className="settings-menu-badge">Belum dibuat</span>
+                    )}
+                    <span className="settings-menu-arrow">
+                      <FiChevronRight aria-hidden="true" />
+                    </span>
+                  </button>
+                  <button
+                    className="settings-menu-item"
                     onClick={onNavigateToHelp}
                   >
                     <span className="settings-menu-icon">
@@ -2746,6 +2775,21 @@ export default function DriverDashboard({
                   </button>
                 )}
               </>
+            )}
+
+            {/* ------------------------------------------------
+                            LAYAR PIN KEAMANAN
+                           ------------------------------------------------ */}
+            {settingsScreen === "pin" && (
+              <PinSecuritySettings
+                wallet={wallet}
+                onWalletChanged={fetchWallet}
+                onBack={() => setSettingsScreen("menu")}
+                onClose={() => {
+                  setShowSettings(false);
+                  setSettingsScreen("menu");
+                }}
+              />
             )}
 
             {/* ------------------------------------------------

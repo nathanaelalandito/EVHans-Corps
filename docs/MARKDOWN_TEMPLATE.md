@@ -122,6 +122,7 @@ Aturan UX Dashboard Driver:
 
 - Beranda menampilkan kendaraan aktif, saldo dan saldo tertahan, satu CTA Cari Charging Station, sesi aktif bila ada, serta maksimal tiga rekomendasi station. Di konten desktop, Station Sekitar mengambil sekitar 30% lebar dan Riwayat Transaksi sekitar 70%.
 - Header menata sapaan/kendaraan aktif, saldo, dan Cari Charging Station dalam satu baris pada desktop lebar. Pada tablet, card pencarian turun ke baris berikutnya; di ponsel semua card ditumpuk. Tombol Tambah Kendaraan berada di samping label Kendaraan Aktif; Notifikasi dan Pengaturan tersedia di area sapaan.
+- Menu Pengaturan Driver memuat PIN Keamanan untuk membuat, mengubah, dan mengatur ulang PIN 6 digit serta menampilkan status dompet terkunci.
 - Rekomendasi Station Sekitar hanya memakai kecocokan konektor kendaraan serta jarak GPS bila valid. Filter Maps tidak mengubah daftar rekomendasi beranda. Maps selalu menampilkan peta dan daftar hasil secara bersamaan.
 - Di Maps, tombol Kembali dan judul Cari Charging Station terpisah sebagai kontrol, tetapi berada bersama di bagian atas Card Pencarian. Pencarian, dropdown konektor, Filter lanjutan, jumlah hasil, dan daftar station tetap dalam panel yang sama.
 - Maps tidak memakai toggle Peta/Daftar. Desktop menampilkan Card Pencarian mengambang selebar sekitar 380px, bersudut membulat dan berjarak dari tepi; mobile menampilkan peta di atas dan daftar station yang discroll di panel bawah.
@@ -169,7 +170,7 @@ Aturan proses Tambah Station:
 - Nama station hanya berisi nama lokasi, tanpa awalan `EVCharge Hub`.
 - Peta mendukung pencarian alamat dengan tindakan Cari Lokasi, pemilihan salah satu hasil, dan penentuan manual di peta.
 - Email Operator dibentuk dari nama email yang diisi Admin ditambah domain tetap `@ops.ac.id`; field nama email mencegah browser mengisi email akun Admin.
-- Nomor telepon Operator hanya menerima angka dan dibatasi maksimal 13 digit pada form serta API.
+- Nomor telepon hanya menerima angka dan dibatasi maksimal 15 digit pada form, API, dan kolom database.
 - Setelah pembuatan akun Operator, Admin menerima umpan balik sukses atau gagal di dekat form; daftar akun diperbarui tanpa menghilangkan konteks halaman.
 - Biaya minimum tidak wajib; nilai kosong menjadi Rp0. Nilai positif menjadi batas bawah biaya energi, sementara parkir tetap dihitung terpisah.
 
