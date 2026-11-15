@@ -1051,7 +1051,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                                                 : 'Belum ada Operator aktif ditugaskan. Station harus tetap Nonaktif sampai petugas aktif ditetapkan.'}
                                         </p>}
                                         {selectedStation.fasilitas && <p className="ops-data-note">Fasilitas: {selectedStation.fasilitas}</p>}
-                                        {selectedStation.foto && <img src={`http://127.0.0.1:8000${selectedStation.foto}`} alt={selectedStation.nama_lokasi} style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '8px' }} />}
+                                        {selectedStation.foto && <img src={`http://127.0.0.1:8000${selectedStation.foto}`} alt={selectedStation.nama_lokasi} style={{ maxWidth: '320px', maxHeight: '240px', width: '100%', objectFit: 'cover', borderRadius: '8px', marginTop: '8px' }} />}
                                         <p className="ops-data-note">Status unit diatur manual. Ketersediaan port dihitung dari port berstatus Available pada unit operasional; port yang sedang mengisi mengikuti sesi aktif.</p>
                                     </section>
                                 )}
