@@ -20,12 +20,12 @@ class NotificationService
         $this->safeCreate($session->id_user, 'charging_gagal', "Charging {$status}", "Sesi charging {$status}. Biaya aktual Rp{$actualCost}, sisa hold Rp{$refund} dikembalikan.", $session->id_session, 'charging_session', "session_failed:{$session->id_session}:{$status}");
     }
 
-    public function notifyTopupFailed(int $userId, $topup, string $reason): void
+    public function notifyTopupFailed(string $userId, $topup, string $reason): void
     {
         $this->safeCreate($userId, 'topup_gagal', 'Top up gagal', "Top up {$topup->referensi} gagal: {$reason}.", $topup->id_topup ?? null, 'topup', "topup_failed:{$topup->id_topup}:{$reason}");
     }
 
-    public function notifyChargerIssue(Charger $charger, string $status, ?string $reason = null): void
+    public function notifyChargerIssue(Charger $charger, string $status, ?string $reason = null, array $driverIds = []): void
     {
         $recipients = collect();
 
@@ -42,6 +42,7 @@ class NotificationService
             ->where('status', 'Berlangsung')
             ->pluck('id_user');
         $recipients = $recipients->merge($activeDriverIds);
+        $recipients = $recipients->merge($driverIds);
 
         foreach ($recipients->unique() as $userId) {
             $this->safeCreate(

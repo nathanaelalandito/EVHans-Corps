@@ -215,7 +215,7 @@ class TopupController extends Controller
         if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada->isPast()) {
             $topup->update(['status_topup' => 'Gagal']);
             app(\App\Services\NotificationService::class)->notifyTopupFailed(
-                (int) DB::table('dompet')->where('id_wallet', $topup->id_wallet)->value('id_user'),
+                (string) DB::table('dompet')->where('id_wallet', $topup->id_wallet)->value('id_user'),
                 $topup->fresh(),
                 'kedaluwarsa'
             );

@@ -414,6 +414,10 @@ class ChargingSessionController extends Controller
         $refund = max(0, (int) $settled->saldo_hold - $actualCost);
         app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
 
+        if ($finalStatus === 'Gagal' && $settled->charger) {
+            app(NotificationService::class)->notifyChargerIssue($settled->charger, 'Out of Order', $data['alasan'] ?? null);
+        }
+
         $message = $finalStatus === 'Gagal'
             ? 'Sesi charging gagal ditangani. Biaya aktual dihitung dan sisa hold dikembalikan.'
             : 'Sesi charging dibatalkan. Biaya aktual dihitung dan sisa hold dikembalikan.';

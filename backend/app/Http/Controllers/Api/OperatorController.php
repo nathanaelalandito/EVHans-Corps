@@ -442,6 +442,7 @@ class OperatorController extends Controller
                 ->where('status', 'Berlangsung')
                 ->lockForUpdate()
                 ->get();
+            $activeDriverIds = $sessions->pluck('id_user')->all();
             foreach ($sessions as $session) {
                 $settlement = app(ChargingSessionController::class)->stopByOperator($request, $session);
                 if ($settlement->getStatusCode() >= 400) {
@@ -478,12 +479,12 @@ class OperatorController extends Controller
             }
         });
 
-        if (in_array($status, ['Maintenance', 'Offline'], true)) {
-            $chargerModel = \App\Models\Charger::find($id);
-            if ($chargerModel) {
-                app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason);
+            if (in_array($status, ['Maintenance', 'Offline'], true)) {
+                $chargerModel = \App\Models\Charger::find($id);
+                if ($chargerModel) {
+                    app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
+                }
             }
-        }
 
         return response()->json([
             'status' => 'success',
@@ -652,7 +653,7 @@ class OperatorController extends Controller
             ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
             ->where('ports.id_port', $id)
             ->where('charger.id_location', $assignment->id_location)
-            ->select('ports.id_port', 'ports.status_port', 'charger.id_location')
+            ->select('ports.id_port', 'ports.status_port', 'charger.id_location', 'charger.id_charger')
             ->first();
 
         if (! $port) {
@@ -664,6 +665,7 @@ class OperatorController extends Controller
                 ->where('status', 'Berlangsung')
                 ->lockForUpdate()
                 ->first();
+            $activeDriverIds = $session ? [$session->id_user] : [];
             if ($session) {
                 $settlement = app(ChargingSessionController::class)->stopByOperator($request, $session);
                 if ($settlement->getStatusCode() >= 400) {
@@ -690,6 +692,13 @@ class OperatorController extends Controller
                 ]);
             }
         });
+
+        if (in_array($status, ['Out of Order', 'Maintenance'], true)) {
+            $chargerModel = \App\Models\Charger::find($port->id_charger);
+            if ($chargerModel) {
+                app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
+            }
+        }
 
         return response()->json([
             'status' => 'success',

@@ -391,10 +391,12 @@ class OperationsController extends Controller
             'alasan' => ['required', 'string', 'min:5', 'max:500'],
         ]);
 
+        $activeDriverIds = [];
         if (isset($data['status_mesin']) && $charger->status_mesin === 'Active' && $data['status_mesin'] !== 'Active') {
             $activeSessions = ChargingSession::whereHas('port.charger', function ($query) use ($charger) {
                 $query->where('id_charger', $charger->id_charger);
             })->where('status', 'Berlangsung')->get();
+            $activeDriverIds = $activeSessions->pluck('id_user')->all();
 
             foreach ($activeSessions as $activeSession) {
                 $settlement = app(ChargingSessionController::class)->stopByOperator($request, $activeSession);
@@ -411,7 +413,7 @@ class OperationsController extends Controller
         $after = $charger->fresh()->only(array_keys($before));
 
         if (isset($data['status_mesin']) && in_array($data['status_mesin'], ['Maintenance', 'Offline'], true) && ($before['status_mesin'] ?? null) !== $data['status_mesin']) {
-            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason);
+            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason, $activeDriverIds);
         }
         if ($before !== $after) {
             AuditLog::create([
@@ -448,8 +450,10 @@ class OperationsController extends Controller
             'alasan' => ['required', 'string', 'min:5', 'max:500'],
         ]);
 
+        $activeDriverIds = [];
         if (isset($data['status_port']) && $data['status_port'] !== $port->status_port && $data['status_port'] !== Port::AVAILABLE) {
             $activeSession = ChargingSession::where('id_port', $port->id_port)->where('status', 'Berlangsung')->first();
+            $activeDriverIds = $activeSession ? [$activeSession->id_user] : [];
             if ($activeSession) {
                 $settlement = app(ChargingSessionController::class)->stopByOperator($request, $activeSession);
                 if ($settlement->getStatusCode() >= 400) {
@@ -465,7 +469,7 @@ class OperationsController extends Controller
         $after = $port->fresh()->only(array_keys($before));
 
         if (isset($data['status_port']) && in_array($data['status_port'], ['Out of Order', 'Maintenance'], true) && ($before['status_port'] ?? null) !== $data['status_port']) {
-            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason);
+            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason, $activeDriverIds);
         }
 
         if ($before !== $after) {
