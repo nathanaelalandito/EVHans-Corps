@@ -376,7 +376,8 @@
   .mapdash-filter-panel.is-sheet-expanded { bottom: auto; }
 
   .mapdash-topbar { top: 24px; }
-  .mapdash-notif { top: 86px; }
+  /* Bar notif persis di bawah topbar (topbar bottom = 66px). */
+  .mapdash-notif { top: 70px; }
   .route-card { top: 84px; }
 }
 
@@ -1478,17 +1479,19 @@
 .mapdash-container.has-selected-station .mapdash-filter-panel { display: block; }
 
 @media (min-width: 1024px) {
-  /* Card mengambang dibuat lebih ramping agar peta tetap menjadi area utama. */
+  /* Card mengambang dibuat lebih ramping agar peta tetap menjadi area utama.
+     Panel mulai di bawah bar notifikasi sesi (notif 70px + tinggi 41.5px + jarak 12px),
+     kalau tidak panel menutupi notifikasi di sisi kiri. */
   .mapdash-sheet,
   .mapdash-sheet.filters-open {
-    top: 24px;
-    bottom: auto;
+    top: 124px;
+    bottom: 24px;
     left: 24px;
     right: auto;
     width: min(380px, calc(100% - 48px));
     max-width: 380px;
-    height: min(78dvh, 740px);
-    max-height: calc(100% - 48px);
+    height: auto;
+    max-height: none;
     overflow: hidden;
     border-radius: var(--ev-radius-lg);
     box-shadow: var(--ev-shadow-card);
@@ -1719,6 +1722,33 @@
   text-align: center;
 }
 
+/* Nota: judul dan tombol aksi selalu terlihat, hanya isi nota yang menggulir.
+   Tanpa ini tombol Cetak/Bagikan PDF berada di bawah fold dan harus digulir dulu. */
+.invoice-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 88vh;
+  overflow: hidden;
+}
+
+.invoice-detail-panel > .invoice-receipt {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.invoice-detail-panel > .invoice-receipt-actions,
+.invoice-detail-panel > .invoice-action-message {
+  flex: 0 0 auto;
+}
+
+/* Tombol aksi pada kartu invoice beranda. */
+.home-invoice-actions {
+  margin-top: 14px;
+}
+
 @media (max-width: 560px) {
   .invoice-detail-panel {
     padding: 14px;
@@ -1783,4 +1813,31 @@
     border-color: #cfd8d2;
     break-inside: avoid;
   }
+
+  /* Isi nota jangan dipotong overflow flex saat dicetak. */
+  .invoice-detail-panel > .invoice-receipt {
+    overflow: visible !important;
+  }
+}
+
+/* PIN Keamanan di panel Pengaturan Driver */
+.settings-menu-badge {
+  padding: 2px var(--ev-space-2, 8px);
+  border-radius: 999px;
+  background: var(--ev-warning-soft);
+  color: var(--ev-warning);
+  font-size: var(--ev-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.settings-pin-cancel.settings-pin-secondary {
+  width: 100%;
+  margin-top: var(--ev-space-3, 12px);
+}
+
+.settings-pin-input.settings-pin-input--text {
+  letter-spacing: normal;
+  text-align: left;
+  font-size: var(--ev-text-sm);
 }

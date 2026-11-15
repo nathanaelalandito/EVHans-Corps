@@ -13,12 +13,20 @@ class UpdateProfileDriverRequest extends FormRequest
         return true; // sudah dijaga middleware auth:sanctum
     }
 
+    /** Pesan validasi dalam Bahasa Indonesia untuk field yang batasnya perlu dijelaskan. */
+    public function messages(): array
+    {
+        return [
+            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+        ];
+    }
+
     /** Aturan validasi untuk perubahan profil dan email pengemudi. */
     public function rules(): array
     {
         return [
             'nama_lengkap' => ['sometimes', 'string', 'max:255'],
-            'nomor_telepon' => ['sometimes', 'string', 'max:13'],
+            'nomor_telepon' => ['sometimes', 'string', 'regex:/^[0-9]{1,15}$/'],
             'alamat' => ['sometimes', 'nullable', 'string'],
             'tanggal_lahir' => ['sometimes', 'date'],
             'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$this->user()->id_user.',id_user'],

@@ -631,7 +631,10 @@ class ChargingFlowController extends Controller
             return true;
         }
 
-        $cur = now()->format('H:i');
+        // jam_buka/jam_tutup disimpan dalam WIB, sedangkan app.timezone = UTC.
+        // now() polos tertinggal 7 jam dan membuat semua station terbaca tutup
+        // selama jam kerja WIB — jadi ambil jam WIB secara eksplisit.
+        $cur = now('Asia/Jakarta')->format('H:i');
 
         return $tutup > $buka
             ? ($cur >= $buka && $cur < $tutup)

@@ -65,6 +65,10 @@ Contoh catatan untuk Konfigurasi Sistem: `11 Nov 2026 | Fix | Driver membaca sta
 
 Contoh catatan untuk direktori Operator: `11 Nov 2026 | Fix | Tampilkan notifikasi pembuatan Operator di dekat form dan perbarui daftar tanpa menutup halaman | Admin perlu konfirmasi langsung setelah akun berhasil dibuat | Tambah status sukses/gagal yang dapat diakses pembaca layar dan indikator proses submit | Tim EVChargeHub | Done`.
 
+Contoh catatan untuk modul Driver (validasi nomor telepon): `14 Nov 2026 | Fix | Nomor telepon dibatasi hanya angka dengan panjang maksimal 15 digit pada form Registrasi, Edit Profil Driver, Pengaturan Operator, dan form Operator Admin; aturan yang sama diterapkan di API dan kolom user_profile.nomor_telepon diperluas dari CHAR(13) menjadi VARCHAR(15) | Batas sebelumnya tidak konsisten (registrasi 15, profil dan Operator 13, kolom DB 13) sehingga nomor 14–15 digit dapat ditolak atau gagal tersimpan | Tambah util frontend utils/phone.js, validasi regex ^[0-9]{1,15}$ pada AuthController, UpdateProfileDriverRequest, OperatorController, dan OperationsController, serta migration 2026_11_14_000001_extend_nomor_telepon_on_user_profile_table; rollback migration gagal bila sudah ada nomor lebih dari 13 digit | Tim EVChargeHub | Done`.
+
+Contoh catatan untuk modul Wallet (PIN Keamanan): `14 Nov 2026 | Create | Menu PIN Keamanan ditambahkan pada panel Pengaturan Driver untuk membuat PIN, mengubah PIN, dan mengatur ulang PIN dengan password akun, termasuk status PIN dan status dompet terkunci | PIN wajib dimiliki sebelum memulai charging, tetapi sebelumnya tidak ada antarmuka pengaturannya di menu Pengaturan | Tambah komponen PinSecuritySettings.jsx dan item menu dengan badge Belum dibuat; memakai endpoint /api/wallet/pin yang sudah ada tanpa perubahan API atau skema; fitur nonaktifkan PIN sengaja tidak ditampilkan | Tim EVChargeHub | Done`.
+
 ## 7. File Terkait
 
 | Area | File/Path | Perubahan | Catatan |
@@ -146,6 +150,8 @@ Aturan UX dan fungsi Driver:
 - Layout desktop memakai dua kolom konten yang proporsional; layar kecil menjadi satu kolom dengan urutan informasi yang sama.
 - Saat GPS tidak tersedia, satu pesan lokasi ditampilkan dan jarak di kartu disembunyikan agar tidak berulang.
 - Ikon memakai sistem ikon aplikasi; emoji tidak digunakan sebagai ikon kontrol atau status.
+- Menu Pengaturan Driver memuat PIN Keamanan. Layar ini menampilkan status PIN (aktif/belum dibuat) dan status dompet terkunci beserta batas waktunya, serta menyediakan Buat PIN, Ubah PIN, dan Lupa PIN (atur ulang dengan password akun). Badge Belum dibuat tampil di menu selama PIN belum ada.
+- PIN terdiri dari 6 digit angka dan tidak ditampilkan sebagai teks biasa. Konfirmasi PIN baru wajib sama, PIN baru tidak boleh sama dengan PIN lama, dan dompet terkunci 15 menit setelah 3 kali PIN salah. Menonaktifkan PIN tidak disediakan di antarmuka karena PIN diwajibkan untuk memulai charging.
 
 Aturan UX dashboard Operator:
 
@@ -177,7 +183,7 @@ Aturan alur penambahan station:
 - Kode `SPKLU-####` unik disimpan sebagai kode panggil terpisah dari ID database; awalan `EVCharge Hub` tidak disimpan pada nama station.
 - Pemilih titik lokasi menyediakan pencarian alamat eksplisit, pilihan hasil, peta lebih besar, dan pemilihan manual.
 - Form email Operator hanya menerima nama email, mencegah autofill email akun Admin, menambahkan `@ops.ac.id`, dan memvalidasi keunikan email lengkap.
-- Nomor telepon Operator hanya menerima angka dengan panjang 1–13 digit; pembatasan diterapkan pada form dan API.
+- Nomor telepon (Driver, Operator, dan Admin saat membuat Operator) hanya menerima angka dengan panjang 1–15 digit; pembatasan diterapkan pada form, API, dan kolom database `VARCHAR(15)`. Karakter non-angka dibuang otomatis saat mengetik atau menempel.
 - Biaya minimum bersifat opsional dengan default Rp0; bila diberi nilai positif, ia menjadi batas minimum biaya energi.
 
 ## 12. Dampak Perubahan

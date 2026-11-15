@@ -211,9 +211,9 @@ Aturan tarif minimum:
 | ---- | ------------------------------------- | ---------------------------------- | ------ | ---------------------------------------------------------- |
 | FR01 | Registrasi Akun Pengemudi             | Pengemudi                          | MUST   | Pintu masuk penggunaan sistem.                             |
 | FR02 | Login Pengemudi                       | Pengemudi                          | MUST   | Autentikasi sebelum mengakses fitur.                       |
-| FR03 | Kelola Profil Pengemudi               | Pengemudi                          | SHOULD | Melihat dan memperbarui data pribadi.                      |
+| FR03 | Kelola Profil Pengemudi               | Pengemudi                          | SHOULD | Melihat dan memperbarui data pribadi; nomor telepon hanya angka, maksimal 15 digit. |
 | FR04 | Kelola Kendaraan                      | Pengemudi                          | MUST   | Tipe konektor digunakan untuk rekomendasi charger.         |
-| FR05 | Kelola PIN Keamanan                   | Pengemudi                          | MUST   | PIN digunakan sebagai verifikasi transaksi.                |
+| FR05 | Kelola PIN Keamanan                   | Pengemudi                          | MUST   | PIN 6 digit digunakan sebagai verifikasi transaksi. Pengemudi membuat, mengubah, dan mengatur ulang PIN (dengan password akun) dari menu Pengaturan; status PIN dan status dompet terkunci terlihat di layar yang sama. |
 | FR06 | Kelola Dompet Digital                 | Pengemudi                          | MUST   | Setiap pengemudi memiliki wallet EVChargeHub.              |
 | FR07 | Top Up Dompet Digital                 | Pengemudi, Payment Gateway         | MUST   | Top up melalui metode pembayaran tersedia.                 |
 | FR08 | Melihat Saldo Dompet Digital          | Pengemudi                          | MUST   | Saldo diperlukan sebelum transaksi.                        |
@@ -263,7 +263,7 @@ Aturan tarif minimum:
 | FR52 | Wizard Penambahan Station             | Admin                              | MUST   | Halaman bertahap untuk informasi, Operator, tarif awal, dan tinjauan; boleh simpan Nonaktif tanpa Operator, tetapi aktivasi mewajibkan minimal satu Operator aktif dan alasan. |
 | FR53 | Kode Panggil Station                  | Sistem, Admin, Operator, Pengemudi | SHOULD | Kode unik `SPKLU-####` berbeda dari ID database dan dapat digunakan untuk mengenali/mencari station. |
 | FR54 | Pencarian Lokasi Station              | Admin                              | SHOULD | Cari alamat secara eksplisit, pilih hasil untuk mengisi koordinat, atau tentukan titik manual pada peta. |
-| FR55 | Email Akun Operator                   | Admin                              | MUST   | Admin mengisi nama email saja; sistem melengkapi domain tetap `@ops.ac.id`, mencegah autofill email akun Admin pada kolom nama email, dan memvalidasi keunikan alamat lengkap. Nomor telepon Operator hanya menerima 1–13 digit. |
+| FR55 | Email Akun Operator                   | Admin                              | MUST   | Admin mengisi nama email saja; sistem melengkapi domain tetap `@ops.ac.id`, mencegah autofill email akun Admin pada kolom nama email, dan memvalidasi keunikan alamat lengkap. Nomor telepon Operator hanya menerima angka, 1–15 digit. |
 | FR56 | Kelola Charger dan Port               | Admin, Operator                    | MUST   | Admin dapat mengelola semua station; Operator hanya station yang ditugaskan. Keduanya dapat membuat dan mengubah data teknis serta status charger/port. Alasan perubahan dicatat dalam audit; status Sedang Mengisi mengikuti sesi sistem dan tidak dapat diatur manual. Jika status perangkat diubah saat sesi aktif, sistem menyelesaikan sesi berdasarkan energi aktual dan merekonsiliasi hold sebelum menerapkan status baru. |
 
 ## 9. Kebutuhan Nonfungsional
@@ -284,7 +284,7 @@ Aturan tarif minimum:
 
 | Entitas          | Atribut Utama                                                                                     | Catatan                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| User             | `id_user`, `nama`, `email`, `nomor_telepon`, `peran`, `status_akun`                               | Pengemudi, operator, admin.                          |
+| User             | `id_user`, `nama`, `email`, `nomor_telepon`, `peran`, `status_akun`                               | Pengemudi, operator, admin; `nomor_telepon` 1–15 digit angka. |
 | Vehicle          | `id_vehicle`, `id_user`, `merek`, `model`, `nomor_polisi`, `tipe_konektor`                        | Kendaraan milik pengemudi.                           |
 | Location         | `id_location`, `kode_station`, `nama_lokasi`, `alamat`, `latitude`, `longitude`, `jam_operasional`, `status` | Kode panggil unik terpisah dari ID database.         |
 | Charger          | `id_charger`, `id_location`, `kode_perangkat`, `tipe_konektor`, `daya_kw`, `status`               | Unit charger di station.                             |
@@ -344,6 +344,15 @@ Aturan tarif minimum:
 - Desktop menampilkan peta dengan Card Pencarian mengambang yang lebih ramping, berjarak dari tepi, dan bersudut membulat; mobile menampilkan peta di area atas dan panel hasil yang dapat discroll di bagian bawah.
 - Filter konektor menggunakan dropdown dengan pilihan Semua sebagai nilai awal. Filter daya, tarif, dan ketersediaan tetap tersedia melalui tombol Filter.
 
+### 12.3 Aturan UX Pengaturan Driver
+
+- Menu Pengaturan memuat Profil, Kendaraan Saya, PIN Keamanan, dan Bantuan. PIN Keamanan menampilkan badge Belum dibuat selama Pengemudi belum memiliki PIN.
+- Layar PIN Keamanan menampilkan status PIN dan status dompet terkunci (beserta batas waktunya), dengan aksi Buat PIN, Ubah PIN, dan Lupa PIN.
+- Buat PIN dan Ubah PIN meminta konfirmasi PIN baru; Ubah PIN juga meminta PIN lama dan menolak PIN baru yang sama dengan PIN lama. Lupa PIN memverifikasi password akun.
+- Input PIN hanya menerima 6 digit angka dan disamarkan. Dompet terkunci 15 menit setelah 3 kali PIN salah.
+- Menonaktifkan PIN tidak ditampilkan di antarmuka karena PIN wajib untuk memulai charging.
+- Input nomor telepon pada Registrasi dan Edit Profil hanya menerima angka maksimal 15 digit; karakter lain dibuang otomatis dan API menolak nilai di luar aturan tersebut.
+
 ## 13. Backlog Dokumen
 
 | Kode  | Dokumen                                               | MoSCoW | Catatan                                                |
@@ -364,6 +373,8 @@ Aturan tarif minimum:
 ## 14. Acceptance Criteria Umum
 
 - `[ ]` Pengemudi dapat registrasi, membuat PIN, menambahkan kendaraan, dan memiliki Dompet Digital.
+- `[ ]` Nomor telepon hanya menerima angka maksimal 15 digit pada form dan API; nilai 16 digit atau berisi huruf ditolak.
+- `[ ]` Pengemudi dapat membuat, mengubah, dan mengatur ulang PIN dari menu Pengaturan.
 - `[ ]` Pengemudi dapat melihat station terdekat sesuai tipe konektor kendaraan.
 - `[ ]` Sistem dapat memvalidasi charger sebelum sesi charging dimulai.
 - `[ ]` Sistem dapat menghitung estimasi biaya dan melakukan hold saldo.

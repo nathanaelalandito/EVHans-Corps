@@ -817,8 +817,10 @@ class OperatorController extends Controller
     public function updateProfile(Request $request)
     {
         $data = $request->validate([
-            'nomor_telepon' => 'required|string|max:13',
+            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,15}$/'],
             'alamat' => 'nullable|string|max:1000',
+        ], [
+            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
         ]);
         DB::table('user_profile')->updateOrInsert(
             ['id_user' => $request->user()->id_user],

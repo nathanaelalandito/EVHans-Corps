@@ -965,7 +965,7 @@ class ChargingSessionController extends Controller
             return true;
         }
 
-        $now = now()->format('H:i');
+        $now = now('Asia/Jakarta')->format('H:i');
 
         return $closeTime > $openTime
             ? ($now >= $openTime && $now < $closeTime)
