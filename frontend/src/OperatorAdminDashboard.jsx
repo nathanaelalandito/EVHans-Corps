@@ -26,7 +26,7 @@ import {
 } from './api/operations';
 import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
 
-const STATION_STATUS = ['Aktif', 'Nonaktif', 'Maintenance'];
+const STATION_STATUS = ['Aktif', 'Nonaktif', 'Maintenance', 'Gangguan'];
 const CHARGER_STATUS = ['Active', 'Maintenance', 'Offline'];
 const DEFAULT_MAP_POINT = { latitude: -7.8014, longitude: 110.3644 };
 
@@ -415,6 +415,8 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
             jam_buka: selectedStation.jam_buka,
             jam_tutup: selectedStation.jam_tutup,
             status: selectedStation.status,
+            fasilitas: selectedStation.fasilitas ?? '',
+            fotoFile: null,
             alasan: '',
         });
         setEditingStation(true);
@@ -562,14 +564,26 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         if (!selectedStation || !editStationForm) return;
         setFeedback('');
         try {
-            const { status: editStatusLoc, ...editFields } = editStationForm;
-            await updateStation(selectedStation.id_location, {
-                ...editFields,
-                status_loc: editStatusLoc,
-                alasan: editStationForm.alasan,
-                latitude: Number(editStationForm.latitude),
-                longitude: Number(editStationForm.longitude),
+        const { status: editStatusLoc, fotoFile, ...editFields } = editStationForm;
+        const payload = {
+            ...editFields,
+            status_loc: editStatusLoc,
+            alasan: editStationForm.alasan,
+            latitude: Number(editStationForm.latitude),
+            longitude: Number(editStationForm.longitude),
+        };
+
+        let body = payload;
+        if (fotoFile) {
+            const formData = new FormData();
+            Object.entries(payload).forEach(([key, value]) => {
+                if (value != null) formData.append(key, value);
             });
+            formData.append('foto', fotoFile);
+            body = formData;
+        }
+
+        await updateStation(selectedStation.id_location, body);
             await fetchDashboard();
             setSelectedStationId(selectedStation.id_location);
             setEditingStation(false);
@@ -1066,6 +1080,8 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                                                 Tutup
                                                 <input type="time" value={editStationForm.jam_tutup} onChange={(e) => setEditStationForm((p) => ({ ...p, jam_tutup: e.target.value }))} />
                                             </label>
+                                            <label>Fasilitas<textarea value={editStationForm.fasilitas} onChange={(e) => setEditStationForm((p) => ({ ...p, fasilitas: e.target.value }))} /></label>
+                                            <label>Foto station<input type="file" accept="image/png,image/jpeg" onChange={(e) => setEditStationForm((p) => ({ ...p, fotoFile: e.target.files?.[0] ?? null }))} /></label>
                                         </div>
                                         <label>Alasan perubahan<input required minLength="5" value={editStationForm.alasan} onChange={(e) => setEditStationForm((p) => ({ ...p, alasan: e.target.value }))} placeholder="Jelaskan alasan perubahan data" /></label>
                                         <div className="ops-form-actions"><button type="submit" className="ops-button-primary">Simpan perubahan</button><button type="button" className="ops-button-secondary" onClick={() => setEditingStation(false)}>Batal</button></div>

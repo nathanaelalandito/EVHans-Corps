@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Charger;
 use App\Models\Location;
 use App\Models\Port;
+use App\Models\StationOperator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -20,11 +21,20 @@ class StationController extends Controller
         $driverLat = is_numeric($request->query('lat')) ? (float) $request->query('lat') : null;
         $driverLng = is_numeric($request->query('lng')) ? (float) $request->query('lng') : null;
 
+        $assignedLocationIds = null;
+        if ($request->user()?->peran === 'operator') {
+            $assignedLocationIds = StationOperator::where('id_user', $request->user()->id_user)
+                ->pluck('id_location')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
         $stations = Location::query()
             ->with([
                 'chargers.ports' => fn ($query) => $query->orderBy('nomor_port'),
                 'tarifs' => fn ($query) => $query->latest('periode_mulai'),
             ])
+            ->when($assignedLocationIds !== null, fn ($query) => $query->whereIn('id_location', $assignedLocationIds))
             ->when($connector, function ($query) use ($connector): void {
                 $cleanConnector = strtolower(str_replace(' ', '', $connector));
                 $query->whereHas('chargers.ports', function ($portQuery) use ($cleanConnector) {
@@ -45,6 +55,15 @@ class StationController extends Controller
     {
         $driverLat = is_numeric($request->query('lat')) ? (float) $request->query('lat') : null;
         $driverLng = is_numeric($request->query('lng')) ? (float) $request->query('lng') : null;
+
+        if ($request->user()?->peran === 'operator') {
+            $assigned = StationOperator::where('id_user', $request->user()->id_user)
+                ->where('id_location', $id)
+                ->exists();
+            if (! $assigned) {
+                abort(404);
+            }
+        }
 
         $location = Location::query()
             ->with([

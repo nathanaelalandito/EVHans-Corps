@@ -182,11 +182,13 @@ class OperationsController extends Controller
             'longitude' => ['sometimes', 'numeric', 'between:-180,180'],
             'jam_buka' => ['sometimes', 'date_format:H:i'],
             'jam_tutup' => ['sometimes', 'date_format:H:i'],
-            'status_loc' => ['sometimes', Rule::in(['Aktif', 'Nonaktif', 'Maintenance'])],
+            'status_loc' => ['sometimes', Rule::in(['Aktif', 'Nonaktif', 'Maintenance', 'Gangguan'])],
+            'fasilitas' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'foto' => ['sometimes', 'file', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
             'alasan' => ['required', 'string', 'min:5', 'max:500'],
         ];
         if ($request->user()->peran !== 'admin') {
-            $rules = ['status_loc' => $rules['status_loc'], 'alasan' => $rules['alasan']];
+            $rules = ['status_loc' => $rules['status_loc'], 'fasilitas' => $rules['fasilitas'], 'alasan' => $rules['alasan']];
         }
         $data = $request->validate($rules);
         // Station hanya dapat diaktifkan bila sekurangnya satu akun Operator aktif ditugaskan.
@@ -197,9 +199,26 @@ class OperationsController extends Controller
                 'status_loc' => 'Station harus memiliki sekurangnya satu Operator aktif sebelum dapat diaktifkan.',
             ]);
         }
-        $before = $station->only(['nama_lokasi', 'alamat', 'latitude', 'longitude', 'jam_buka', 'jam_tutup', 'status_loc']);
+        $before = $station->only(['nama_lokasi', 'alamat', 'latitude', 'longitude', 'jam_buka', 'jam_tutup', 'status_loc', 'fasilitas', 'foto']);
         $reason = $data['alasan'];
         unset($data['alasan']);
+
+        if (isset($data['status_loc']) && in_array($data['status_loc'], ['Nonaktif', 'Maintenance', 'Gangguan'], true) && $station->status_loc === 'Aktif') {
+            $activeSessions = ChargingSession::whereHas('charger', fn ($query) => $query->where('id_location', $station->id_location))
+                ->where('status', 'Berlangsung')
+                ->get();
+
+            foreach ($activeSessions as $activeSession) {
+                $settlement = app(ChargingSessionController::class)->stopByOperator($request, $activeSession);
+                if ($settlement->getStatusCode() >= 400) {
+                    throw ValidationException::withMessages(['sesi' => $settlement->getData()->message ?? 'Sesi aktif tidak dapat diselesaikan.']);
+                }
+            }
+        }
+
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $request->file('foto')->store('stations', 'public');
+        }
 
         $station->update($data);
         if ($before !== $station->fresh()->only(array_keys($before))) {
@@ -233,7 +252,8 @@ class OperationsController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'jam_buka' => ['required', 'date_format:H:i'],
             'jam_tutup' => ['required', 'date_format:H:i'],
-            'status_loc' => ['required', Rule::in(['Aktif', 'Nonaktif', 'Maintenance'])], // Format Kapital
+            'status_loc' => ['required', Rule::in(['Aktif', 'Nonaktif', 'Maintenance', 'Gangguan'])], // Format Kapital
+            'fasilitas' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
 
         return DB::transaction(function () use ($data, $request): JsonResponse {
@@ -518,7 +538,7 @@ class OperationsController extends Controller
         $data = $request->validate([
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'regex:/^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*@ops\.ac\.id$/i', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6'],
+            'password' => ['required', 'string', 'min:8', 'regex:/^(?=.*[A-Za-z])(?=.*\d).+$/'],
             'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,15}$/'],
             'id_locations' => ['sometimes', 'array'],
             'id_locations.*' => ['integer', 'distinct', 'exists:location,id_location'],
@@ -651,6 +671,66 @@ class OperationsController extends Controller
         return response()->json(['message' => 'Daftar petugas station berhasil diperbarui.']);
     }
 
+    /** Memperbarui data kontak akun operator dari panel admin. */
+    public function updateOperator(Request $request, string $operator): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $user = User::where('id_user', $operator)->where('peran', 'operator')->firstOrFail();
+        $profile = $user->profile;
+
+        $data = $request->validate([
+            'nama_lengkap' => ['sometimes', 'required', 'string', 'max:255'],
+            'email' => ['sometimes', 'required', 'email', 'max:255', 'unique:users,email,'.$user->id_user.',id_user'],
+            'nomor_telepon' => ['sometimes', 'required', 'string', 'regex:/^[0-9]{1,15}$/'],
+            'alamat' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ], [
+            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+        ]);
+
+        $before = [
+            'email' => $user->email,
+            'nama_lengkap' => $profile?->nama_lengkap,
+            'nomor_telepon' => $profile?->nomor_telepon,
+            'alamat' => $profile?->alamat,
+        ];
+
+        if (array_key_exists('email', $data)) {
+            $user->email = $data['email'];
+            $user->save();
+        }
+
+        $profileData = array_intersect_key($data, array_flip(['nama_lengkap', 'nomor_telepon', 'alamat']));
+        if ($profileData !== []) {
+            if ($profile) {
+                $profile->update($profileData);
+            } else {
+                UserProfile::create(array_merge(['id_user' => $user->id_user], $profileData));
+            }
+        }
+
+        $after = [
+            'email' => $user->fresh()->email,
+            'nama_lengkap' => $user->fresh()->profile?->nama_lengkap,
+            'nomor_telepon' => $user->fresh()->profile?->nomor_telepon,
+            'alamat' => $user->fresh()->profile?->alamat,
+        ];
+
+        AuditLog::create([
+            'id_user' => $request->user()->id_user,
+            'aksi' => 'ubah_data_operator',
+            'entitas' => 'operator',
+            'id_entitas' => $user->id_user,
+            'data_sebelum' => $before,
+            'data_sesudah' => $after,
+        ]);
+
+        return response()->json([
+            'message' => 'Data operator berhasil diperbarui.',
+            'data' => collect($this->operators())->firstWhere('id_user', $user->id_user),
+        ]);
+    }
+
     /** Mengaktifkan atau menonaktifkan akun operator dari panel admin. */
     public function updateOperatorStatus(Request $request, string $operator): JsonResponse
     {
@@ -662,8 +742,33 @@ class OperationsController extends Controller
             'status_akun' => ['required', Rule::in(['Aktif', 'Nonaktif', 'Suspend', 'Banned'])],
         ]);
 
+        if ($data['status_akun'] !== 'Aktif') {
+            $activeStations = StationOperator::where('id_user', $user->id_user)
+                ->pluck('id_location')
+                ->all();
+
+            foreach ($activeStations as $locationId) {
+                $otherActiveOperators = StationOperator::where('id_location', $locationId)
+                    ->where('id_user', '!=', $user->id_user)
+                    ->whereHas('user', fn ($query) => $query->where('peran', 'operator')->where('status_akun', 'Aktif'))
+                    ->exists();
+
+                $stationActive = Location::where('id_location', $locationId)->where('status_loc', 'Aktif')->exists();
+                if ($stationActive && ! $otherActiveOperators) {
+                    throw ValidationException::withMessages([
+                        'status_akun' => 'Operator ini adalah petugas aktif terakhir pada station aktif. Tetapkan pengganti sebelum menonaktifkan.',
+                    ]);
+                }
+            }
+        }
+
         $oldStatus = $user->status_akun;
         $user->update(['status_akun' => $data['status_akun']]);
+
+        if ($data['status_akun'] !== 'Aktif') {
+            $user->tokens()->delete();
+        }
+
         AuditLog::create([
             'id_user' => $request->user()->id_user,
             'aksi' => 'ubah_status_operator',
@@ -684,11 +789,38 @@ class OperationsController extends Controller
     {
         $this->ensureAdmin($request);
 
+        $filters = $request->validate([
+            'aktor' => ['sometimes', 'string', 'max:100'],
+            'entitas' => ['sometimes', 'string', 'max:80'],
+            'from' => ['sometimes', 'date_format:Y-m-d'],
+            'to' => ['sometimes', 'date_format:Y-m-d'],
+            'search' => ['sometimes', 'string', 'max:100'],
+        ]);
+
         // 1. Audit Transaksi Sesi Pengisian & Pembayaran
-        $transaksiLogs = ChargingSession::with(['charger.location', 'user.profile', 'payment'])
+        $transaksiQuery = ChargingSession::with(['charger.location', 'user.profile', 'payment'])
             ->latest('created_at')
-            ->limit(30)
-            ->get()
+            ->limit(50);
+
+        if (isset($filters['from'])) {
+            $transaksiQuery->whereDate('created_at', '>=', $filters['from']);
+        }
+        if (isset($filters['to'])) {
+            $transaksiQuery->whereDate('created_at', '<=', $filters['to']);
+        }
+        if (isset($filters['aktor'])) {
+            $aktor = $filters['aktor'];
+            $transaksiQuery->whereHas('user.profile', fn ($q) => $q->where('nama_lengkap', 'like', "%{$aktor}%"));
+        }
+        if (isset($filters['search'])) {
+            $search = $filters['search'];
+            $transaksiQuery->where(function ($q) use ($search) {
+                $q->whereHas('charger', fn ($c) => $c->where('kode_perangkat', 'like', "%{$search}%"))
+                    ->orWhereHas('charger.location', fn ($l) => $l->where('nama_lokasi', 'like', "%{$search}%"));
+            });
+        }
+
+        $transaksiLogs = $transaksiQuery->get()
             ->map(function ($s) {
                 return [
                     'id' => 'TRX-'.$s->id_session,
@@ -703,11 +835,26 @@ class OperationsController extends Controller
             });
 
         // 2. Audit Perubahan Tarif
-        $tarifLogs = AuditLog::with(['user.profile', 'location'])
+        $tarifQuery = AuditLog::with(['user.profile', 'location'])
             ->where('entitas', 'tarif')
             ->latest('created_at')
-            ->limit(30)
-            ->get()
+            ->limit(50);
+
+        if (isset($filters['from'])) {
+            $tarifQuery->whereDate('created_at', '>=', $filters['from']);
+        }
+        if (isset($filters['to'])) {
+            $tarifQuery->whereDate('created_at', '<=', $filters['to']);
+        }
+        if (isset($filters['aktor'])) {
+            $aktor = $filters['aktor'];
+            $tarifQuery->whereHas('user.profile', fn ($q) => $q->where('nama_lengkap', 'like', "%{$aktor}%"));
+        }
+        if (isset($filters['entitas'])) {
+            $tarifQuery->where('entitas', $filters['entitas']);
+        }
+
+        $tarifLogs = $tarifQuery->get()
             ->map(function (AuditLog $log) {
                 return [
                     'id' => 'AUD-'.$log->id_audit,
@@ -721,11 +868,26 @@ class OperationsController extends Controller
                 ];
             });
 
-        $changeLogs = AuditLog::with(['user.profile', 'location'])
+        $changeQuery = AuditLog::with(['user.profile', 'location'])
             ->whereIn('entitas', ['station', 'charger', 'port', 'operator', 'charging_session', 'system_config'])
             ->latest('created_at')
-            ->limit(50)
-            ->get()
+            ->limit(100);
+
+        if (isset($filters['entitas'])) {
+            $changeQuery->where('entitas', $filters['entitas']);
+        }
+        if (isset($filters['from'])) {
+            $changeQuery->whereDate('created_at', '>=', $filters['from']);
+        }
+        if (isset($filters['to'])) {
+            $changeQuery->whereDate('created_at', '<=', $filters['to']);
+        }
+        if (isset($filters['aktor'])) {
+            $aktor = $filters['aktor'];
+            $changeQuery->whereHas('user.profile', fn ($q) => $q->where('nama_lengkap', 'like', "%{$aktor}%"));
+        }
+
+        $changeLogs = $changeQuery->get()
             ->map(fn (AuditLog $log): array => [
                 'id' => 'AUD-'.$log->id_audit,
                 'kategori' => str_replace('_', ' ', $log->aksi),
@@ -738,14 +900,26 @@ class OperationsController extends Controller
             ]);
 
         // 3. Audit Gangguan Perangkat (Error Log)
-        $gangguanLogs = DB::table('error_log')
+        $gangguanQuery = DB::table('error_log')
             ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
             ->leftJoin('location', 'charger.id_location', '=', 'location.id_location')
             ->leftJoin('users', 'error_log.id_user', '=', 'users.id_user')
             ->leftJoin('user_profile', 'users.id_user', '=', 'user_profile.id_user')
-            ->select('error_log.*', 'charger.kode_perangkat', 'location.nama_lokasi', 'user_profile.nama_lengkap as nama_pelapor')
+            ->select('error_log.*', 'charger.kode_perangkat', 'location.nama_lokasi', 'user_profile.nama_lengkap as nama_pelapor');
+
+        if (isset($filters['from'])) {
+            $gangguanQuery->whereDate('error_log.created_at', '>=', $filters['from']);
+        }
+        if (isset($filters['to'])) {
+            $gangguanQuery->whereDate('error_log.created_at', '<=', $filters['to']);
+        }
+        if (isset($filters['aktor'])) {
+            $gangguanQuery->where('user_profile.nama_lengkap', 'like', "%{$filters['aktor']}%");
+        }
+
+        $gangguanLogs = $gangguanQuery
             ->latest('error_log.created_at')
-            ->limit(20)
+            ->limit(50)
             ->get()
             ->map(function ($g) {
                 return [
@@ -779,7 +953,7 @@ class OperationsController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'arrival_radius_m' => (int) config('charging.arrival_radius_m', 200),
+                'arrival_radius_m' => (int) config('charging.arrival_radius_m', 1000),
                 'require_arrival' => (bool) config('charging.require_arrival', true),
                 'default_battery_kwh' => (float) config('charging.default_battery_kwh', 50),
                 'simulation_speed' => (float) config('charging.simulation_speed', 60),
@@ -794,7 +968,7 @@ class OperationsController extends Controller
         $this->ensureAdmin($request);
 
         $before = [
-            'arrival_radius_m' => (int) config('charging.arrival_radius_m', 200),
+            'arrival_radius_m' => (int) config('charging.arrival_radius_m', 1000),
             'require_arrival' => (bool) config('charging.require_arrival', true),
             'default_battery_kwh' => (float) config('charging.default_battery_kwh', 50),
             'simulation_speed' => (float) config('charging.simulation_speed', 60),
@@ -896,6 +1070,8 @@ class OperationsController extends Controller
             'latitude' => (float) $location->latitude,
             'longitude' => (float) $location->longitude,
             'status' => $location->status_loc,
+            'fasilitas' => $location->fasilitas,
+            'foto' => $location->foto ? \Illuminate\Support\Facades\Storage::url($location->foto) : null,
             'jam_buka' => substr((string) $location->jam_buka, 0, 5),
             'jam_tutup' => substr((string) $location->jam_tutup, 0, 5),
             'charger_total' => $chargers->count(),

@@ -170,7 +170,7 @@ class UserSeeder extends Seeder
                 [
                     'id_user' => $idUser,
                     'email_verified_at' => $existingUser?->email_verified_at ?? $now,
-                    'password' => Hash::make('password123'),
+                    'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'EVChargeHub#2026!')),
                     'peran' => $data['peran'],
                     'status_akun' => $data['status_akun'],
                     'updated_at' => $now,

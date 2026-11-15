@@ -51,7 +51,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/payments/history', [PaymentController::class, 'history']);
     Route::get('/payments/{payment}', [PaymentController::class, 'show']);
+});
 
+Route::middleware(['auth:sanctum', 'role:operator,admin'])->group(function () {
     Route::get('/operations/dashboard', [OperationsController::class, 'dashboard']);
     Route::get('/operations/reports', [OperationsController::class, 'reports']);
     Route::get('/operations/station-location-search', [OperationsController::class, 'searchStationLocations']);
@@ -66,11 +68,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/operations/tarifs/{tarif}', [OperationsController::class, 'rescheduleTarif']);
     Route::delete('/operations/tarifs/{tarif}', [OperationsController::class, 'cancelTarif']);
     Route::post('/operations/operators', [OperationsController::class, 'createOperator']);
+    Route::put('/operations/operators/{operator}/profile', [OperationsController::class, 'updateOperator']);
     Route::put('/operations/operators/{operator}/station', [OperationsController::class, 'assignOperator']);
     Route::put('/operations/operators/{operator}/status', [OperationsController::class, 'updateOperatorStatus']);
     Route::get('/operations/audit-logs', [OperationsController::class, 'auditLogs']);
     Route::get('/operations/config', [OperationsController::class, 'getSystemConfig']);
     Route::put('/operations/config', [OperationsController::class, 'updateSystemConfig']);
+});
+
+Route::middleware('auth:sanctum')->group(function () {
     Route::get('/charging-sessions/history', [ChargingSessionController::class, 'history']);
     Route::get('/charging-settings', [ChargingSessionController::class, 'settings']);
     Route::get('/charging-sessions/active', [ChargingSessionController::class, 'active']);
@@ -90,7 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/topup/{reference}', [TopupController::class, 'show']);
     Route::post('/topup/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
 });
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth:sanctum', 'role:operator,admin'])->group(function () {
     Route::get('/operator/stations', [OperatorController::class, 'getAssignedStations']);
     Route::get('/operator/tarif', [OperatorController::class, 'getActiveTarif']);
     Route::post('/operator/tarif', [OperatorController::class, 'storeTarif']);
