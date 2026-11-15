@@ -61,6 +61,7 @@ import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from "./utils/phone";
 import StationDetail from "./StationDetail";
 import StartCharging from "./StartCharging";
 import PinSecuritySettings from "./PinSecuritySettings";
+import NotificationsBell from "./NotificationsBell";
 
 /** Memilih pesan error API yang bisa langsung ditampilkan kepada pengemudi. */
 function extractErrorMessage(error, fallback) {
@@ -1322,6 +1323,7 @@ export default function DriverDashboard({
                     <FiBell aria-hidden="true" />
                     {activeSession && <span className="mapdash-badge-dot" />}
                   </button>
+                  <NotificationsBell />
                   <button
                     type="button"
                     className="home-icon-btn"

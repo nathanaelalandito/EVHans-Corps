@@ -478,6 +478,13 @@ class OperatorController extends Controller
             }
         });
 
+        if (in_array($status, ['Maintenance', 'Offline'], true)) {
+            $chargerModel = \App\Models\Charger::find($id);
+            if ($chargerModel) {
+                app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason);
+            }
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => $successMessage.($reason ? ' Jika ada sesi aktif, biaya aktual diselesaikan dan sisa saldo hold dikembalikan.' : ''),

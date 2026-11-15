@@ -16,6 +16,7 @@ use App\Models\Port;
 use App\Models\Tarif;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -350,6 +351,11 @@ class ChargingSessionController extends Controller
             return $settled;
         }
 
+        $payment = $settled->payment;
+        $actualCost = $payment ? (int) $payment->total_bayar : 0;
+        $refund = max(0, (int) $settled->saldo_hold - $actualCost);
+        app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
+
         return response()->json([
             'message' => 'Sesi charging selesai. Invoice digital berhasil diterbitkan.',
             'data' => $this->presentInvoice($settled),
@@ -376,6 +382,11 @@ class ChargingSessionController extends Controller
             return $settled;
         }
 
+        $payment = $settled->payment;
+        $actualCost = $payment ? (int) $payment->total_bayar : 0;
+        $refund = max(0, (int) $settled->saldo_hold - $actualCost);
+        app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
+
         return response()->json([
             'message' => 'Sesi dihentikan oleh Operator. Biaya aktual dihitung dan sisa saldo hold dikembalikan.',
             'data' => $this->presentInvoice($settled),
@@ -397,6 +408,11 @@ class ChargingSessionController extends Controller
         if ($settled instanceof JsonResponse) {
             return $settled;
         }
+
+        $payment = $settled->payment;
+        $actualCost = $payment ? (int) $payment->total_bayar : 0;
+        $refund = max(0, (int) $settled->saldo_hold - $actualCost);
+        app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
 
         $message = $finalStatus === 'Gagal'
             ? 'Sesi charging gagal ditangani. Biaya aktual dihitung dan sisa hold dikembalikan.'
@@ -446,7 +462,7 @@ class ChargingSessionController extends Controller
             $hold = (int) $session->saldo_hold;
             $actualCost = $actualKwh > 0
                 ? min($hold, $session->tarif->costFor($actualKwh, $this->powerOf($session))['total'])
-                : 0;
+                : min($hold, (int) $session->tarif->biaya_parkir_flat);
             $refundAmount = max(0, $hold - $actualCost);
 
             $wallet->saldo = max(0, (int) $wallet->saldo - $actualCost);
@@ -874,7 +890,7 @@ class ChargingSessionController extends Controller
             'energi_kwh' => $actualKwh,
             'tarif_per_kwh' => $session->tarif->harga_per_kwh,
             'biaya_charging' => $actualKwh > 0 ? $cost['biaya_charging'] : 0,
-            'biaya_parkir' => $actualKwh > 0 ? $cost['biaya_parkir'] : 0,
+            'biaya_parkir' => $actualKwh > 0 ? $cost['biaya_parkir'] : (int) $session->tarif->biaya_parkir_flat,
             'biaya_aktual' => $actualCost,
             'saldo_hold' => $hold,
             'jumlah_hold' => $hold,

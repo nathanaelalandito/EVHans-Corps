@@ -25,7 +25,7 @@ function toDashboardStation(s) {
         jam_buka: s.jam_operasional?.buka ?? s.jam_buka,
         jam_tutup: s.jam_operasional?.tutup ?? s.jam_tutup,
         jarak_km: s.jarak_km,
-        biaya_parkir: s.biaya_parkir ?? 0,
+        biaya_parkir: s.biaya_parkir_flat ?? s.biaya_parkir ?? 0,
         // Daftar charger + port (dipakai pemilih port di daftar station).
         chargers: s.chargers ?? [],
     };

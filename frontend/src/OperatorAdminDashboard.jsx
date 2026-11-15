@@ -25,6 +25,7 @@ import {
     cancelScheduledTarif
 } from './api/operations';
 import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
+import NotificationsBell from './NotificationsBell';
 
 const STATION_STATUS = ['Aktif', 'Nonaktif', 'Maintenance', 'Gangguan'];
 const CHARGER_STATUS = ['Active', 'Maintenance', 'Offline'];
@@ -815,6 +816,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                     <h1>{displayName}</h1>
                     <p>{isAdmin ? 'Kontrol operator, station, charger, tarif, dan audit operasional.' : 'Monitoring station, charger, tarif, dan laporan penggunaan.'}</p>
                 </div>
+                <NotificationsBell />
                 <button className="ops-logout" onClick={onLogout}>Keluar</button>
             </header>
 

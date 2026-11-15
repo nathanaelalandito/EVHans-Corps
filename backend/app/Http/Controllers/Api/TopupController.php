@@ -120,7 +120,7 @@ class TopupController extends Controller
     /** Simulasi callback pembayaran yang menyelesaikan top up pada lingkungan demo. */
     public function simulatePay(Request $request, string $reference)
     {
-        abort_unless(config('app.debug'), 403, 'Simulasi hanya tersedia saat APP_DEBUG=true.');
+        abort_unless(config('payment.simulation'), 403, 'Simulasi pembayaran sedang dinonaktifkan.');
 
         $topup = $this->expireIfNeeded($this->findOwned($request, $reference));
 
@@ -214,6 +214,11 @@ class TopupController extends Controller
     {
         if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada->isPast()) {
             $topup->update(['status_topup' => 'Gagal']);
+            app(\App\Services\NotificationService::class)->notifyTopupFailed(
+                (int) DB::table('dompet')->where('id_wallet', $topup->id_wallet)->value('id_user'),
+                $topup->fresh(),
+                'kedaluwarsa'
+            );
         }
 
         return $topup;

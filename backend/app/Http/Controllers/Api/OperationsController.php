@@ -409,6 +409,10 @@ class OperationsController extends Controller
         $before = $charger->only(['kode_perangkat', 'merek_model', 'kap_tot_kw', 'status_mesin']);
         $charger->update($data);
         $after = $charger->fresh()->only(array_keys($before));
+
+        if (isset($data['status_mesin']) && in_array($data['status_mesin'], ['Maintenance', 'Offline'], true) && ($before['status_mesin'] ?? null) !== $data['status_mesin']) {
+            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason);
+        }
         if ($before !== $after) {
             AuditLog::create([
                 'id_user' => $request->user()->id_user,
@@ -459,6 +463,10 @@ class OperationsController extends Controller
         $before = $port->only(['nomor_port', 'tipe_konektor', 'tipe_charging', 'daya_maks_kw', 'status_port']);
         $port->update($data);
         $after = $port->fresh()->only(array_keys($before));
+
+        if (isset($data['status_port']) && in_array($data['status_port'], ['Out of Order', 'Maintenance'], true) && ($before['status_port'] ?? null) !== $data['status_port']) {
+            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason);
+        }
 
         if ($before !== $after) {
             AuditLog::create([

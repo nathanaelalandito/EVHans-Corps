@@ -6,6 +6,7 @@ import OperatorStationPicker from './OperatorStationPicker';
 import OperatorSettingsModal from './OperatorSettingsModal';
 import { countUnreadNotifications, getNotifSeenAtMs, getOperatorNotifications, markOperatorNotificationsSeen } from './api/operatorNotifications';
 import './opsDashboard.css';
+import NotificationsBell from './NotificationsBell';
 import logoECH from './assets/Gemini_Generated_Image_8581rg8581rg8581.jfif.jpeg';
 
 /** Memilih sapaan berdasarkan waktu lokal perangkat Operator. */
@@ -111,7 +112,7 @@ export default function OperatorDashboard({ user, onLogout, onNavigateToCharger,
     return <div className="op-layout-container">
         <header className="op-header">
             <div className="op-header-left"><img className="op-logo" src={logoECH} alt="EV Charge Hub" /><div><p className="op-eyebrow">PANEL OPERATOR</p><h2>{greeting()}{name ? `, ${name.split(' ')[0]}` : ''}</h2></div></div>
-            <div className="op-header-right"><OperatorStationPicker onStationChange={() => load()} /><button className="op-icon-btn" aria-label="Pusat notifikasi" onClick={() => openNotifications()}><FaBell />{alertCount > 0 && <span className="op-badge">{alertCount}</span>}</button><button className="op-icon-btn" aria-label="Pengaturan dashboard" onClick={() => setModal('settings')}><FaCog /></button></div>
+            <div className="op-header-right"><OperatorStationPicker onStationChange={() => load()} /><NotificationsBell /><button className="op-icon-btn" aria-label="Pusat notifikasi" onClick={() => openNotifications()}><FaBell />{alertCount > 0 && <span className="op-badge">{alertCount}</span>}</button><button className="op-icon-btn" aria-label="Pengaturan dashboard" onClick={() => setModal('settings')}><FaCog /></button></div>
         </header>
         <div className="op-body-wrapper">
             <aside className="op-sidebar" aria-label="Navigasi Operator"><nav><button className="op-menu-item active" aria-current="page"><FaTachometerAlt /><span>Dashboard</span></button><button className="op-menu-item" onClick={onNavigateToCharger}><FaChargingStation /><span>Kelola charger</span></button><button className="op-menu-item" onClick={onNavigateToOpsReport}><FaFileAlt /><span>Laporan transaksi</span></button><div className="op-sidebar-exit"><button className="op-logout-btn" onClick={onLogout}><FaSignOutAlt /><span>Keluar</span></button></div></nav></aside>
