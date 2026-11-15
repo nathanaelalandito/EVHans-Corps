@@ -14,6 +14,12 @@ export async function getOperationsReport(filters) {
 
 /** Mengubah informasi atau status station melalui endpoint operasi. */
 export async function updateStation(id, payload) {
+    if (payload instanceof FormData) {
+        if (!payload.has('_method')) payload.append('_method', 'PUT');
+        const { data } = await api.post(`/operations/stations/${id}`, payload);
+        return data.data ?? data;
+    }
+
     const { data } = await api.put(`/operations/stations/${id}`, payload);
     return data.data ?? data;
 }
