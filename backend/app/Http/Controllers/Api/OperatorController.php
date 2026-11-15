@@ -437,6 +437,8 @@ class OperatorController extends Controller
             return response()->json(['message' => 'Charger tidak ditemukan atau di luar station penugasan.'], 404);
         }
 
+        $activeDriverIds = ChargingSession::where('id_charger', $id)->where('status', 'Berlangsung')->pluck('id_user')->all();
+
         DB::transaction(function () use ($request, $id, $status, $charger, $assignment, $reason): void {
             $sessions = $reason === null ? collect() : ChargingSession::where('id_charger', $id)
                 ->where('status', 'Berlangsung')
@@ -485,6 +487,17 @@ class OperatorController extends Controller
                     app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
                 }
             }
+
+        if (in_array($status, ['Maintenance', 'Offline'], true)) {
+            $chargerModel = \App\Models\Charger::find($id);
+            if ($chargerModel) {
+                try {
+                    app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds ?? []);
+                } catch (\Throwable $e) {
+                    \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                }
+            }
+        }
 
         return response()->json([
             'status' => 'success',
@@ -660,6 +673,8 @@ class OperatorController extends Controller
             return response()->json(['message' => 'Port tidak ditemukan atau di luar wilayah penugasan.'], 404);
         }
 
+        $activeDriverIds = ChargingSession::where('id_port', $id)->where('status', 'Berlangsung')->pluck('id_user')->all();
+
         DB::transaction(function () use ($request, $id, $status, $assignment, $port, $reason): void {
             $session = ChargingSession::where('id_port', $id)
                 ->where('status', 'Berlangsung')
@@ -697,6 +712,17 @@ class OperatorController extends Controller
             $chargerModel = \App\Models\Charger::find($port->id_charger);
             if ($chargerModel) {
                 app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
+            }
+        }
+
+        if (in_array($status, ['Out of Order', 'Maintenance'], true)) {
+            $chargerModel = \App\Models\Charger::find($port->id_charger);
+            if ($chargerModel) {
+                try {
+                    app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds ?? []);
+                } catch (\Throwable $e) {
+                    \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                }
             }
         }
 

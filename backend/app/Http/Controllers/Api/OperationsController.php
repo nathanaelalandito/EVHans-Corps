@@ -413,7 +413,11 @@ class OperationsController extends Controller
         $after = $charger->fresh()->only(array_keys($before));
 
         if (isset($data['status_mesin']) && in_array($data['status_mesin'], ['Maintenance', 'Offline'], true) && ($before['status_mesin'] ?? null) !== $data['status_mesin']) {
-            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason, $activeDriverIds);
+            try {
+                app(\App\Services\NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason, $activeDriverIds);
+            } catch (\Throwable $e) {
+                \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+            }
         }
         if ($before !== $after) {
             AuditLog::create([
@@ -469,7 +473,11 @@ class OperationsController extends Controller
         $after = $port->fresh()->only(array_keys($before));
 
         if (isset($data['status_port']) && in_array($data['status_port'], ['Out of Order', 'Maintenance'], true) && ($before['status_port'] ?? null) !== $data['status_port']) {
-            app(\App\Services\NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason, $activeDriverIds);
+            try {
+                app(\App\Services\NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason, $activeDriverIds);
+            } catch (\Throwable $e) {
+                \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+            }
         }
 
         if ($before !== $after) {

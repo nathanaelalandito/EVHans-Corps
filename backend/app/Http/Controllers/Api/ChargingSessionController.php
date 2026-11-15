@@ -354,7 +354,11 @@ class ChargingSessionController extends Controller
         $payment = $settled->payment;
         $actualCost = $payment ? (int) $payment->total_bayar : 0;
         $refund = max(0, (int) $settled->saldo_hold - $actualCost);
-        app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
+        try {
+            app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim notifikasi sesi: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Sesi charging selesai. Invoice digital berhasil diterbitkan.',
@@ -385,7 +389,11 @@ class ChargingSessionController extends Controller
         $payment = $settled->payment;
         $actualCost = $payment ? (int) $payment->total_bayar : 0;
         $refund = max(0, (int) $settled->saldo_hold - $actualCost);
-        app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
+        try {
+            app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim notifikasi sesi: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Sesi dihentikan oleh Operator. Biaya aktual dihitung dan sisa saldo hold dikembalikan.',
@@ -412,10 +420,18 @@ class ChargingSessionController extends Controller
         $payment = $settled->payment;
         $actualCost = $payment ? (int) $payment->total_bayar : 0;
         $refund = max(0, (int) $settled->saldo_hold - $actualCost);
-        app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
+        try {
+            app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
+        } catch (\Throwable $e) {
+            \Log::warning('Gagal mengirim notifikasi sesi: ' . $e->getMessage());
+        }
 
         if ($finalStatus === 'Gagal' && $settled->charger) {
-            app(NotificationService::class)->notifyChargerIssue($settled->charger, 'Out of Order', $data['alasan'] ?? null);
+            try {
+                app(NotificationService::class)->notifyChargerIssue($settled->charger, 'Out of Order', $data['alasan'] ?? null);
+            } catch (\Throwable $e) {
+                \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+            }
         }
 
         $message = $finalStatus === 'Gagal'
