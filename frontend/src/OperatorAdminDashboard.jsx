@@ -22,7 +22,14 @@ import {
     getSystemConfig,
     updateSystemConfig,
     updateScheduledTarif,
-    cancelScheduledTarif
+    cancelScheduledTarif,
+    getDrivers,
+    getDriverDetail,
+    updateDriverStatus,
+    getPaymentMethods,
+    createPaymentMethod,
+    updatePaymentMethod,
+    updatePaymentMethodStatus
 } from './api/operations';
 import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
 import NotificationsBell from './NotificationsBell';
@@ -39,6 +46,19 @@ function rupiah(value) {
 /** Mengubah kode status teknis menjadi label yang mudah dibaca. */
 function readableStatus(value) {
     return String(value || '-').replaceAll('_', ' ');
+}
+
+/** Menampilkan waktu ISO dari backend dalam format lokal Indonesia. */
+function formatDateTime(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+/** Memberi label tipe metode pembayaran yang dipakai pada alur Top Up. */
+function paymentTypeLabel(value) {
+    return value === 'va' ? 'Virtual Account' : 'E-Wallet';
 }
 
 /** Menjaga input nomor telepon Operator hanya berisi angka, maksimal 15 digit. */
@@ -207,6 +227,31 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
     const [operatorNotice, setOperatorNotice] = useState(null);
     const [operatorSubmitting, setOperatorSubmitting] = useState(false);
     const [feedback, setFeedback] = useState('');
+    const [driversData, setDriversData] = useState(null);
+    const [driverFilters, setDriverFilters] = useState({ search: '', status: 'all', page: 1 });
+    const [driversLoading, setDriversLoading] = useState(false);
+    const [driversError, setDriversError] = useState('');
+    const [selectedDriverId, setSelectedDriverId] = useState(null);
+    const [driverDetail, setDriverDetail] = useState(null);
+    const [driverDetailLoading, setDriverDetailLoading] = useState(false);
+    const [driverDetailError, setDriverDetailError] = useState('');
+    const [driverStatusAction, setDriverStatusAction] = useState(null);
+    const [driverStatusReason, setDriverStatusReason] = useState('');
+    const [driverStatusError, setDriverStatusError] = useState('');
+    const [driverStatusSaving, setDriverStatusSaving] = useState(false);
+
+    const [paymentMethodsData, setPaymentMethodsData] = useState(null);
+    const [paymentLoading, setPaymentLoading] = useState(false);
+    const [paymentError, setPaymentError] = useState('');
+    const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+    const [paymentEditingId, setPaymentEditingId] = useState(null);
+    const [paymentForm, setPaymentForm] = useState({ nama_metode: '', tipe_metode: 'ewallet', biaya_layanan: '0', alasan: '' });
+    const [paymentFormNotice, setPaymentFormNotice] = useState(null);
+    const [paymentSaving, setPaymentSaving] = useState(false);
+    const [paymentStatusAction, setPaymentStatusAction] = useState(null);
+    const [paymentStatusReason, setPaymentStatusReason] = useState('');
+    const [paymentStatusError, setPaymentStatusError] = useState('');
+    const [paymentStatusSaving, setPaymentStatusSaving] = useState(false);
 
     // Tab navigasi panel Admin & Operator
     const [activeTab, setActiveTab] = useState(user?.peran === 'admin' ? 'overview' : 'stations'); // 'overview' | 'stations' | 'reports' | 'operators' | 'config' | 'audit'
@@ -252,7 +297,193 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         }
     };
 
-    /** Memuat catatan audit transaksi, sesi charging, dan gangguan. */
+    /** Memuat direktori Driver sesuai pencarian, filter status, dan halaman aktif. */
+    const fetchDrivers = async (overrides = {}) => {
+        const filters = { ...driverFilters, ...overrides };
+        setDriversLoading(true);
+        setDriversError('');
+        try {
+            const params = { per_page: 8, page: filters.page };
+            if (filters.search.trim()) params.search = filters.search.trim();
+            if (filters.status !== 'all') params.status = filters.status;
+            setDriversData(await getDrivers(params));
+        } catch (err) {
+            setDriversError(errorMessage(err, 'Gagal memuat Driver.'));
+        } finally {
+            setDriversLoading(false);
+        }
+    };
+
+    /** Memuat detail Driver yang dipilih tanpa menutup daftar utama. */
+    const openDriverDetail = async (id) => {
+        setSelectedDriverId(id);
+        setDriverDetail(null);
+        setDriverDetailError('');
+        setDriverDetailLoading(true);
+        try {
+            setDriverDetail(await getDriverDetail(id));
+        } catch (err) {
+            setDriverDetailError(errorMessage(err, 'Gagal memuat detail Driver.'));
+        } finally {
+            setDriverDetailLoading(false);
+        }
+    };
+
+    /** Membuka konfirmasi perubahan status Driver beserta alasan opsional. */
+    const requestDriverStatus = (driver, nextStatus) => {
+        setDriverStatusAction({ driver, nextStatus });
+        setDriverStatusReason('');
+        setDriverStatusError('');
+    };
+
+    /** Menyimpan perubahan status Driver dan menyegarkan daftar serta detailnya. */
+    const submitDriverStatus = async (event) => {
+        event.preventDefault();
+        if (!driverStatusAction || driverStatusSaving) return;
+        const { driver, nextStatus } = driverStatusAction;
+        const payload = { status_akun: nextStatus };
+        if (driverStatusReason.trim()) payload.alasan = driverStatusReason.trim();
+
+        setDriverStatusSaving(true);
+        setDriverStatusError('');
+        try {
+            await updateDriverStatus(driver.id_user, payload);
+            setDriverStatusAction(null);
+            setDriverStatusReason('');
+            setFeedback(`Status akun Driver ${driver.nama_lengkap || driver.email} berhasil diubah menjadi ${nextStatus}.`);
+            await fetchDrivers();
+            if (selectedDriverId === driver.id_user) await openDriverDetail(driver.id_user);
+        } catch (err) {
+            setDriverStatusError(errorMessage(err, 'Gagal mengubah status akun Driver.'));
+        } finally {
+            setDriverStatusSaving(false);
+        }
+    };
+
+    /** Memuat semua metode pembayaran Top Up untuk panel Admin. */
+    const fetchPaymentMethods = async () => {
+        setPaymentLoading(true);
+        setPaymentError('');
+        try {
+            setPaymentMethodsData(await getPaymentMethods({ per_page: 50 }));
+        } catch (err) {
+            setPaymentError(errorMessage(err, 'Gagal memuat metode bayar.'));
+        } finally {
+            setPaymentLoading(false);
+        }
+    };
+
+    /** Mengosongkan isian form metode tanpa menutup panelnya. */
+    const resetPaymentFields = () => {
+        setPaymentEditingId(null);
+        setPaymentForm({ nama_metode: '', tipe_metode: 'ewallet', biaya_layanan: '0', alasan: '' });
+    };
+
+    /** Membuka form metode baru dalam keadaan bersih. */
+    const openPaymentCreate = () => {
+        resetPaymentFields();
+        setPaymentFormNotice(null);
+        setPaymentFormOpen(true);
+    };
+
+    /** Mengisi form dengan data metode yang akan diubah. */
+    const openPaymentEdit = (method) => {
+        setPaymentEditingId(method.id_metode);
+        setPaymentForm({
+            nama_metode: method.nama_metode,
+            tipe_metode: method.tipe_metode || 'ewallet',
+            biaya_layanan: String(method.biaya_layanan ?? 0),
+            alasan: '',
+        });
+        setPaymentFormNotice(null);
+        setPaymentFormOpen(true);
+    };
+
+    /** Menutup dan membersihkan form metode pembayaran. */
+    const closePaymentForm = () => {
+        setPaymentFormOpen(false);
+        setPaymentFormNotice(null);
+        resetPaymentFields();
+    };
+
+    /** Memvalidasi lalu menyimpan metode pembayaran baru atau perubahan datanya. */
+    const submitPaymentMethod = async (event) => {
+        event.preventDefault();
+        if (paymentSaving) return;
+
+        const nama = paymentForm.nama_metode.trim();
+        const feeText = String(paymentForm.biaya_layanan).trim();
+        const fee = Number(feeText);
+        const reason = paymentForm.alasan.trim();
+
+        if (!nama) {
+            setPaymentFormNotice({ type: 'error', message: 'Nama metode pembayaran wajib diisi.' });
+            return;
+        }
+        if (!feeText || !Number.isInteger(fee) || fee < 0 || fee > 100000) {
+            setPaymentFormNotice({ type: 'error', message: 'Biaya layanan harus bilangan bulat Rp0 sampai Rp100.000.' });
+            return;
+        }
+        if (paymentEditingId && reason && reason.length < 5) {
+            setPaymentFormNotice({ type: 'error', message: 'Alasan perubahan minimal 5 karakter atau kosongkan.' });
+            return;
+        }
+
+        const payload = {
+            nama_metode: nama,
+            tipe_metode: paymentForm.tipe_metode,
+            biaya_layanan: fee,
+        };
+        if (paymentEditingId && reason) payload.alasan = reason;
+
+        setPaymentSaving(true);
+        setPaymentFormNotice(null);
+        try {
+            const response = paymentEditingId
+                ? await updatePaymentMethod(paymentEditingId, payload)
+                : await createPaymentMethod(payload);
+            setPaymentFormNotice({ type: 'success', message: response?.message || 'Metode pembayaran berhasil disimpan.' });
+            setPaymentFormOpen(false);
+            resetPaymentFields();
+            await fetchPaymentMethods();
+        } catch (err) {
+            setPaymentFormNotice({ type: 'error', message: errorMessage(err, 'Gagal menyimpan metode pembayaran.') });
+        } finally {
+            setPaymentSaving(false);
+        }
+    };
+
+    /** Membuka konfirmasi aktivasi atau penonaktifan metode pembayaran. */
+    const requestPaymentStatus = (method, nextStatus) => {
+        setPaymentStatusAction({ method, nextStatus });
+        setPaymentStatusReason('');
+        setPaymentStatusError('');
+    };
+
+    /** Menyimpan perubahan status metode pembayaran dengan alasan opsional. */
+    const submitPaymentStatus = async (event) => {
+        event.preventDefault();
+        if (!paymentStatusAction || paymentStatusSaving) return;
+        const { method, nextStatus } = paymentStatusAction;
+        const reason = paymentStatusReason.trim();
+        const payload = { status_metode: nextStatus };
+        if (reason) payload.alasan = reason;
+
+        setPaymentStatusSaving(true);
+        setPaymentStatusError('');
+        try {
+            await updatePaymentMethodStatus(method.id_metode, payload);
+            setPaymentStatusAction(null);
+            setPaymentStatusReason('');
+            setFeedback(`Metode ${method.nama_metode} berhasil ${nextStatus === 'Aktif' ? 'diaktifkan' : 'dinonaktifkan'}.`);
+            await fetchPaymentMethods();
+        } catch (err) {
+            setPaymentStatusError(errorMessage(err, 'Gagal mengubah status metode pembayaran.'));
+        } finally {
+            setPaymentStatusSaving(false);
+        }
+    };
+
     const fetchAudit = async () => {
         setAuditLoading(true);
         try {
@@ -688,7 +919,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
     const submitReasonAction = async (e) => {
         e.preventDefault();
         if (!reasonAction || reasonText.trim().length < 5) return;
-        let saved = false;
+        let saved;
         if (reasonAction.kind === 'station') {
             saved = await saveStationStatus(reasonAction.item, reasonAction.value, reasonText.trim());
         } else if (reasonAction.kind === 'port') {
@@ -833,6 +1064,16 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                 {isAdmin && (
                     <button className={activeTab === 'operators' ? 'active' : ''} onClick={() => setActiveTab('operators')}>
                         <FaUsers aria-hidden="true" /> Operator
+                    </button>
+                )}
+                {isAdmin && (
+                    <button className={activeTab === 'drivers' ? 'active' : ''} onClick={() => { setActiveTab('drivers'); fetchDrivers(); }}>
+                        <FaUsers aria-hidden="true" /> Kelola Driver
+                    </button>
+                )}
+                {isAdmin && (
+                    <button className={activeTab === 'payment-methods' ? 'active' : ''} onClick={() => { setActiveTab('payment-methods'); fetchPaymentMethods(); }}>
+                        <FaTags aria-hidden="true" /> Metode Bayar
                     </button>
                 )}
                 <button className={activeTab === 'reports' ? 'active' : ''} onClick={() => { setActiveTab('reports'); fetchReport(); }}>
@@ -1256,7 +1497,188 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                 </section>
             )}
 
-            {/* TAB 4: KONFIGURASI SISTEM (FR48) */}
+            {/* TAB 3: KELOLA DRIVER (FR57) */}
+            {activeTab === 'drivers' && isAdmin && (
+                <section className="ops-panel">
+                    <div className="ops-panel-head">
+                        <div>
+                            <h2>Kelola Driver</h2>
+                            <p>Cari akun pengemudi, tinjau profil dan dompet, lalu atur status akunnya.</p>
+                        </div>
+                        <span>{driversData?.meta?.total ?? 0} Driver terdaftar</span>
+                    </div>
+
+                    <form
+                        className="ops-operator-directory-tools ops-driver-filters"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            setDriverFilters((filters) => ({ ...filters, page: 1 }));
+                            fetchDrivers({ page: 1, search: driverFilters.search, status: driverFilters.status });
+                        }}
+                    >
+                        <label className="ops-operator-search"><span>Cari Driver</span><div><FaSearch aria-hidden="true" /><input type="search" value={driverFilters.search} onChange={(event) => setDriverFilters((filters) => ({ ...filters, search: event.target.value }))} placeholder="Nama, email, atau nomor telepon" aria-label="Cari Driver" /></div></label>
+                        <label>Status akun<select value={driverFilters.status} onChange={(event) => setDriverFilters((filters) => ({ ...filters, status: event.target.value }))}><option value="all">Semua status</option><option value="Aktif">Aktif</option><option value="Nonaktif">Nonaktif</option></select></label>
+                        <button type="submit" className="ops-button-primary ops-compact-button" disabled={driversLoading}>{driversLoading ? 'Memuat...' : 'Terapkan filter'}</button>
+                    </form>
+
+                    {driversError && <p className="ops-inline-error">{driversError}</p>}
+
+                    {driversLoading && !driversData ? (
+                        <div className="ops-empty-state">Memuat daftar Driver...</div>
+                    ) : (
+                        <>
+                            <div className="ops-table-wrap">
+                                <table className="ops-table">
+                                    <thead><tr><th>Driver</th><th>Kontak</th><th>Terdaftar</th><th>Status</th><th>Aksi</th></tr></thead>
+                                    <tbody>
+                                        {(driversData?.data ?? []).length > 0 ? driversData.data.map((driver) => (
+                                            <tr key={driver.id_user}>
+                                                <td><strong>{driver.nama_lengkap || 'Nama belum diisi'}</strong><br /><small>{driver.id_user}</small></td>
+                                                <td>{driver.email}<br /><small>{driver.nomor_telepon || 'Nomor telepon belum tersedia'}</small></td>
+                                                <td>{formatDateTime(driver.created_at)}</td>
+                                                <td><span className={`ops-status-pill ops-status-${String(driver.status_akun).toLowerCase()}`}>{driver.status_akun}</span></td>
+                                                <td><div className="ops-form-actions"><button type="button" className="ops-button-secondary ops-compact-button" onClick={() => openDriverDetail(driver.id_user)}>Lihat detail</button><button type="button" className="ops-button-secondary ops-compact-button" onClick={() => requestDriverStatus(driver, driver.status_akun === 'Aktif' ? 'Nonaktif' : 'Aktif')}>{driver.status_akun === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan'}</button></div></td>
+                                            </tr>
+                                        )) : <tr><td colSpan="5" className="ops-table-empty">Tidak ada Driver yang cocok dengan pencarian atau filter ini.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {(driversData?.meta?.last_page ?? 1) > 1 && (
+                                <div className="ops-form-actions ops-pagination">
+                                    <button type="button" className="ops-button-secondary ops-compact-button" disabled={driversLoading || driversData.meta.current_page <= 1} onClick={() => { const page = driversData.meta.current_page - 1; setDriverFilters((filters) => ({ ...filters, page })); fetchDrivers({ page }); }}>Sebelumnya</button>
+                                    <span>Halaman {driversData.meta.current_page} dari {driversData.meta.last_page}</span>
+                                    <button type="button" className="ops-button-secondary ops-compact-button" disabled={driversLoading || driversData.meta.current_page >= driversData.meta.last_page} onClick={() => { const page = driversData.meta.current_page + 1; setDriverFilters((filters) => ({ ...filters, page })); fetchDrivers({ page }); }}>Berikutnya</button>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {selectedDriverId && (
+                        <section className="ops-driver-detail" aria-label="Detail Driver">
+                            <div className="ops-panel-head">
+                                <div>
+                                    <span className="ops-eyebrow">DETAIL DRIVER</span>
+                                    <h3>{driverDetail?.profile?.nama_lengkap || driverDetail?.email || 'Memuat Driver...'}</h3>
+                                    <p>{driverDetail?.email || 'Menyiapkan data profil, dompet, kendaraan, dan riwayat transaksi.'}</p>
+                                </div>
+                                <button type="button" className="ops-button-secondary ops-compact-button" onClick={() => { setSelectedDriverId(null); setDriverDetail(null); setDriverDetailError(''); }}>Tutup</button>
+                            </div>
+
+                            {driverDetailLoading ? (
+                                <div className="ops-empty-state">Memuat detail Driver...</div>
+                            ) : driverDetailError ? (
+                                <p className="ops-inline-error">{driverDetailError}</p>
+                            ) : driverDetail && (
+                                <>
+                                    <div className="ops-driver-summary-grid">
+                                        <article><span>Saldo dompet</span><strong>{rupiah(driverDetail.wallet?.saldo)}</strong><small>Hold {rupiah(driverDetail.wallet?.saldo_hold)} · Tersedia {rupiah(driverDetail.wallet?.saldo_tersedia)}</small></article>
+                                        <article><span>Status akun</span><strong>{driverDetail.status_akun}</strong><small>Status dompet: {driverDetail.wallet?.status_dompet || 'Belum ada dompet'}</small></article>
+                                        <article><span>Kendaraan</span><strong>{driverDetail.vehicles?.length ?? 0}</strong><small>{driverDetail.recent_sessions?.length ?? 0} sesi terakhir · {driverDetail.recent_topups?.length ?? 0} top up terakhir</small></article>
+                                    </div>
+
+                                    <div className="ops-driver-columns">
+                                        <section>
+                                            <h4>Profil & Kendaraan</h4>
+                                            <dl className="ops-driver-facts">
+                                                <div><dt>Email</dt><dd>{driverDetail.email}</dd></div>
+                                                <div><dt>Nomor telepon</dt><dd>{driverDetail.profile?.nomor_telepon || '-'}</dd></div>
+                                                <div><dt>Alamat</dt><dd>{driverDetail.profile?.alamat || '-'}</dd></div>
+                                                <div><dt>Tanggal lahir</dt><dd>{driverDetail.profile?.tanggal_lahir || '-'}</dd></div>
+                                            </dl>
+                                            <div className="ops-driver-vehicles">
+                                                {(driverDetail.vehicles ?? []).length > 0 ? driverDetail.vehicles.map((vehicle) => (
+                                                    <article key={vehicle.id_vehicle}><strong>{vehicle.merek} {vehicle.model}</strong><span>{vehicle.nomor_polisi} · {vehicle.tipe_konektor}</span></article>
+                                                )) : <div className="ops-empty-state">Driver belum menambahkan kendaraan.</div>}
+                                            </div>
+                                        </section>
+                                        <section>
+                                            <h4>Ringkasan Dompet</h4>
+                                            <dl className="ops-driver-facts">
+                                                <div><dt>Saldo</dt><dd>{rupiah(driverDetail.wallet?.saldo)}</dd></div>
+                                                <div><dt>Dana ditahan</dt><dd>{rupiah(driverDetail.wallet?.saldo_hold)}</dd></div>
+                                                <div><dt>Saldo tersedia</dt><dd>{rupiah(driverDetail.wallet?.saldo_tersedia)}</dd></div>
+                                                <div><dt>Status dompet</dt><dd>{driverDetail.wallet?.status_dompet || '-'}</dd></div>
+                                            </dl>
+                                        </section>
+                                    </div>
+
+                                    <div className="ops-driver-history">
+                                        <div className="ops-panel-head"><div><h4>Riwayat sesi terakhir</h4><p>Maksimal 10 sesi terbaru milik Driver.</p></div></div>
+                                        <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>ID Sesi</th><th>Status</th><th>Energi</th><th>Total</th><th>Waktu mulai</th></tr></thead><tbody>
+                                            {(driverDetail.recent_sessions ?? []).length > 0 ? driverDetail.recent_sessions.map((session) => <tr key={session.id_session}><td>#{session.id_session}</td><td><span className={`ops-status-pill ops-status-${String(session.status).toLowerCase()}`}>{session.status}</span></td><td>{session.energi_kwh} kWh</td><td>{rupiah(session.total)}</td><td>{formatDateTime(session.waktu_mulai)}</td></tr>) : <tr><td colSpan="5" className="ops-table-empty">Belum ada riwayat sesi charging.</td></tr>}
+                                        </tbody></table></div>
+                                    </div>
+
+                                    <div className="ops-driver-history">
+                                        <div className="ops-panel-head"><div><h4>Riwayat Top Up terakhir</h4><p>Maksimal 10 permintaan Top Up terbaru.</p></div></div>
+                                        <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Referensi</th><th>Metode</th><th>Nominal</th><th>Biaya</th><th>Total</th><th>Status</th><th>Waktu</th></tr></thead><tbody>
+                                            {(driverDetail.recent_topups ?? []).length > 0 ? driverDetail.recent_topups.map((topup) => <tr key={topup.id_topup}><td><code>{topup.referensi}</code></td><td>{topup.nama_metode || '-'}</td><td>{rupiah(topup.nominal)}</td><td>{rupiah(topup.biaya_layanan)}</td><td>{rupiah(topup.total)}</td><td>{topup.status_topup}</td><td>{formatDateTime(topup.waktu_topup)}</td></tr>) : <tr><td colSpan="7" className="ops-table-empty">Belum ada riwayat Top Up.</td></tr>}
+                                        </tbody></table></div>
+                                    </div>
+
+                                    <div className="ops-form-actions ops-driver-detail-actions">
+                                        <button type="button" className="ops-button-primary" onClick={() => requestDriverStatus(driverDetail, driverDetail.status_akun === 'Aktif' ? 'Nonaktif' : 'Aktif')}>{driverDetail.status_akun === 'Aktif' ? 'Nonaktifkan Driver' : 'Aktifkan Driver'}</button>
+                                    </div>
+                                </>
+                            )}
+                        </section>
+                    )}
+                </section>
+            )}
+
+            {/* TAB 4: KELOLA METODE BAYAR (FR58) */}
+            {activeTab === 'payment-methods' && isAdmin && (
+                <section className="ops-panel">
+                    <div className="ops-panel-head">
+                        <div>
+                            <h2>Kelola Metode Bayar</h2>
+                            <p>Metode ini hanya dipakai untuk Top Up Dompet Digital, bukan pembayaran charging.</p>
+                        </div>
+                        <div className="ops-head-actions"><span>{paymentMethodsData?.meta?.total ?? 0} metode</span><button type="button" className="ops-button-primary" onClick={openPaymentCreate}><FaPlus aria-hidden="true" /> Tambah metode</button></div>
+                    </div>
+
+                    {paymentFormNotice && <div className={`ops-operator-notice is-${paymentFormNotice.type}`} role={paymentFormNotice.type === 'error' ? 'alert' : 'status'}>{paymentFormNotice.message}</div>}
+
+                    {paymentFormOpen && (
+                        <form className="ops-form ops-operator-form ops-payment-form" onSubmit={submitPaymentMethod}>
+                            <div className="ops-form-title"><strong>{paymentEditingId ? 'Ubah metode pembayaran' : 'Tambah metode pembayaran'}</strong><span>Perubahan biaya layanan hanya berlaku untuk Top Up baru; transaksi lama memakai snapshot biaya saat dibuat.</span></div>
+                            <div className="ops-inline-fields">
+                                <label>Nama metode<input value={paymentForm.nama_metode} onChange={(event) => setPaymentForm((form) => ({ ...form, nama_metode: event.target.value }))} maxLength={50} placeholder="Contoh: GoPay, DANA, VA BRI" required /></label>
+                                <label>Tipe metode<select value={paymentForm.tipe_metode} onChange={(event) => setPaymentForm((form) => ({ ...form, tipe_metode: event.target.value }))}><option value="ewallet">E-Wallet</option><option value="va">Virtual Account</option></select></label>
+                                <label>Biaya layanan (Rp)<input type="number" inputMode="numeric" min="0" max="100000" step="1" value={paymentForm.biaya_layanan} onChange={(event) => setPaymentForm((form) => ({ ...form, biaya_layanan: event.target.value }))} required /></label>
+                                {paymentEditingId && <label>Alasan perubahan (opsional)<input value={paymentForm.alasan} onChange={(event) => setPaymentForm((form) => ({ ...form, alasan: event.target.value }))} minLength={5} maxLength={500} placeholder="Kosongkan jika tidak perlu" /></label>}
+                            </div>
+                            <div className="ops-form-actions"><button type="submit" className="ops-button-primary" disabled={paymentSaving}>{paymentSaving ? 'Menyimpan...' : paymentEditingId ? 'Simpan perubahan' : 'Tambah metode'}</button><button type="button" className="ops-button-secondary" disabled={paymentSaving} onClick={closePaymentForm}>Batal</button></div>
+                        </form>
+                    )}
+
+                    {paymentError && <p className="ops-inline-error">{paymentError}</p>}
+
+                    {paymentLoading && !paymentMethodsData ? (
+                        <div className="ops-empty-state">Memuat metode pembayaran...</div>
+                    ) : (
+                        <div className="ops-table-wrap">
+                            <table className="ops-table">
+                                <thead><tr><th>Metode</th><th>Tipe</th><th>Biaya layanan</th><th>Status</th><th>Aksi</th></tr></thead>
+                                <tbody>
+                                    {(paymentMethodsData?.data ?? []).length > 0 ? paymentMethodsData.data.map((method) => (
+                                        <tr key={method.id_metode}>
+                                            <td><strong>{method.nama_metode}</strong><br /><small>{method.id_metode}</small></td>
+                                            <td>{paymentTypeLabel(method.tipe_metode)}</td>
+                                            <td>{rupiah(method.biaya_layanan)}</td>
+                                            <td><span className={`ops-status-pill ops-status-${String(method.status_metode).toLowerCase()}`}>{method.status_metode}</span></td>
+                                            <td><div className="ops-form-actions"><button type="button" className="ops-button-secondary ops-compact-button" onClick={() => openPaymentEdit(method)}><FaEdit aria-hidden="true" /> Ubah</button><button type="button" className="ops-button-secondary ops-compact-button" onClick={() => requestPaymentStatus(method, method.status_metode === 'Aktif' ? 'Nonaktif' : 'Aktif')}>{method.status_metode === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan'}</button></div></td>
+                                        </tr>
+                                    )) : <tr><td colSpan="5" className="ops-table-empty">Belum ada metode pembayaran. Tambahkan metode pertama untuk Top Up Driver.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    <p className="ops-data-note">Metode nonaktif tidak muncul pada pilihan Top Up Driver. Transaksi pending yang sudah dibuat tetap dapat diselesaikan atau kedaluwarsa secara normal.</p>
+                </section>
+            )}
+
             {activeTab === 'config' && isAdmin && (
                 <section className="ops-panel">
                     <div className="ops-panel-head">
@@ -1423,6 +1845,34 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
             )}
             </div>
             </div>
+            {driverStatusAction && (
+                <div className="ops-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDriverStatusAction(null); }}>
+                    <form className="ops-reason-modal" role="dialog" aria-modal="true" aria-labelledby="ops-driver-status-title" onSubmit={submitDriverStatus}>
+                        <button type="button" className="ops-modal-close" aria-label="Tutup" onClick={() => setDriverStatusAction(null)}><FaTimes aria-hidden="true" /></button>
+                        <span className="ops-eyebrow">KONFIRMASI STATUS DRIVER</span>
+                        <h2 id="ops-driver-status-title">{driverStatusAction.nextStatus === 'Nonaktif' ? 'Nonaktifkan' : 'Aktifkan'} Driver?</h2>
+                        <p><strong>{driverStatusAction.driver.profile?.nama_lengkap || driverStatusAction.driver.nama_lengkap || driverStatusAction.driver.email}</strong> akan diubah menjadi <strong>{driverStatusAction.nextStatus}</strong>. {driverStatusAction.nextStatus === 'Nonaktif' ? 'Sesi charging yang sedang berjalan akan diselesaikan otomatis, dana hold disesuaikan, dan token akses Driver dicabut.' : 'Driver dapat kembali login dan memakai layanan setelah akun aktif.'}</p>
+                        {driverStatusError && <div className="ops-operator-notice is-error" role="alert">{driverStatusError}</div>}
+                        <label>Alasan perubahan (opsional)<textarea rows="3" minLength={5} maxLength={500} value={driverStatusReason} onChange={(event) => setDriverStatusReason(event.target.value)} placeholder="Kosongkan jika tidak perlu dicatat" /></label>
+                        <div className="ops-form-actions"><button type="button" className="ops-button-secondary" disabled={driverStatusSaving} onClick={() => setDriverStatusAction(null)}>Batal</button><button type="submit" className="ops-button-primary" disabled={driverStatusSaving}>{driverStatusSaving ? 'Menyimpan...' : 'Konfirmasi status'}</button></div>
+                    </form>
+                </div>
+            )}
+
+            {paymentStatusAction && (
+                <div className="ops-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaymentStatusAction(null); }}>
+                    <form className="ops-reason-modal" role="dialog" aria-modal="true" aria-labelledby="ops-payment-status-title" onSubmit={submitPaymentStatus}>
+                        <button type="button" className="ops-modal-close" aria-label="Tutup" onClick={() => setPaymentStatusAction(null)}><FaTimes aria-hidden="true" /></button>
+                        <span className="ops-eyebrow">KONFIRMASI METODE BAYAR</span>
+                        <h2 id="ops-payment-status-title">{paymentStatusAction.nextStatus === 'Nonaktif' ? 'Nonaktifkan' : 'Aktifkan'} metode?</h2>
+                        <p>Metode <strong>{paymentStatusAction.method.nama_metode}</strong> akan diubah menjadi <strong>{paymentStatusAction.nextStatus}</strong>. {paymentStatusAction.nextStatus === 'Nonaktif' ? 'Metode tidak lagi muncul pada pilihan Top Up Driver, tetapi transaksi pending yang sudah ada tetap dapat diselesaikan atau kedaluwarsa.' : 'Metode akan kembali tersedia untuk pembuatan Top Up baru.'}</p>
+                        {paymentStatusError && <div className="ops-operator-notice is-error" role="alert">{paymentStatusError}</div>}
+                        <label>Alasan perubahan (opsional)<textarea rows="3" minLength={5} maxLength={500} value={paymentStatusReason} onChange={(event) => setPaymentStatusReason(event.target.value)} placeholder="Kosongkan jika tidak perlu dicatat" /></label>
+                        <div className="ops-form-actions"><button type="button" className="ops-button-secondary" disabled={paymentStatusSaving} onClick={() => setPaymentStatusAction(null)}>Batal</button><button type="submit" className="ops-button-primary" disabled={paymentStatusSaving}>{paymentStatusSaving ? 'Menyimpan...' : 'Konfirmasi status'}</button></div>
+                    </form>
+                </div>
+            )}
+
             {reasonAction && (
                 <div className="ops-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setReasonAction(null); }}>
                     <form className="ops-reason-modal" role="dialog" aria-modal="true" aria-labelledby="ops-reason-title" onSubmit={submitReasonAction}>

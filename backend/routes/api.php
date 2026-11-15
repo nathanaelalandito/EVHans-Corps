@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ChargingSessionController;
 use App\Http\Controllers\Api\DompetPinController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OperationsController;
 use App\Http\Controllers\Api\OperatorController;
 use App\Http\Controllers\Api\PaymentController;
@@ -22,10 +23,10 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
-    Route::put('/notifications/{notification}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markRead']);
-    Route::put('/notifications/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'markAllRead']);
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::put('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::put('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 });
 
 // Kelola PIN dompet (semua butuh login via Sanctum)
@@ -81,6 +82,17 @@ Route::middleware(['auth:sanctum', 'role:operator,admin'])->group(function () {
     Route::get('/operations/audit-logs', [OperationsController::class, 'auditLogs']);
     Route::get('/operations/config', [OperationsController::class, 'getSystemConfig']);
     Route::put('/operations/config', [OperationsController::class, 'updateSystemConfig']);
+});
+
+Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::get('/operations/payment-methods', [OperationsController::class, 'paymentMethods']);
+    Route::post('/operations/payment-methods', [OperationsController::class, 'storePaymentMethod']);
+    Route::put('/operations/payment-methods/{id}', [OperationsController::class, 'updatePaymentMethod']);
+    Route::put('/operations/payment-methods/{id}/status', [OperationsController::class, 'updatePaymentMethodStatus']);
+
+    Route::get('/operations/drivers', [OperationsController::class, 'drivers']);
+    Route::get('/operations/drivers/{driver}', [OperationsController::class, 'driver']);
+    Route::put('/operations/drivers/{driver}/status', [OperationsController::class, 'updateDriverStatus']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

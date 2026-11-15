@@ -119,3 +119,45 @@ export async function updateSystemConfig(payload) {
     const { data } = await api.put('/operations/config', payload);
     return data.data ?? data;
 }
+
+/** Mengambil daftar Driver untuk panel admin. */
+export async function getDrivers(params = {}) {
+    const { data } = await api.get('/operations/drivers', { params });
+    return data;
+}
+
+/** Mengambil detail Driver untuk panel admin. */
+export async function getDriverDetail(id) {
+    const { data } = await api.get(`/operations/drivers/${id}`);
+    return data.data ?? data;
+}
+
+/** Mengubah status akun Driver. */
+export async function updateDriverStatus(id, payload) {
+    const { data } = await api.put(`/operations/drivers/${id}/status`, payload);
+    return data;
+}
+
+/** Mengambil metode pembayaran Top Up beserta parameter paginasi opsional. */
+export async function getPaymentMethods(params = {}) {
+    const { data } = await api.get('/operations/payment-methods', { params });
+    return data;
+}
+
+/** Menambah metode pembayaran Top Up. */
+export async function createPaymentMethod(payload) {
+    const { data } = await api.post('/operations/payment-methods', payload);
+    return data;
+}
+
+/** Mengubah data metode pembayaran Top Up. */
+export async function updatePaymentMethod(id, payload) {
+    const { data } = await api.put(`/operations/payment-methods/${id}`, payload);
+    return data;
+}
+
+/** Mengubah status metode pembayaran Top Up. */
+export async function updatePaymentMethodStatus(id, payload) {
+    const { data } = await api.put(`/operations/payment-methods/${id}/status`, payload);
+    return data;
+}

@@ -14,12 +14,16 @@ return new class extends Migration
             $table->string('foto')->nullable()->after('fasilitas');
         });
 
-        DB::statement("ALTER TABLE location MODIFY status_loc ENUM('Aktif','Nonaktif','Maintenance','Gangguan') DEFAULT 'Aktif'");
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE location MODIFY status_loc ENUM('Aktif','Nonaktif','Maintenance','Gangguan') DEFAULT 'Aktif'");
+        }
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE location MODIFY status_loc ENUM('Aktif','Nonaktif','Maintenance') DEFAULT 'Aktif'");
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE location MODIFY status_loc ENUM('Aktif','Nonaktif','Maintenance') DEFAULT 'Aktif'");
+        }
 
         Schema::table('location', function (Blueprint $table): void {
             $table->dropColumn(['fasilitas', 'foto']);

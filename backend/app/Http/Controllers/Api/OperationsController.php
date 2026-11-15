@@ -6,13 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Charger;
 use App\Models\ChargingSession;
+use App\Models\Dompet;
 use App\Models\Location;
+use App\Models\MetodePembayaran;
 use App\Models\Payment;
 use App\Models\Port;
 use App\Models\StationOperator;
 use App\Models\Tarif;
+use App\Models\Topup;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Models\Vehicle;
+use App\Services\NotificationService;
 use App\Services\TariffScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -414,9 +420,9 @@ class OperationsController extends Controller
 
         if (isset($data['status_mesin']) && in_array($data['status_mesin'], ['Maintenance', 'Offline'], true) && ($before['status_mesin'] ?? null) !== $data['status_mesin']) {
             try {
-                app(\App\Services\NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason, $activeDriverIds);
+                app(NotificationService::class)->notifyChargerIssue($charger->fresh(), $data['status_mesin'], $reason, $activeDriverIds);
             } catch (\Throwable $e) {
-                \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                \Log::warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
             }
         }
         if ($before !== $after) {
@@ -474,9 +480,9 @@ class OperationsController extends Controller
 
         if (isset($data['status_port']) && in_array($data['status_port'], ['Out of Order', 'Maintenance'], true) && ($before['status_port'] ?? null) !== $data['status_port']) {
             try {
-                app(\App\Services\NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason, $activeDriverIds);
+                app(NotificationService::class)->notifyChargerIssue($charger, $data['status_port'], $reason, $activeDriverIds);
             } catch (\Throwable $e) {
-                \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                \Log::warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
             }
         }
 
@@ -1048,6 +1054,334 @@ class OperationsController extends Controller
         ]);
     }
 
+    /** Menampilkan daftar Driver dengan pencarian, filter status, dan pagination. */
+    public function drivers(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $perPage = max(1, min((int) $request->query('per_page', 15), 50));
+        $query = User::where('peran', 'driver')->with('profile');
+
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('email', 'like', "%{$search}%")
+                    ->orWhereHas('profile', function ($profileQuery) use ($search) {
+                        $profileQuery->where('nama_lengkap', 'like', "%{$search}%")
+                            ->orWhere('nomor_telepon', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($status = $request->query('status')) {
+            $query->where('status_akun', $status);
+        }
+
+        $drivers = $query->latest('created_at')->paginate($perPage);
+
+        return response()->json([
+            'data' => $drivers->getCollection()->map(fn (User $user) => [
+                'id_user' => $user->id_user,
+                'email' => $user->email,
+                'status_akun' => $user->status_akun,
+                'nama_lengkap' => $user->profile?->nama_lengkap,
+                'nomor_telepon' => $user->profile?->nomor_telepon,
+                'created_at' => $user->created_at,
+            ])->values(),
+            'meta' => [
+                'current_page' => $drivers->currentPage(),
+                'last_page' => $drivers->lastPage(),
+                'per_page' => $drivers->perPage(),
+                'total' => $drivers->total(),
+            ],
+        ]);
+    }
+
+    /** Menampilkan detail Driver beserta kendaraan dan ringkasan dompet. */
+    public function driver(Request $request, string $id): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $user = User::where('id_user', $id)->where('peran', 'driver')->firstOrFail();
+        $wallet = Dompet::where('id_user', $user->id_user)->first();
+
+        $sessions = ChargingSession::with(['charger.location', 'payment'])
+            ->where('id_user', $user->id_user)
+            ->latest('waktu_mulai')
+            ->limit(10)
+            ->get()
+            ->map(fn (ChargingSession $session) => [
+                'id_session' => $session->id_session,
+                'status' => $session->status,
+                'energi_kwh' => (float) $session->total_energi_kwh,
+                'total' => $session->payment?->total_bayar ?? $session->saldo_hold,
+                'waktu_mulai' => $session->waktu_mulai?->toISOString(),
+            ])->values();
+
+        $topups = Topup::with('method')
+            ->where('id_wallet', $wallet?->id_wallet)
+            ->latest('waktu_topup')
+            ->limit(10)
+            ->get()
+            ->map(fn (Topup $topup) => [
+                'id_topup' => $topup->id_topup,
+                'referensi' => $topup->referensi,
+                'nama_metode' => $topup->method?->nama_metode,
+                'nominal' => (int) $topup->nominal,
+                'biaya_layanan' => (int) $topup->biaya_layanan,
+                'total' => (int) $topup->nominal + (int) $topup->biaya_layanan,
+                'status_topup' => $topup->status_topup,
+                'waktu_topup' => $topup->waktu_topup?->toISOString(),
+            ])->values();
+
+        return response()->json([
+            'data' => [
+                'id_user' => $user->id_user,
+                'email' => $user->email,
+                'status_akun' => $user->status_akun,
+                'profile' => $user->profile ? [
+                    'nama_lengkap' => $user->profile->nama_lengkap,
+                    'nomor_telepon' => $user->profile->nomor_telepon,
+                    'alamat' => $user->profile->alamat,
+                    'tanggal_lahir' => $user->profile->tanggal_lahir?->format('Y-m-d'),
+                ] : null,
+                'vehicles' => $user->vehicles->map(fn (Vehicle $vehicle) => [
+                    'id_vehicle' => $vehicle->id_vehicle,
+                    'merek' => $vehicle->merek,
+                    'model' => $vehicle->model,
+                    'nomor_polisi' => $vehicle->nomor_polisi,
+                    'tipe_konektor' => $vehicle->tipe_konektor,
+                ])->values(),
+                'wallet' => $wallet ? [
+                    'saldo' => (int) $wallet->saldo,
+                    'saldo_hold' => (int) $wallet->saldo_hold,
+                    'saldo_tersedia' => $wallet->saldoTersedia(),
+                    'status_dompet' => $wallet->status_dompet,
+                ] : null,
+                'recent_sessions' => $sessions,
+                'recent_topups' => $topups,
+            ],
+        ]);
+    }
+
+    /** Mengaktifkan atau menonaktifkan akun Driver dan mencatat audit. */
+    public function updateDriverStatus(Request $request, string $id): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $user = User::where('id_user', $id)->where('peran', 'driver')->firstOrFail();
+
+        $data = $request->validate([
+            'status_akun' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
+            'alasan' => ['sometimes', 'nullable', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $oldStatus = $user->status_akun;
+        $newStatus = $data['status_akun'];
+
+        if ($newStatus === 'Nonaktif' && $oldStatus !== 'Nonaktif') {
+            $activeSessions = ChargingSession::where('id_user', $user->id_user)
+                ->where('status', 'Berlangsung')
+                ->get();
+
+            foreach ($activeSessions as $activeSession) {
+                $settled = app(ChargingSessionController::class)->settleForAccountDeactivation($request, $activeSession);
+                if ($settled instanceof JsonResponse) {
+                    throw ValidationException::withMessages([
+                        'sesi' => $settled->getData()->message ?? 'Sesi aktif tidak dapat diselesaikan.',
+                    ]);
+                }
+            }
+
+            $user->tokens()->delete();
+        }
+
+        $user->update(['status_akun' => $newStatus]);
+
+        AuditLog::create([
+            'id_user' => $request->user()->id_user,
+            'aksi' => 'ubah_status_driver',
+            'entitas' => 'driver',
+            'id_entitas' => $user->id_user,
+            'data_sebelum' => ['status_akun' => $oldStatus],
+            'data_sesudah' => ['status_akun' => $user->status_akun],
+            'alasan' => $data['alasan'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => "Status akun Driver berhasil diubah menjadi {$newStatus}.",
+            'data' => [
+                'id_user' => $user->id_user,
+                'status_akun' => $user->status_akun,
+            ],
+        ]);
+    }
+
+    /** Menampilkan semua metode pembayaran Top Up (aktif dan nonaktif). */
+    public function paymentMethods(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $perPage = max(1, min((int) $request->query('per_page', 15), 50));
+        $methods = MetodePembayaran::latest('id_metode')->paginate($perPage);
+
+        return response()->json([
+            'data' => $methods->getCollection()
+                ->map(fn (MetodePembayaran $method) => $this->presentPaymentMethod($method))
+                ->values(),
+            'meta' => [
+                'current_page' => $methods->currentPage(),
+                'last_page' => $methods->lastPage(),
+                'per_page' => $methods->perPage(),
+                'total' => $methods->total(),
+            ],
+        ]);
+    }
+
+    /** Menambah metode pembayaran Top Up baru. */
+    public function storePaymentMethod(Request $request): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $data = $request->validate([
+            'nama_metode' => ['required', 'string', 'max:50'],
+            'tipe_metode' => ['required', Rule::in(['ewallet', 'va'])],
+            'biaya_layanan' => ['required', 'integer', 'min:0', 'max:100000'],
+            'status_metode' => ['sometimes', Rule::in(['Aktif', 'Nonaktif'])],
+        ]);
+
+        $data['nama_metode'] = trim($data['nama_metode']);
+        if ($data['nama_metode'] === '') {
+            throw ValidationException::withMessages(['nama_metode' => 'Nama metode wajib diisi.']);
+        }
+        $this->assertUniquePaymentMethodName($data['nama_metode']);
+
+        $method = MetodePembayaran::create([
+            'nama_metode' => $data['nama_metode'],
+            'tipe_metode' => $data['tipe_metode'],
+            'biaya_layanan' => $data['biaya_layanan'],
+            'status_metode' => $data['status_metode'] ?? 'Aktif',
+        ]);
+
+        AuditLog::create([
+            'id_user' => $request->user()->id_user,
+            'aksi' => 'buat_metode_pembayaran',
+            'entitas' => 'metode_pembayaran',
+            'id_entitas' => (string) $method->id_metode,
+            'data_sebelum' => [],
+            'data_sesudah' => $method->only(['nama_metode', 'tipe_metode', 'biaya_layanan', 'status_metode']),
+        ]);
+
+        return response()->json([
+            'message' => 'Metode pembayaran berhasil dibuat.',
+            'data' => $this->presentPaymentMethod($method->fresh()),
+        ], 201);
+    }
+
+    /** Mengubah data metode pembayaran Top Up. */
+    public function updatePaymentMethod(Request $request, int $id): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $method = MetodePembayaran::findOrFail($id);
+
+        $data = $request->validate([
+            'nama_metode' => ['sometimes', 'required', 'string', 'max:50'],
+            'tipe_metode' => ['sometimes', 'required', Rule::in(['ewallet', 'va'])],
+            'biaya_layanan' => ['sometimes', 'required', 'integer', 'min:0', 'max:100000'],
+            'alasan' => ['sometimes', 'nullable', 'string', 'min:5', 'max:500'],
+        ]);
+
+        if (array_key_exists('nama_metode', $data)) {
+            $data['nama_metode'] = trim($data['nama_metode']);
+            if ($data['nama_metode'] === '') {
+                throw ValidationException::withMessages(['nama_metode' => 'Nama metode wajib diisi.']);
+            }
+            $this->assertUniquePaymentMethodName($data['nama_metode'], (int) $method->id_metode);
+        }
+
+        $reason = $data['alasan'] ?? null;
+        unset($data['alasan']);
+
+        $before = $method->only(['nama_metode', 'tipe_metode', 'biaya_layanan', 'status_metode']);
+        $method->update($data);
+        $after = $method->fresh()->only(array_keys($before));
+
+        if ($before !== $after) {
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'aksi' => 'ubah_metode_pembayaran',
+                'entitas' => 'metode_pembayaran',
+                'id_entitas' => (string) $method->id_metode,
+                'data_sebelum' => $before,
+                'data_sesudah' => $after,
+                'alasan' => $reason,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Metode pembayaran berhasil diperbarui.',
+            'data' => $this->presentPaymentMethod($method->fresh()),
+        ]);
+    }
+
+    /** Mengaktifkan atau menonaktifkan metode pembayaran Top Up. */
+    public function updatePaymentMethodStatus(Request $request, int $id): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $method = MetodePembayaran::findOrFail($id);
+
+        $data = $request->validate([
+            'status_metode' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
+            'alasan' => ['sometimes', 'nullable', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $oldStatus = $method->status_metode;
+        $method->update(['status_metode' => $data['status_metode']]);
+
+        AuditLog::create([
+            'id_user' => $request->user()->id_user,
+            'aksi' => 'ubah_status_metode_pembayaran',
+            'entitas' => 'metode_pembayaran',
+            'id_entitas' => (string) $method->id_metode,
+            'data_sebelum' => ['status_metode' => $oldStatus],
+            'data_sesudah' => ['status_metode' => $method->status_metode],
+            'alasan' => $data['alasan'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => 'Status metode pembayaran berhasil diperbarui.',
+            'data' => $this->presentPaymentMethod($method->fresh()),
+        ]);
+    }
+
+    /** Menyeragamkan field metode pembayaran yang aman ditampilkan ke klien. */
+    private function presentPaymentMethod(MetodePembayaran $method): array
+    {
+        return [
+            'id_metode' => $method->id_metode,
+            'nama_metode' => $method->nama_metode,
+            'tipe_metode' => $method->tipe_metode,
+            'biaya_layanan' => (int) $method->biaya_layanan,
+            'status_metode' => $method->status_metode,
+        ];
+    }
+
+    /** Menolak nama metode yang sama tanpa membedakan huruf besar/kecil. */
+    private function assertUniquePaymentMethodName(string $name, ?int $ignoreId = null): void
+    {
+        $exists = MetodePembayaran::query()
+            ->whereRaw('LOWER(nama_metode) = ?', [mb_strtolower($name)])
+            ->when($ignoreId !== null, fn ($query) => $query->where('id_metode', '!=', $ignoreId))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'nama_metode' => 'Nama metode pembayaran sudah digunakan.',
+            ]);
+        }
+    }
+
     /** Menolak akses jika pemanggil bukan admin atau operator aktif. */
     private function ensureStaff(Request $request): void
     {
@@ -1091,7 +1425,7 @@ class OperationsController extends Controller
             'longitude' => (float) $location->longitude,
             'status' => $location->status_loc,
             'fasilitas' => $location->fasilitas,
-            'foto' => $location->foto ? \Illuminate\Support\Facades\Storage::url($location->foto) : null,
+            'foto' => $location->foto ? Storage::url($location->foto) : null,
             'jam_buka' => substr((string) $location->jam_buka, 0, 5),
             'jam_tutup' => substr((string) $location->jam_tutup, 0, 5),
             'charger_total' => $chargers->count(),

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Topup;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -31,7 +32,7 @@ class TopupController extends Controller
             ->orderBy('id_metode')
             ->get()
             ->map(function ($m) {
-                $type = $this->typeOf($m->nama_metode);
+                $type = $this->typeOf($m);
 
                 return [
                     'id' => $m->id_metode,
@@ -81,7 +82,7 @@ class TopupController extends Controller
             ], 422);
         }
 
-        $isVa = $this->typeOf($metode->nama_metode) === 'va';
+        $isVa = $this->typeOf($metode) === 'va';
 
         // VA = kode bank + nomor telepon (tanpa 0 di depan); GoPay/DANA = nomor telepon
         $kodePembayaran = $isVa
@@ -154,8 +155,18 @@ class TopupController extends Controller
     /* ---------------- helper ---------------- */
 
     /** Mengelompokkan metode menjadi tipe instruksi pembayaran frontend. */
-    private function typeOf(string $namaMetode): string
+    private function typeOf($metode): string
     {
+        $tipe = is_object($metode) ? ($metode->tipe_metode ?? null) : null;
+        if ($tipe === 'va') {
+            return 'va';
+        }
+        if ($tipe === 'ewallet') {
+            return 'qr';
+        }
+
+        $namaMetode = is_object($metode) ? (string) $metode->nama_metode : (string) $metode;
+
         return preg_match('/\bva\b/i', $namaMetode) ? 'va' : 'qr';
     }
 
@@ -215,13 +226,13 @@ class TopupController extends Controller
         if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada->isPast()) {
             $topup->update(['status_topup' => 'Gagal']);
             try {
-                app(\App\Services\NotificationService::class)->notifyTopupFailed(
+                app(NotificationService::class)->notifyTopupFailed(
                     (string) DB::table('dompet')->where('id_wallet', $topup->id_wallet)->value('id_user'),
                     $topup->fresh(),
                     'kedaluwarsa'
                 );
             } catch (\Throwable $e) {
-                \Log::warning('Gagal mengirim notifikasi top up: ' . $e->getMessage());
+                \Log::warning('Gagal mengirim notifikasi top up: '.$e->getMessage());
             }
         }
 

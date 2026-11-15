@@ -12,7 +12,7 @@ class PaymentMethodSeeder extends Seeder
         collect(['Dompet Digital', 'Mandiri', 'OVO', 'BCA', 'BRI', 'BNI'])
             ->each(fn (string $name) => MetodePembayaran::firstOrCreate(
                 ['nama_metode' => $name],
-                ['biaya_layanan' => 0, 'status_metode' => 'Aktif']
+                ['tipe_metode' => 'ewallet', 'biaya_layanan' => 0, 'status_metode' => 'Aktif']
             ));
     }
 }

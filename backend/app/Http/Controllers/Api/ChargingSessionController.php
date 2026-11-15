@@ -357,7 +357,7 @@ class ChargingSessionController extends Controller
         try {
             app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
         } catch (\Throwable $e) {
-            \Log::warning('Gagal mengirim notifikasi sesi: ' . $e->getMessage());
+            \Log::warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }
 
         return response()->json([
@@ -392,7 +392,7 @@ class ChargingSessionController extends Controller
         try {
             app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
         } catch (\Throwable $e) {
-            \Log::warning('Gagal mengirim notifikasi sesi: ' . $e->getMessage());
+            \Log::warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }
 
         return response()->json([
@@ -423,14 +423,14 @@ class ChargingSessionController extends Controller
         try {
             app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
         } catch (\Throwable $e) {
-            \Log::warning('Gagal mengirim notifikasi sesi: ' . $e->getMessage());
+            \Log::warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }
 
         if ($finalStatus === 'Gagal' && $settled->charger) {
             try {
                 app(NotificationService::class)->notifyChargerIssue($settled->charger, 'Out of Order', $data['alasan'] ?? null);
             } catch (\Throwable $e) {
-                \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                \Log::warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
             }
         }
 
@@ -442,6 +442,15 @@ class ChargingSessionController extends Controller
             'message' => $message,
             'data' => $this->presentInvoice($settled),
         ]);
+    }
+
+    /**
+     * Menyelesaikan sesi aktif dari jalur administratif (mis. penonaktifan akun
+     * Driver oleh Admin) memakai rumus settle yang sama dengan stop operasional.
+     */
+    public function settleForAccountDeactivation(Request $request, ChargingSession $session): ChargingSession|JsonResponse
+    {
+        return $this->settleSession($request, $session, [], 'Selesai');
     }
 
     /** Menutup sesi, menghitung biaya aktual, melepas hold, dan mencatat pembayaran. */
@@ -462,7 +471,7 @@ class ChargingSessionController extends Controller
                 if (! $assignment) {
                     abort(404);
                 }
-            } elseif ($session->id_user !== $request->user()->id_user) {
+            } elseif ($session->id_user !== $request->user()->id_user && $request->user()->peran !== 'admin') {
                 abort(404);
             }
 

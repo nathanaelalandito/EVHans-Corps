@@ -120,8 +120,8 @@ class AuthController extends Controller
 
         if ($user->status_akun !== 'Aktif') {
             return response()->json([
-                'message' => 'Akun Anda tidak aktif. Hubungi admin.',
-            ], 403);
+                'message' => 'Email atau password salah.',
+            ], 401);
         }
 
         // Hapus token lama supaya tidak menumpuk setiap kali login
