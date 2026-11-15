@@ -1047,8 +1047,10 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                     <h1>{displayName}</h1>
                     <p>{isAdmin ? 'Kontrol operator, station, charger, tarif, dan audit operasional.' : 'Monitoring station, charger, tarif, dan laporan penggunaan.'}</p>
                 </div>
-                <NotificationsBell />
-                <button className="ops-logout" onClick={onLogout}>Keluar</button>
+                <div className="ops-header-actions">
+                    <NotificationsBell />
+                    <button className="ops-logout" onClick={onLogout}>Keluar</button>
+                </div>
             </header>
 
             <div className={isAdmin ? 'ops-dashboard-grid' : 'ops-operator-content'}>

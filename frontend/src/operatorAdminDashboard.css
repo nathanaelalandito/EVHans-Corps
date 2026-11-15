@@ -24,6 +24,14 @@
     border-bottom: 1px solid var(--ops-line);
 }
 
+.ops-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: none;
+}
+
 .ops-role,
 .ops-eyebrow {
     display: block;
