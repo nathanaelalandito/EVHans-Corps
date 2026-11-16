@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Charger;
 use App\Models\ChargingSession;
 use App\Models\Location;
 use App\Models\Tarif;
+use App\Services\NotificationService;
 use App\Services\TariffScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -481,20 +483,20 @@ class OperatorController extends Controller
             }
         });
 
-            if (in_array($status, ['Maintenance', 'Offline'], true)) {
-                $chargerModel = \App\Models\Charger::find($id);
-                if ($chargerModel) {
-                    app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
-                }
+        if (in_array($status, ['Maintenance', 'Offline'], true)) {
+            $chargerModel = Charger::find($id);
+            if ($chargerModel) {
+                app(NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
             }
+        }
 
         if (in_array($status, ['Maintenance', 'Offline'], true)) {
-            $chargerModel = \App\Models\Charger::find($id);
+            $chargerModel = Charger::find($id);
             if ($chargerModel) {
                 try {
-                    app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds ?? []);
+                    app(NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds ?? []);
                 } catch (\Throwable $e) {
-                    \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                    \Log::warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
                 }
             }
         }
@@ -709,19 +711,19 @@ class OperatorController extends Controller
         });
 
         if (in_array($status, ['Out of Order', 'Maintenance'], true)) {
-            $chargerModel = \App\Models\Charger::find($port->id_charger);
+            $chargerModel = Charger::find($port->id_charger);
             if ($chargerModel) {
-                app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
+                app(NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds);
             }
         }
 
         if (in_array($status, ['Out of Order', 'Maintenance'], true)) {
-            $chargerModel = \App\Models\Charger::find($port->id_charger);
+            $chargerModel = Charger::find($port->id_charger);
             if ($chargerModel) {
                 try {
-                    app(\App\Services\NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds ?? []);
+                    app(NotificationService::class)->notifyChargerIssue($chargerModel, $status, $reason, $activeDriverIds ?? []);
                 } catch (\Throwable $e) {
-                    \Log::warning('Gagal mengirim notifikasi charger: ' . $e->getMessage());
+                    \Log::warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
                 }
             }
         }
@@ -813,11 +815,73 @@ class OperatorController extends Controller
         // Menggunakan paginate agar respons ringan
         $transactions = $query->orderBy('charging_session.created_at', 'desc')->paginate(15);
 
+        $malfunctionQuery = DB::table('error_log')
+            ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('location', 'charger.id_location', '=', 'location.id_location')
+            ->leftJoin('users', 'error_log.id_user', '=', 'users.id_user')
+            ->leftJoin('user_profile', 'users.id_user', '=', 'user_profile.id_user')
+            ->where('charger.id_location', $assignment->id_location)
+            ->select(
+                'error_log.id_log',
+                'error_log.id_charger',
+                'error_log.id_session',
+                'error_log.jenis_error',
+                'error_log.desk_mslh',
+                'error_log.status_tanganan',
+                'error_log.waktu_terjadi',
+                'error_log.created_at',
+                'error_log.updated_at',
+                'charger.kode_perangkat',
+                'charger.merek_model',
+                'location.nama_lokasi',
+                'location.alamat',
+                'users.email as email_pelapor',
+                'user_profile.nama_lengkap as nama_pelapor'
+            );
+
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $malfunctionQuery->whereBetween('error_log.waktu_terjadi', [
+                Carbon::parse($request->start_date)->startOfDay(),
+                Carbon::parse($request->end_date)->endOfDay(),
+            ]);
+        }
+
+        $malfunctionSummaryQuery = clone $malfunctionQuery;
+        $summary['malfunctions'] = [
+            'total' => (clone $malfunctionSummaryQuery)->count('error_log.id_log'),
+            'pending' => (clone $malfunctionSummaryQuery)->where('error_log.status_tanganan', 'Menunggu')->count('error_log.id_log'),
+            'in_progress' => (clone $malfunctionSummaryQuery)->where('error_log.status_tanganan', 'Sedang Ditangani')->count('error_log.id_log'),
+            'resolved' => (clone $malfunctionSummaryQuery)->where('error_log.status_tanganan', 'Selesai')->count('error_log.id_log'),
+        ];
+
+        $malfunctions = $malfunctionQuery
+            ->orderByDesc('error_log.waktu_terjadi')
+            ->limit(100)
+            ->get()
+            ->map(fn ($log): array => [
+                'id_log' => $log->id_log,
+                'id_charger' => $log->id_charger,
+                'id_session' => $log->id_session,
+                'kode_perangkat' => $log->kode_perangkat,
+                'merek_model' => $log->merek_model,
+                'nama_lokasi' => $log->nama_lokasi,
+                'alamat' => $log->alamat,
+                'jenis_error' => $log->jenis_error,
+                'deskripsi' => $log->desk_mslh,
+                'status_tanganan' => $log->status_tanganan,
+                'nama_pelapor' => $log->nama_pelapor ?? 'Sistem / Sensor',
+                'email_pelapor' => $log->email_pelapor,
+                'waktu_terjadi' => $log->waktu_terjadi ? Carbon::parse($log->waktu_terjadi)->format('Y-m-d H:i:s') : null,
+                'created_at' => $log->created_at ? Carbon::parse($log->created_at)->format('Y-m-d H:i:s') : null,
+                'updated_at' => $log->updated_at ? Carbon::parse($log->updated_at)->format('Y-m-d H:i:s') : null,
+            ]);
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'transactions' => $transactions,
                 'summary' => $summary,
+                'malfunctions' => $malfunctions,
             ],
         ]);
     }

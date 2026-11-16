@@ -33,6 +33,7 @@ import {
 } from './api/operations';
 import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
 import NotificationsBell from './NotificationsBell';
+import MalfunctionReportModal from './MalfunctionReportModal';
 
 const STATION_STATUS = ['Aktif', 'Nonaktif', 'Maintenance', 'Gangguan'];
 const CHARGER_STATUS = ['Active', 'Maintenance', 'Offline'];
@@ -261,6 +262,8 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
     const [reportData, setReportData] = useState(null);
     const [reportLoading, setReportLoading] = useState(false);
     const [reportError, setReportError] = useState('');
+    const [reportView, setReportView] = useState('transactions');
+    const [malfunctionDetail, setMalfunctionDetail] = useState(null);
 
     // State Konfigurasi Sistem (FR48)
     const [configData, setConfigData] = useState({
@@ -1435,7 +1438,11 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
             {/* TAB 2: LAPORAN & UTILISASI (FR39, FR40, FR41) */}
             {activeTab === 'reports' && (
                 <section className="ops-panel">
-                    <div className="ops-page-heading"><div><span className="ops-eyebrow">ANALISIS OPERASIONAL</span><h2>Laporan</h2><p>Bandingkan pendapatan, sesi, dan energi berdasarkan station dan periode.</p></div></div>
+                    <div className="ops-page-heading"><div><span className="ops-eyebrow">ANALISIS OPERASIONAL</span><h2>Laporan</h2><p>Tinjau transaksi, utilisasi, dan gangguan perangkat berdasarkan station dan periode.</p></div></div>
+                    <div className="ops-report-views" role="tablist" aria-label="Jenis laporan">
+                        <button type="button" role="tab" aria-selected={reportView === 'transactions'} className={reportView === 'transactions' ? 'active' : ''} onClick={() => setReportView('transactions')}>Transaksi &amp; Utilisasi</button>
+                        <button type="button" role="tab" aria-selected={reportView === 'malfunctions'} className={reportView === 'malfunctions' ? 'active' : ''} onClick={() => setReportView('malfunctions')}>Laporan Gangguan ({reportData?.summary?.malfunctions?.total ?? 0})</button>
+                    </div>
                     <form className="ops-report-filters" onSubmit={(e) => { e.preventDefault(); fetchReport(); }}>
                         <label>Dari tanggal<input type="date" value={reportFilters.from} max={reportFilters.to} onChange={(e) => setReportFilters((filters) => ({ ...filters, from: e.target.value }))} /></label>
                         <label>Sampai tanggal<input type="date" value={reportFilters.to} min={reportFilters.from} onChange={(e) => setReportFilters((filters) => ({ ...filters, to: e.target.value }))} /></label>
@@ -1444,7 +1451,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                         <button className="ops-button-primary" type="submit">Perbarui laporan</button>
                     </form>
                     {reportError && <div className="ops-inline-error" role="alert">{reportError}</div>}
-                    {reportLoading ? <div className="ops-empty-state">Memuat laporan…</div> : reportData && <>
+                    {reportLoading ? <div className="ops-empty-state">Memuat laporan…</div> : reportData && (reportView === 'transactions' ? <>
                         <div className="ops-report-grid">
                             <article><span>Pendapatan charging</span><strong>{rupiah(reportData.summary.pendapatan)}</strong></article>
                             <article><span>Sesi selesai</span><strong>{reportData.summary.sesi_selesai}</strong></article>
@@ -1456,7 +1463,19 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                                 {reportData.stations.length ? reportData.stations.map((station) => <tr key={station.id_location}><td><strong>{station.nama_lokasi}</strong></td><td><span className={`ops-status-pill ops-status-${String(station.status).toLowerCase()}`}>{station.status}</span></td><td>{station.jumlah_charger}</td><td>{station.port_tersedia}</td><td>{station.sesi_selesai}</td><td>{station.energi_kwh} kWh</td><td>{rupiah(station.pendapatan)}</td></tr>) : <tr><td colSpan="7" className="ops-table-empty">Tidak ada data pada filter ini.</td></tr>}
                             </tbody></table></div>
                         </div>
-                    </>}
+                    </> : <>
+                        <div className="ops-report-grid">
+                            <article><span>Total laporan</span><strong>{reportData.summary.malfunctions?.total ?? 0}</strong></article>
+                            <article><span>Menunggu</span><strong>{reportData.summary.malfunctions?.pending ?? 0}</strong></article>
+                            <article><span>Sedang ditangani</span><strong>{reportData.summary.malfunctions?.in_progress ?? 0}</strong></article>
+                            <article><span>Selesai</span><strong>{reportData.summary.malfunctions?.resolved ?? 0}</strong></article>
+                        </div>
+                        <div className="ops-report-table-section"><div className="ops-panel-head"><div><h3>Laporan gangguan perangkat</h3><p>Riwayat error log charger pada periode terpilih</p></div></div>
+                            <div className="ops-table-wrap"><table className="ops-table"><thead><tr><th>Waktu</th><th>Charger / Station</th><th>Jenis Gangguan</th><th>Pelapor</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+                                {reportData.malfunctions?.length ? reportData.malfunctions.map((log) => <tr key={log.id_log}><td>{formatDateTime(log.waktu_terjadi)}</td><td><strong>{log.kode_perangkat || '-'}</strong><small>{log.nama_lokasi || '-'}</small></td><td><strong>{log.jenis_error || 'Gangguan perangkat'}</strong><small>{log.deskripsi || 'Tidak ada deskripsi'}</small></td><td>{log.nama_pelapor || 'Sistem / Sensor'}</td><td><span className={`ops-status-pill ${log.status_tanganan === 'Selesai' ? 'ops-status-selesai' : log.status_tanganan === 'Sedang Ditangani' ? 'ops-status-ditangani' : 'ops-status-menunggu'}`}>{log.status_tanganan || 'Menunggu'}</span></td><td><button type="button" className="ops-button-secondary ops-compact-button" onClick={() => setMalfunctionDetail(log)}>Detail</button></td></tr>) : <tr><td colSpan="6" className="ops-table-empty">Tidak ada laporan gangguan pada filter ini.</td></tr>}
+                            </tbody></table></div>
+                        </div>
+                    </>)}
                 </section>
             )}
 
@@ -1887,6 +1906,8 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                     </form>
                 </div>
             )}
+
+            {malfunctionDetail && <MalfunctionReportModal log={malfunctionDetail} onClose={() => setMalfunctionDetail(null)} />}
         </div>
     );
 }

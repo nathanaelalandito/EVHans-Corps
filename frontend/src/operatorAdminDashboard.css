@@ -626,8 +626,15 @@
 .ops-technical-form .ops-form-actions { grid-column: 1 / -1; }
 .ops-port-edit-form { grid-column: 1 / -1; }
 
+.ops-report-views { width: fit-content; max-width: 100%; margin: 0 0 14px; padding: 4px; display: flex; flex-wrap: wrap; gap: 4px; border: 1px solid var(--ops-line); border-radius: 999px; background: var(--ev-bg,#f6f8f7); }
+.ops-report-views button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ops-muted); font: 650 12px var(--ops-font, 'Plus Jakarta Sans', sans-serif); cursor: pointer; }
+.ops-report-views button.active { background: #fff; color: var(--ops-primary); box-shadow: 0 1px 4px rgb(31 63 48 / 10%); }
 .ops-report-filters { margin: 0 0 18px; padding: 16px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)) auto; align-items: end; gap: 12px; border: 1px solid var(--ops-line); border-radius: 14px; background: var(--ev-surface,#fff); }
 .ops-report-grid { margin-top: 0; }
+.ops-table td small { display: block; margin-top: 3px; color: var(--ops-muted); font-size: 11px; line-height: 1.45; }
+.ops-status-selesai { background: #eaf7ef; color: #1f7a3f; }
+.ops-status-menunggu { background: #fff0ef; color: #a53d36; }
+.ops-status-ditangani { background: #fff5df; color: #8b6412; }
 .ops-report-table-section { margin-top: 22px; }
 .ops-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--ops-line); border-radius: 12px; }
 .ops-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 12px; text-align: left; }

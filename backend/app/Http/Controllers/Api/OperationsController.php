@@ -125,6 +125,64 @@ class OperationsController extends Controller
             ->orderBy('nama_lokasi')
             ->get();
 
+        $malfunctionQuery = DB::table('error_log')
+            ->join('charger', 'error_log.id_charger', '=', 'charger.id_charger')
+            ->leftJoin('location', 'charger.id_location', '=', 'location.id_location')
+            ->leftJoin('users', 'error_log.id_user', '=', 'users.id_user')
+            ->leftJoin('user_profile', 'users.id_user', '=', 'user_profile.id_user')
+            ->whereDate('error_log.waktu_terjadi', '>=', $filters['from'])
+            ->whereDate('error_log.waktu_terjadi', '<=', $filters['to'])
+            ->when(isset($filters['id_charger']), fn ($query) => $query->where('error_log.id_charger', $filters['id_charger']))
+            ->when(isset($filters['id_location']), fn ($query) => $query->where('charger.id_location', $filters['id_location']))
+            ->when($allowedLocationIds !== null, fn ($query) => $query->whereIn('charger.id_location', $allowedLocationIds))
+            ->select(
+                'error_log.id_log',
+                'error_log.id_charger',
+                'error_log.id_session',
+                'error_log.jenis_error',
+                'error_log.desk_mslh',
+                'error_log.status_tanganan',
+                'error_log.waktu_terjadi',
+                'error_log.created_at',
+                'error_log.updated_at',
+                'charger.kode_perangkat',
+                'charger.merek_model',
+                'location.nama_lokasi',
+                'location.alamat',
+                'users.email as email_pelapor',
+                'user_profile.nama_lengkap as nama_pelapor'
+            );
+
+        $malfunctionSummaryQuery = clone $malfunctionQuery;
+        $malfunctionSummary = [
+            'total' => (clone $malfunctionSummaryQuery)->count('error_log.id_log'),
+            'pending' => (clone $malfunctionSummaryQuery)->where('error_log.status_tanganan', 'Menunggu')->count('error_log.id_log'),
+            'in_progress' => (clone $malfunctionSummaryQuery)->where('error_log.status_tanganan', 'Sedang Ditangani')->count('error_log.id_log'),
+            'resolved' => (clone $malfunctionSummaryQuery)->where('error_log.status_tanganan', 'Selesai')->count('error_log.id_log'),
+        ];
+
+        $malfunctions = $malfunctionQuery
+            ->orderByDesc('error_log.waktu_terjadi')
+            ->limit(100)
+            ->get()
+            ->map(fn ($log): array => [
+                'id_log' => $log->id_log,
+                'id_charger' => $log->id_charger,
+                'id_session' => $log->id_session,
+                'kode_perangkat' => $log->kode_perangkat,
+                'merek_model' => $log->merek_model,
+                'nama_lokasi' => $log->nama_lokasi,
+                'alamat' => $log->alamat,
+                'jenis_error' => $log->jenis_error,
+                'deskripsi' => $log->desk_mslh,
+                'status_tanganan' => $log->status_tanganan,
+                'nama_pelapor' => $log->nama_pelapor ?? 'Sistem / Sensor',
+                'email_pelapor' => $log->email_pelapor,
+                'waktu_terjadi' => $log->waktu_terjadi ? Carbon::parse($log->waktu_terjadi)->format('Y-m-d H:i:s') : null,
+                'created_at' => $log->created_at ? Carbon::parse($log->created_at)->format('Y-m-d H:i:s') : null,
+                'updated_at' => $log->updated_at ? Carbon::parse($log->updated_at)->format('Y-m-d H:i:s') : null,
+            ]);
+
         return response()->json([
             'data' => [
                 'filters' => $filters,
@@ -133,7 +191,9 @@ class OperationsController extends Controller
                     'sesi_selesai' => (clone $sessionQuery)->where('status', 'Selesai')->count(),
                     'sesi_terhenti' => (clone $sessionQuery)->whereIn('status', ['Gagal', 'Dibatalkan'])->count(),
                     'energi_kwh' => round((float) (clone $sessionQuery)->where('status', 'Selesai')->sum('total_energi_kwh'), 2),
+                    'malfunctions' => $malfunctionSummary,
                 ],
+                'malfunctions' => $malfunctions,
                 'stations' => $stationQuery->map(function (Location $station) use ($filters, $allowedLocationIds): array {
                     $reportChargers = $station->chargers->when(
                         isset($filters['id_charger']),
