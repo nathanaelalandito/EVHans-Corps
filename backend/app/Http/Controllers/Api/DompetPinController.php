@@ -4,13 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\ChecksWalletPin;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Dompet;
-use App\Models\MetodePembayaran;
-use App\Models\Payment;
-use App\Models\Topup;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -71,9 +67,11 @@ class DompetPinController extends Controller
         $validator = Validator::make($request->all(), [
             'pin' => ['required', 'digits:6', 'confirmed'],
         ]);
-
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if ($weakPinError = $this->weakPinError($request, 'pin')) {
+            return $weakPinError;
         }
 
         $wallet = $this->getOrCreateWallet($request);
@@ -88,6 +86,7 @@ class DompetPinController extends Controller
         $wallet->percobaan_pin_gagal = 0;
         $wallet->locked_until = null;
         $wallet->save();
+        $this->auditPinAction($request, $wallet, 'buat_pin', false);
 
         return response()->json(['message' => 'PIN dompet berhasil dibuat.']);
     }
@@ -103,9 +102,11 @@ class DompetPinController extends Controller
             'pin_lama' => ['required', 'digits:6'],
             'pin_baru' => ['required', 'digits:6', 'confirmed', 'different:pin_lama'],
         ]);
-
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if ($weakPinError = $this->weakPinError($request, 'pin_baru')) {
+            return $weakPinError;
         }
 
         $wallet = $this->getOrCreateWallet($request);
@@ -124,13 +125,15 @@ class DompetPinController extends Controller
         }
 
         if (! Hash::check($request->pin_lama, $wallet->pin_transaksi)) {
-            return $this->handleFailedAttempt($wallet, 'PIN lama salah.');
+            return $this->handleFailedAttempt($wallet, 'Verifikasi PIN gagal.');
         }
 
+        $wasSet = $wallet->hasPin();
         $wallet->pin_transaksi = Hash::make($request->pin_baru);
         $wallet->percobaan_pin_gagal = 0;
         $wallet->locked_until = null;
         $wallet->save();
+        $this->auditPinAction($request, $wallet, 'ubah_pin', $wasSet);
 
         return response()->json(['message' => 'PIN dompet berhasil diubah.']);
     }
@@ -176,100 +179,6 @@ class DompetPinController extends Controller
     }
 
     /**
-     * POST /api/wallet/topup
-     * Prototype top up instant untuk driver.
-     */
-    /** Menambah saldo dompet melalui transaksi internal yang tervalidasi. */
-    public function topUp(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'nominal' => ['required', 'integer', 'min:10000', 'max:5000000'],
-            'metode_pembayaran' => ['required', 'in:Mandiri,OVO,BCA,BRI,BNI'],
-            'pin' => ['nullable', 'digits:6'],
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $this->getOrCreateWallet($request);
-
-        $result = DB::transaction(function () use ($request) {
-            $wallet = Dompet::where('id_user', $request->user()->id_user)->lockForUpdate()->firstOrFail();
-
-            if ($wallet->status_dompet !== 'Aktif') {
-                return response()->json(['message' => 'Dompet Digital sedang tidak aktif.'], 409);
-            }
-
-            if ($wallet->hasPin()) {
-                if (! $request->filled('pin')) {
-                    return response()->json(['message' => 'PIN Dompet diperlukan untuk top up.'], 422);
-                }
-
-                if ($wallet->isLocked()) {
-                    return response()->json([
-                        'message' => 'Dompet terkunci sementara.',
-                        'terkunci_sampai' => $wallet->locked_until,
-                    ], 423);
-                }
-
-                if (! Hash::check($request->pin, $wallet->pin_transaksi)) {
-                    return $this->handleFailedAttempt($wallet, 'PIN salah.');
-                }
-            }
-
-            $method = $this->paymentMethod((string) $request->metode_pembayaran);
-            $nominal = (int) $request->nominal;
-            $reference = 'TOPUP-'.now()->format('YmdHis').'-'.$wallet->id_wallet;
-
-            $payment = Payment::create([
-                'id_session' => null,
-                'id_metode' => $method->id_metode,
-                'jenis_pembayaran' => 'topup',
-                'total_bayar' => $nominal,
-                'status_pembayaran' => 'Sukses',
-                'waktu_pembayaran' => now(),
-                'referensi_gateway' => $reference,
-            ]);
-
-            Topup::create([
-                'id_wallet' => $wallet->id_wallet,
-                'id_payment' => $payment->id_payment,
-                'nominal' => $nominal,
-                'status_topup' => 'Sukses',
-                'waktu_topup' => now(),
-            ]);
-
-            $wallet->saldo += $nominal;
-            $wallet->percobaan_pin_gagal = 0;
-            $wallet->locked_until = null;
-            $wallet->save();
-
-            return [
-                'wallet' => $wallet,
-                'payment' => $payment->load('method'),
-            ];
-        });
-
-        if ($result instanceof JsonResponse) {
-            return $result;
-        }
-
-        $wallet = $result['wallet'];
-        $payment = $result['payment'];
-
-        return response()->json([
-            'message' => 'Top up Dompet Digital berhasil.',
-            'id_payment' => $payment->id_payment,
-            'referensi_gateway' => $payment->referensi_gateway,
-            'metode_pembayaran' => $payment->method->nama_metode,
-            'saldo' => $wallet->saldo,
-            'saldo_hold' => (int) $wallet->saldo_hold,
-            'saldo_tersedia' => $wallet->saldoTersedia(),
-        ]);
-    }
-
-    /**
      * POST /api/wallet/pin/reset
      * Reset PIN saat lupa menggunakan password akun.
      */
@@ -280,9 +189,11 @@ class DompetPinController extends Controller
             'password' => ['required', 'string'],
             'pin_baru' => ['required', 'digits:6', 'confirmed'],
         ]);
-
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+        if ($weakPinError = $this->weakPinError($request, 'pin_baru')) {
+            return $weakPinError;
         }
 
         $user = $request->user();
@@ -292,10 +203,17 @@ class DompetPinController extends Controller
         }
 
         $wallet = $this->getOrCreateWallet($request);
+        if ($wallet->hasPin() && Hash::check($request->pin_baru, $wallet->pin_transaksi)) {
+            return response()->json([
+                'errors' => ['pin_baru' => ['PIN baru tidak boleh sama dengan PIN lama.']],
+            ], 422);
+        }
+        $wasSet = $wallet->hasPin();
         $wallet->pin_transaksi = Hash::make($request->pin_baru);
         $wallet->percobaan_pin_gagal = 0;
         $wallet->locked_until = null;
         $wallet->save();
+        $this->auditPinAction($request, $wallet, 'reset_pin', $wasSet);
 
         return response()->json(['message' => 'PIN dompet berhasil direset.']);
     }
@@ -365,12 +283,51 @@ class DompetPinController extends Controller
         ], 422);
     }
 
-    /** Mengambil atau membuat metode pembayaran internal yang dinamai. */
-    protected function paymentMethod(string $name): MetodePembayaran
+    /** Menolak PIN berulang atau pola berurutan sebelum mengubah dompet. */
+    private function weakPinError(Request $request, string $field)
     {
-        return MetodePembayaran::firstOrCreate(
-            ['nama_metode' => $name],
-            ['biaya_layanan' => 0, 'status_metode' => 'Aktif']
-        );
+        $pin = $request->input($field);
+        if (is_string($pin) && $this->isWeakPin($pin)) {
+            return response()->json([
+                'errors' => [$field => ['PIN tidak boleh seluruhnya sama atau berupa urutan naik/turun.']],
+            ], 422);
+        }
+
+        return null;
     }
+
+    /** Memeriksa pola berulang dan urutan bersebelahan tanpa wrap-around. */
+    private function isWeakPin(string $pin): bool
+    {
+        if (strlen($pin) !== 6 || ! ctype_digit($pin)) {
+            return false;
+        }
+
+        $digits = array_map('intval', str_split($pin));
+        $allSame = count(array_unique($digits)) === 1;
+        $ascending = true;
+        $descending = true;
+        for ($index = 1; $index < count($digits); $index++) {
+            $ascending = $ascending && $digits[$index] === $digits[$index - 1] + 1;
+            $descending = $descending && $digits[$index] === $digits[$index - 1] - 1;
+        }
+
+        return $allSame || $ascending || $descending;
+    }
+
+    /** Mencatat aksi PIN tanpa menyimpan nilai PIN atau hash. */
+    private function auditPinAction(Request $request, Dompet $wallet, string $action, bool $wasSet): void
+    {
+        AuditLog::create([
+            'id_user' => (string) $request->user()->id_user,
+            'id_location' => null,
+            'aksi' => $action,
+            'entitas' => 'dompet',
+            'id_entitas' => (string) $wallet->id_wallet,
+            'data_sebelum' => ['pin_sudah_diset' => $wasSet],
+            'data_sesudah' => ['pin_sudah_diset' => true],
+            'alasan' => null,
+        ]);
+    }
+
 }

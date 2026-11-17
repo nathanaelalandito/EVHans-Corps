@@ -6,11 +6,16 @@ use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Demo account seeding is disabled in production.');
+        }
+
         $users = [
             [
                 'email' => 'bona@gmail.com',

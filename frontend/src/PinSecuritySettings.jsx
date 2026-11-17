@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { FiArrowLeft, FiLock, FiX } from "react-icons/fi";
+import { FiArrowLeft, FiEye, FiEyeOff, FiLock, FiX } from "react-icons/fi";
 import { changePin, createPin, resetPin } from "./api/wallet";
+import { isWeakPin } from "./utils/pin";
 
 /** Panjang PIN Dompet yang diterima backend (digits:6). */
 const PIN_LENGTH = 6;
@@ -32,6 +33,7 @@ function formatLockedUntil(value) {
 }
 
 const EMPTY_FORM = { pinLama: "", pinBaru: "", pinKonfirmasi: "", password: "" };
+const WEAK_PIN_MESSAGE = "Jangan gunakan enam digit yang sama atau urutan naik/turun, seperti 123456 atau 654321.";
 
 /**
  * Layar "PIN Keamanan" di panel Pengaturan Driver.
@@ -45,6 +47,8 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
   const [view, setView] = useState("status"); // status | create | change | reset
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [visibleFields, setVisibleFields] = useState({});
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,12 +59,16 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
   /** Membuat handler input PIN yang hanya menerima angka. */
   const handlePinField = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: normalizePin(e.target.value) }));
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    setError("");
   };
 
   /** Membuka salah satu formulir PIN dengan isian dan pesan yang bersih. */
   const openForm = (nextView) => {
     setForm(EMPTY_FORM);
     setError("");
+    setFieldErrors({});
+    setVisibleFields({});
     setNotice("");
     setView(nextView);
   };
@@ -69,6 +77,10 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
   const backToStatus = () => {
     setForm(EMPTY_FORM);
     setError("");
+    setFieldErrors({});
+    setVisibleFields({});
+    setFieldErrors({});
+    setVisibleFields({});
     setView("status");
   };
 
@@ -80,10 +92,24 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
       const result = await action();
       setNotice(result?.message || successFallback);
       setForm(EMPTY_FORM);
+      setFieldErrors({});
+      setVisibleFields({});
       setView("status");
       await onWalletChanged?.();
     } catch (err) {
-      setError(extractErrorMessage(err, failureFallback));
+      const apiErrors = err?.response?.data?.errors;
+      if (apiErrors) {
+        const fieldMap = { pin: "pinBaru", pin_lama: "pinLama", pin_baru: "pinBaru", pin_baru_confirmation: "pinKonfirmasi", password: "password" };
+        const mapped = {};
+        Object.entries(apiErrors).forEach(([key, messages]) => {
+          const field = fieldMap[key];
+          if (field) mapped[field] = Array.isArray(messages) ? messages[0] : String(messages);
+        });
+        setFieldErrors(mapped);
+        setError(Object.keys(mapped).length ? "" : extractErrorMessage(err, failureFallback));
+      } else {
+        setError(extractErrorMessage(err, failureFallback));
+      }
       // 423 = dompet baru saja terkunci; status di layar perlu ikut diperbarui.
       if (err?.response?.status === 423) onWalletChanged?.();
     } finally {
@@ -95,11 +121,15 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
   const handleCreate = (e) => {
     e.preventDefault();
     if (form.pinBaru.length !== PIN_LENGTH) {
-      setError(`PIN harus terdiri dari ${PIN_LENGTH} digit angka.`);
+      setFieldErrors({ pinBaru: `PIN harus terdiri dari ${PIN_LENGTH} digit angka.` });
+      return;
+    }
+    if (isWeakPin(form.pinBaru)) {
+      setFieldErrors({ pinBaru: WEAK_PIN_MESSAGE });
       return;
     }
     if (form.pinBaru !== form.pinKonfirmasi) {
-      setError("Konfirmasi PIN tidak sama dengan PIN baru.");
+      setFieldErrors({ pinKonfirmasi: "Konfirmasi PIN tidak sama dengan PIN baru." });
       return;
     }
     submitAction(
@@ -113,19 +143,23 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
   const handleChange = (e) => {
     e.preventDefault();
     if (form.pinLama.length !== PIN_LENGTH) {
-      setError(`PIN lama harus ${PIN_LENGTH} digit angka.`);
+      setFieldErrors({ pinLama: `PIN lama harus ${PIN_LENGTH} digit angka.` });
       return;
     }
     if (form.pinBaru.length !== PIN_LENGTH) {
-      setError(`PIN baru harus terdiri dari ${PIN_LENGTH} digit angka.`);
+      setFieldErrors({ pinBaru: `PIN baru harus terdiri dari ${PIN_LENGTH} digit angka.` });
       return;
     }
     if (form.pinBaru === form.pinLama) {
-      setError("PIN baru tidak boleh sama dengan PIN lama.");
+      setFieldErrors({ pinBaru: "PIN baru tidak boleh sama dengan PIN lama." });
+      return;
+    }
+    if (isWeakPin(form.pinBaru)) {
+      setFieldErrors({ pinBaru: WEAK_PIN_MESSAGE });
       return;
     }
     if (form.pinBaru !== form.pinKonfirmasi) {
-      setError("Konfirmasi PIN baru tidak sama.");
+      setFieldErrors({ pinKonfirmasi: "Konfirmasi PIN baru tidak sama." });
       return;
     }
     submitAction(
@@ -139,15 +173,19 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
   const handleReset = (e) => {
     e.preventDefault();
     if (!form.password) {
-      setError("Masukkan password akun Anda.");
+      setFieldErrors({ password: "Masukkan password akun Anda." });
       return;
     }
     if (form.pinBaru.length !== PIN_LENGTH) {
-      setError(`PIN baru harus terdiri dari ${PIN_LENGTH} digit angka.`);
+      setFieldErrors({ pinBaru: `PIN baru harus terdiri dari ${PIN_LENGTH} digit angka.` });
+      return;
+    }
+    if (isWeakPin(form.pinBaru)) {
+      setFieldErrors({ pinBaru: WEAK_PIN_MESSAGE });
       return;
     }
     if (form.pinBaru !== form.pinKonfirmasi) {
-      setError("Konfirmasi PIN baru tidak sama.");
+      setFieldErrors({ pinKonfirmasi: "Konfirmasi PIN baru tidak sama." });
       return;
     }
     submitAction(
@@ -159,23 +197,38 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
 
   /** Merender satu kolom PIN 6 digit bernomor dengan label yang terhubung. */
   const renderPinField = (id, label, field, options = {}) => (
-    <>
+    <div className="settings-pin-field">
       <label className="settings-pin-label" htmlFor={id}>
         {label}
       </label>
-      <input
-        id={id}
-        className="settings-pin-input"
-        type="password"
-        inputMode="numeric"
-        autoComplete="off"
-        maxLength={PIN_LENGTH}
-        value={form[field]}
-        onChange={handlePinField(field)}
-        autoFocus={options.autoFocus}
-        disabled={submitting}
-      />
-    </>
+      <div className="settings-pin-control">
+        <input
+          id={id}
+          name={field}
+          className="settings-pin-input"
+          type={visibleFields[field] ? "text" : "password"}
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={PIN_LENGTH}
+          value={form[field]}
+          onChange={handlePinField(field)}
+          autoFocus={options.autoFocus}
+          disabled={submitting}
+          aria-describedby={fieldErrors[field] ? `${id}-error` : undefined}
+        />
+        <button
+          type="button"
+          className="settings-pin-toggle"
+          aria-label={`${visibleFields[field] ? "Sembunyikan" : "Tampilkan"} ${label.toLowerCase()}`}
+          aria-pressed={Boolean(visibleFields[field])}
+          onClick={() => setVisibleFields((prev) => ({ ...prev, [field]: !prev[field] }))}
+          disabled={submitting}
+        >
+          {visibleFields[field] ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
+        </button>
+      </div>
+      {fieldErrors[field] && <small id={`${id}-error`} className="settings-pin-field-error" role="alert">{fieldErrors[field]}</small>}
+    </div>
   );
 
   /** Merender tombol Batal dan Simpan yang dipakai semua formulir PIN. */
@@ -301,7 +354,7 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
       {view === "create" && (
         <form className="settings-pin-form" onSubmit={handleCreate} noValidate>
           <p className="settings-pin-desc">
-            Gunakan {PIN_LENGTH} digit angka yang mudah Anda ingat namun sulit ditebak.
+            Gunakan {PIN_LENGTH} digit angka yang mudah Anda ingat namun sulit ditebak. {WEAK_PIN_MESSAGE}
           </p>
           {renderPinField("pin-baru", "PIN baru", "pinBaru", { autoFocus: true })}
           {renderPinField("pin-konfirmasi", "Ulangi PIN baru", "pinKonfirmasi")}
@@ -316,6 +369,7 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
 
       {view === "change" && (
         <form className="settings-pin-form" onSubmit={handleChange} noValidate>
+          <p className="settings-pin-desc">{WEAK_PIN_MESSAGE}</p>
           {renderPinField("pin-lama", "PIN lama", "pinLama", { autoFocus: true })}
           {renderPinField("pin-baru", "PIN baru", "pinBaru")}
           {renderPinField("pin-konfirmasi", "Ulangi PIN baru", "pinKonfirmasi")}
@@ -331,7 +385,7 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
       {view === "reset" && (
         <form className="settings-pin-form" onSubmit={handleReset} noValidate>
           <p className="settings-pin-desc">
-            Masukkan password akun untuk membuat PIN baru tanpa PIN lama.
+            Masukkan password akun untuk membuat PIN baru tanpa PIN lama. {WEAK_PIN_MESSAGE}
           </p>
           <label className="settings-pin-label" htmlFor="pin-reset-password">
             Password akun
@@ -339,13 +393,21 @@ export default function PinSecuritySettings({ wallet, onWalletChanged, onBack, o
           <input
             id="pin-reset-password"
             className="settings-pin-input settings-pin-input--text"
-            type="password"
+            type={visibleFields.password ? "text" : "password"}
             autoComplete="current-password"
             value={form.password}
-            onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+            onChange={(e) => {
+              setForm((prev) => ({ ...prev, password: e.target.value }));
+              setFieldErrors((prev) => ({ ...prev, password: undefined }));
+              setError("");
+            }}
             autoFocus
             disabled={submitting}
           />
+          <button type="button" className="settings-pin-toggle" aria-label={`${visibleFields.password ? "Sembunyikan" : "Tampilkan"} password akun`} aria-pressed={Boolean(visibleFields.password)} onClick={() => setVisibleFields((prev) => ({ ...prev, password: !prev.password }))} disabled={submitting}>
+            {visibleFields.password ? <FiEyeOff aria-hidden="true" /> : <FiEye aria-hidden="true" />}
+          </button>
+          {fieldErrors.password && <small className="settings-pin-field-error" role="alert">{fieldErrors.password}</small>}
           {renderPinField("pin-baru", "PIN baru", "pinBaru")}
           {renderPinField("pin-konfirmasi", "Ulangi PIN baru", "pinKonfirmasi")}
           {error && (

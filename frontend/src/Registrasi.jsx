@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './registrasi.css';
 import { register } from './api/auth';
-import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
+import { PHONE_MAX_DIGITS, PHONE_PATTERN, PHONE_VALIDATION_MESSAGE, normalizePhone } from './utils/phone';
 
 /** Form pembuatan akun pengemudi dan data kendaraan awal. */
 export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) {
@@ -88,7 +88,8 @@ export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) 
                             value={formData.email}
                             onChange={handleChange}
                             required
-                            placeholder="nama@email.com (atau @admin.ac.id / @ops.ac.id)"
+                            autoComplete="email"
+                            placeholder="nama@email.com"
                         />
                         {errors.email && <span className="error-text">{errors.email[0]}</span>}
                     </div>
@@ -98,6 +99,7 @@ export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) 
                         <input
                             type="password"
                             name="password"
+                            autoComplete="new-password"
                             value={formData.password}
                             onChange={handleChange}
                             required
@@ -117,10 +119,11 @@ export default function Registrasi({ onBackToWelcome, onRegistrationComplete }) 
                             onChange={(e) => setFormData({ ...formData, nomor_telepon: normalizePhone(e.target.value) })}
                             maxLength={PHONE_MAX_DIGITS}
                             pattern={PHONE_PATTERN}
-                            title={`Hanya angka, maksimal ${PHONE_MAX_DIGITS} digit`}
+                            title={PHONE_VALIDATION_MESSAGE}
                             required
                             placeholder="08123456789"
                         />
+                        <small>{PHONE_VALIDATION_MESSAGE}</small>
                         {errors.nomor_telepon && <span className="error-text">{errors.nomor_telepon[0]}</span>}
                     </div>
 

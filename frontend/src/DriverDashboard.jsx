@@ -5,14 +5,16 @@ import { API_BASE_URL } from "./api/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
+  FiAlertTriangle,
   FiArrowDown,
   FiArrowLeft,
   FiArrowRight,
   FiArrowUp,
   FiBattery,
-  FiBell,
   FiCalendar,
   FiChevronRight,
+  FiCheck,
+  FiCopy,
   FiCrosshair,
   FiEye,
   FiEyeOff,
@@ -52,6 +54,9 @@ import {
   ARRIVAL_RADIUS_M,
   konektorLabel,
   sameConnector,
+  stationAvailabilityLabel,
+  portStatusLabel,
+  chargerStatusLabel,
 } from "./api/station";
 import { getActiveSession, getChargingSettings } from "./api/charging";
 import {
@@ -63,7 +68,7 @@ import {
 } from "./api/chargingSessions";
 import { getPaymentDetail, getPaymentHistory } from "./api/payments";
 import { createInvoicePdf, invoicePdfName } from "./utils/invoicePdf";
-import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from "./utils/phone";
+import { PHONE_MAX_DIGITS, PHONE_PATTERN, PHONE_VALIDATION_MESSAGE, normalizePhone } from "./utils/phone";
 import StationDetail from "./StationDetail";
 import StartCharging from "./StartCharging";
 import PinSecuritySettings from "./PinSecuritySettings";
@@ -120,14 +125,14 @@ function getGreeting() {
 }
 
 /** Membentuk label ketersediaan station dari status dan jumlah port bebas. */
-function stationStatusLabel(status, tersedia) {
-  if (["Dalam Perawatan", "Maintenance"].includes(status))
-    return { text: "Perawatan", tone: "warn" };
-  if (["Nonaktif", "Tutup Sementara"].includes(status))
-    return { text: "Nonaktif", tone: "danger" };
-  if (status === "Penuh" || tersedia === 0)
-    return { text: "Penuh", tone: "danger" };
-  return { text: "Tersedia", tone: "ok" };
+function stationStatusLabel(station) {
+  const text = stationAvailabilityLabel(station);
+  const tone = station?.can_start
+    ? "ok"
+    : ["Dalam Perawatan", "Gangguan"].includes(text)
+      ? "warn"
+      : "danger";
+  return { text, tone };
 }
 
 /** Membuat ikon peta station dengan warna sesuai keadaan ketersediaannya. */
@@ -232,6 +237,41 @@ export default function DriverDashboard({
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [invoiceActionMessage, setInvoiceActionMessage] = useState("");
+  const [invoiceCopyStatus, setInvoiceCopyStatus] = useState("idle");
+  const invoiceCopyTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (invoiceCopyTimerRef.current) window.clearTimeout(invoiceCopyTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const resetTimer = window.setTimeout(() => setInvoiceCopyStatus("idle"), 0);
+    if (invoiceCopyTimerRef.current) {
+      window.clearTimeout(invoiceCopyTimerRef.current);
+      invoiceCopyTimerRef.current = null;
+    }
+    return () => window.clearTimeout(resetTimer);
+  }, [selectedInvoice]);
+
+  useEffect(() => {
+    if (!selectedInvoice && !invoiceLoading) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setSelectedInvoice(null);
+        setInvoiceLoading(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedInvoice, invoiceLoading]);
+
   const [connectorFilter, setConnectorFilter] = useState("Semua");
   const [stationKeyword, setStationKeyword] = useState("");
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
@@ -380,7 +420,7 @@ export default function DriverDashboard({
   const [sessionNotice, setSessionNotice] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [selectedStationId, setSelectedStationId] = useState(null);
-  const [showNotif, setShowNotif] = useState(!!DUMMY_ACTIVE_SESSION);
+  const [showSessionStatus, setShowSessionStatus] = useState(!!DUMMY_ACTIVE_SESSION);
   const [showSettings, setShowSettings] = useState(false);
 
   const [wallet, setWallet] = useState(null);
@@ -603,8 +643,8 @@ export default function DriverDashboard({
             driverPosition && locationStatus === "live"
               ? distanceKm(driverPosition, s)
               : null,
-          charger_tersedia: tersediaCount,
-          charger_total: allPorts.length,
+          port_tersedia: s.can_start ? tersediaCount : 0,
+          jumlah_port: allPorts.length,
           tipe_konektor_list: uniqueConnectors,
         };
       }),
@@ -668,7 +708,7 @@ export default function DriverDashboard({
       .then((session) => {
         if (cancelled || !session) return;
         setActiveSession(session);
-        setShowNotif(true);
+        setShowSessionStatus(true);
       })
       .catch((err) => {
         console.warn("Gagal memuat sesi aktif:", err);
@@ -770,7 +810,7 @@ export default function DriverDashboard({
       const matchesAvailability =
         availabilityFilter === "all" ||
         (availabilityFilter === "available"
-          ? station.status === "Aktif" && station.charger_tersedia > 0
+          ? station.can_start && station.port_tersedia > 0
           : station.status === "Penuh");
       const matchesPower =
         minimumPowerFilter === "all" ||
@@ -788,13 +828,14 @@ export default function DriverDashboard({
       );
     })
     .sort((first, second) =>
-      locationStatus === "live"
+      Number(Boolean(second.can_start)) - Number(Boolean(first.can_start)) ||
+      (locationStatus === "live"
         ? (first.jarak_km ?? Number.POSITIVE_INFINITY) -
           (second.jarak_km ?? Number.POSITIVE_INFINITY)
         : String(first.nama_lokasi ?? "").localeCompare(
             String(second.nama_lokasi ?? ""),
             "id-ID",
-          ),
+          )),
     );
   const activeStationFilterCount = [
     connectorFilter !== "Semua",
@@ -907,14 +948,19 @@ export default function DriverDashboard({
       if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng))
         return;
 
-      const badge = stationStatusLabel(s.status, s.charger_tersedia);
+      const badge = stationStatusLabel(s);
+      const popup = document.createElement("div");
+      const stationName = document.createElement("strong");
+      stationName.textContent = s.nama_lokasi ?? "Station";
+      const availability = document.createTextNode(
+        `${s.port_tersedia} dari ${s.jumlah_port} port tersedia · ${formatRupiah(s.tarif_per_kwh)}/kWh`,
+      );
+      popup.append(stationName, document.createElement("br"), availability);
       const marker = L.marker([Number(s.lat), Number(s.lng)], {
         icon: buildStationIcon(badge.tone),
       })
         .addTo(map)
-        .bindPopup(
-          `<strong>${s.nama_lokasi}</strong><br/>${s.charger_tersedia}/${s.charger_total} port &middot; ${formatRupiah(s.tarif_per_kwh)}/kWh`,
-        )
+        .bindPopup(popup)
         .on("click", () => {
           setSelectedStationId(s.id_location);
         });
@@ -968,7 +1014,7 @@ export default function DriverDashboard({
           setSessionSyncError("");
           if (!session) {
             setActiveSession(null);
-            setShowNotif(false);
+            setShowSessionStatus(false);
             reloadStations();
             fetchWallet();
             fetchTransactionHistory();
@@ -978,7 +1024,7 @@ export default function DriverDashboard({
             return;
           }
           setActiveSession(session);
-          setShowNotif(true);
+          setShowSessionStatus(true);
         })
         .catch(() =>
           setSessionSyncError(
@@ -1093,7 +1139,7 @@ export default function DriverDashboard({
   const afterSessionSettled = async (settledInvoice) => {
     setInvoice(settledInvoice);
     setActiveSession(null);
-    setShowNotif(false);
+    setShowSessionStatus(false);
     reloadStations();
     await Promise.all([fetchWallet(), fetchTransactionHistory()]);
   };
@@ -1155,7 +1201,7 @@ export default function DriverDashboard({
     setActiveSession(session);
     setSessionNotice("");
     setSessionSyncError("");
-    setShowNotif(true);
+    setShowSessionStatus(true);
     setInvoice(null);
     setView("home");
     reloadStations();
@@ -1207,6 +1253,41 @@ export default function DriverDashboard({
   /** Membuka dialog cetak browser untuk mencetak nota atau menyimpannya sebagai PDF. */
   const handlePrintInvoice = () => {
     if (selectedInvoice) window.print();
+  };
+
+  const handleCopyInvoiceId = async () => {
+    const invoiceId = selectedInvoice?.id_payment ?? selectedInvoice?.id_session;
+    if (invoiceId == null || invoiceId === "") return;
+    if (invoiceCopyTimerRef.current) {
+      window.clearTimeout(invoiceCopyTimerRef.current);
+      invoiceCopyTimerRef.current = null;
+    }
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(String(invoiceId));
+      } else if (typeof document.execCommand === "function") {
+        const textarea = document.createElement("textarea");
+        textarea.value = String(invoiceId);
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.top = "-9999px";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (!copied) throw new Error("copy failed");
+      } else {
+        throw new Error("clipboard unavailable");
+      }
+      setInvoiceCopyStatus("copied");
+    } catch {
+      setInvoiceCopyStatus("failed");
+    }
+    invoiceCopyTimerRef.current = window.setTimeout(() => {
+      setInvoiceCopyStatus("idle");
+      invoiceCopyTimerRef.current = null;
+    }, 2000);
   };
 
   /** Membagikan PDF invoice melalui fitur perangkat atau mengunduhnya sebagai fallback. */
@@ -1404,6 +1485,7 @@ export default function DriverDashboard({
   /** Rekomendasi beranda hanya mengikuti konektor kendaraan dan GPS, terpisah dari filter Maps. */
   const nearbyStations = activeVehicleConnector
     ? stations
+        .filter((station) => station.can_start)
         .filter((station) =>
           station.tipe_konektor_list?.some((type) =>
             sameConnector(type, activeVehicle.tipe_konektor),
@@ -1425,20 +1507,14 @@ export default function DriverDashboard({
         status:
           charger.status_mesin !== "Active"
             ? charger.status_mesin
-            : port.status_port === "available" ||
-                port.status_port === "tersedia"
-              ? "tersedia"
-              : port.status_port,
+            : port.status_port,
+        status_type: charger.status_mesin !== "Active" ? "charger" : "port",
       })),
     );
-  /** Mengubah status teknis charger menjadi keterangan untuk pengemudi. */
-  const chargerStatusLabel = (status) => {
-    const s = String(status ?? "").toLowerCase();
-    if (s === "tersedia" || s === "available")
-      return { text: "Tersedia", tone: "ok" };
-    if (s === "maintenance") return { text: "Maintenance", tone: "warn" };
-    return { text: capitalize(status || "Tidak tersedia"), tone: "danger" };
-  };
+  const technicalStatusLabel = (item) =>
+    item.status_type === "charger"
+      ? chargerStatusLabel(item.status)
+      : portStatusLabel(item.status);
 
   const firstName = user.nama.split(" ")[0];
 
@@ -1535,6 +1611,7 @@ export default function DriverDashboard({
                         {/* Urutan card kendaraan, saldo, lalu pencarian dipertahankan di semua breakpoint. */}
             <div className="home-balance-panel">
               <div>
+                <p className="home-wallet-title">Dompet Digital</p>
                 <div className="home-wallet-label-row">
                   <p className="home-wallet-label">Saldo Dompet</p>
                   <button
@@ -1640,6 +1717,7 @@ export default function DriverDashboard({
               <p className="mapdash-session-location">
                 <FiMapPin aria-hidden="true" /> {activeSession.nama_lokasi} ·{" "}
                 {activeSession.kode_charger}
+                {activeSession.nomor_port && <> · {activeSession.nomor_port} · {portStatusLabel(activeSession.status_port).text}</>}
                 {activeSession.soc_sekarang != null ? (
                   <>
                     <span> · </span>
@@ -2039,7 +2117,7 @@ export default function DriverDashboard({
 
             <div className="mapdash-station-scroll home-station-scroll">
               {nearbyStations.slice(0, 3).map((s) => {
-                const badge = stationStatusLabel(s.status, s.charger_tersedia);
+                const badge = stationStatusLabel(s);
                 return (
                   <button
                     key={s.id_location}
@@ -2061,7 +2139,7 @@ export default function DriverDashboard({
                       {(s.tipe_konektor_list ?? [])
                         .map(konektorLabel)
                         .join(" / ")}{" "}
-                      · {s.charger_tersedia}/{s.charger_total} port tersedia ·{" "}
+                      · {s.port_tersedia} dari {s.jumlah_port} port tersedia ·{" "}
                       {formatRupiah(s.tarif_per_kwh)}/kWh
                     </p>
                   </button>
@@ -2075,7 +2153,7 @@ export default function DriverDashboard({
               <div>
                 <h2 className="home-section-title">Riwayat Transaksi</h2>
                 <p className="home-section-caption">
-                  {filteredTransactionHistory.length} transaksi · 2 tabel, maksimal {TRANSACTIONS_PER_TABLE} per tabel
+                  {filteredTransactionHistory.length} transaksi ditemukan. Menampilkan maksimal {TRANSACTIONS_PER_TABLE} transaksi per kategori pada setiap halaman.
                 </p>
               </div>
               <div
@@ -2266,12 +2344,14 @@ export default function DriverDashboard({
         <div className="mapdash-topbar">
           <div className="mapdash-topbar-right">
             <button
+              type="button"
               className="mapdash-round-btn"
-              aria-label="Notifikasi"
-              onClick={() => setShowNotif((v) => !v)}
+              aria-label="Tampilkan status sesi aktif"
+              title="Status sesi charging"
+              disabled={!activeSession}
+              onClick={() => setShowSessionStatus((visible) => !visible)}
             >
-              <FiBell aria-hidden="true" />
-              {activeSession && <span className="mapdash-badge-dot" />}
+              <FiZap aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -2284,16 +2364,16 @@ export default function DriverDashboard({
           </div>
         </div>
 
-        {showNotif && activeSession && (
-          <div className="mapdash-notif">
+        {showSessionStatus && activeSession && (
+          <div className="mapdash-notif mapdash-session-status" role="status" aria-label="Status sesi charging">
             <span>
-              <FiZap aria-hidden="true" /> Sesi charging Anda di{" "}
+              <FiZap aria-hidden="true" /> <strong>Sesi aktif</strong> di{" "}
               <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.
             </span>
             <button
               className="mapdash-notif-close"
-              onClick={() => setShowNotif(false)}
-              aria-label="Tutup notifikasi"
+              onClick={() => setShowSessionStatus(false)}
+              aria-label="Tutup status sesi"
             >
               <FiX aria-hidden="true" />
             </button>
@@ -2480,6 +2560,7 @@ export default function DriverDashboard({
               <p className="mapdash-session-location">
                 <FiMapPin aria-hidden="true" /> {activeSession.nama_lokasi} ·{" "}
                 {activeSession.kode_charger}
+                {activeSession.nomor_port && <> · {activeSession.nomor_port} · {portStatusLabel(activeSession.status_port).text}</>}
                 {activeSession.soc_sekarang != null ? (
                   <>
                     <span> · </span>
@@ -2605,10 +2686,7 @@ export default function DriverDashboard({
 
               <div className="dash-station-list mapdash-station-list-full">
                   {filteredStations.map((s) => {
-                    const badge = stationStatusLabel(
-                      s.status,
-                      s.charger_tersedia,
-                    );
+                    const badge = stationStatusLabel(s);
                     return (
                       <div
                         key={s.id_location}
@@ -2640,7 +2718,7 @@ export default function DriverDashboard({
                             {badge.text}
                           </span>
                           <span className="dash-station-count">
-                            {s.charger_tersedia}/{s.charger_total} port
+                            {s.port_tersedia} dari {s.jumlah_port} port tersedia
                           </span>
                           <button
                             className="dash-btn-navigate"
@@ -2656,21 +2734,19 @@ export default function DriverDashboard({
                         {selectedStationId === s.id_location && (
                           <div className="charger-picker">
                             <div className="charger-picker-head">
-                              <span>Unit Charger</span>
+                              <span>Pilih port</span>
                               <small>
                                 {formatRupiah(s.tarif_per_kwh)}/kWh · parkir{" "}
                                 {formatRupiah(s.biaya_parkir)}
                               </small>
                             </div>
                             {stationPorts(s).map((charger) => {
-                              const chargerBadge = chargerStatusLabel(
-                                charger.status,
-                              );
+                              const chargerBadge = technicalStatusLabel(charger);
                               return (
                                 <button
                                   key={charger.id_port}
                                   className="charger-option"
-                                  disabled={chargerBadge.tone !== "ok"}
+                                  disabled={!s.can_start || chargerBadge.tone !== "ok"}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     openStartCharging(s, charger);
@@ -2722,15 +2798,18 @@ export default function DriverDashboard({
             className="charge-flow-panel invoice-detail-panel"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="settings-panel-header">
+            <div className="settings-panel-header invoice-modal-header">
               <span className="settings-panel-title">
                 {selectedInvoice?.jenis_pembayaran === "topup" ? "Nota Top Up" : "Nota Charging"}
               </span>
               <button
                 type="button"
-                className="mapdash-notif-close"
-                onClick={() => setSelectedInvoice(null)}
-                aria-label="Tutup invoice"
+                className="invoice-modal-close"
+                onClick={() => {
+                  setSelectedInvoice(null);
+                  setInvoiceLoading(false);
+                }}
+                aria-label="Tutup nota"
               >
                 <FiX aria-hidden="true" />
               </button>
@@ -2747,12 +2826,36 @@ export default function DriverDashboard({
                       <strong>EVCharge Hub</strong>
                       <span>Bukti transaksi digital</span>
                     </div>
-                    <span className="invoice-receipt-status">{selectedInvoice.status ?? "Diproses"}</span>
+                    <span className={`invoice-receipt-status dash-status-badge ${sessionStatusTone(selectedInvoice.status)}`}>{selectedInvoice.status ?? "Diproses"}</span>
                   </header>
 
                   <div className="invoice-receipt-number">
                     <span>Nomor invoice</span>
-                    <strong>INV-{String(selectedInvoice.id_payment ?? selectedInvoice.id_session ?? "").padStart(6, "0")}</strong>
+                    <div className="invoice-receipt-number-actions">
+                      <strong>INV-{String(selectedInvoice.id_payment ?? selectedInvoice.id_session ?? "").padStart(6, "0")}</strong>
+                      <button
+                        type="button"
+                        className={`invoice-copy-button${invoiceCopyStatus === "copied" ? " is-copied" : ""}${invoiceCopyStatus === "failed" ? " is-failed" : ""}`}
+                        aria-label="Salin ID transaksi"
+                        disabled={(selectedInvoice.id_payment ?? selectedInvoice.id_session) == null || (selectedInvoice.id_payment ?? selectedInvoice.id_session) === ""}
+                        onClick={handleCopyInvoiceId}
+                      >
+                        {invoiceCopyStatus === "copied" ? (
+                          <>
+                            <FiCheck aria-hidden="true" /> Tersalin
+                          </>
+                        ) : invoiceCopyStatus === "failed" ? (
+                          <>Gagal menyalin</>
+                        ) : (
+                          <>
+                            <FiCopy aria-hidden="true" /> Salin ID transaksi
+                          </>
+                        )}
+                        <span className="invoice-copy-live" aria-live="polite" aria-atomic="true">
+                          {invoiceCopyStatus === "copied" ? "Tersalin" : invoiceCopyStatus === "failed" ? "Gagal menyalin" : ""}
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   {selectedInvoice.jenis_pembayaran === "topup" ? (
@@ -2760,11 +2863,13 @@ export default function DriverDashboard({
                       <h3>Top Up Dompet Digital</h3>
                       <dl className="invoice-receipt-rows">
                         <div><dt>Waktu pembayaran</dt><dd>{selectedInvoice.waktu_pembayaran ? new Date(selectedInvoice.waktu_pembayaran).toLocaleString("id-ID") : "Tidak tersedia"}</dd></div>
+                        <div><dt>Nominal Top Up</dt><dd>{formatRupiah(selectedInvoice.nominal ?? 0)}</dd></div>
+                        <div><dt>Biaya layanan</dt><dd>{formatRupiah(selectedInvoice.biaya_layanan ?? 0)}</dd></div>
                         <div><dt>Metode pembayaran</dt><dd>{selectedInvoice.metode_pembayaran ?? "Tidak tersedia"}</dd></div>
                         <div><dt>Referensi</dt><dd>{selectedInvoice.referensi_gateway ?? "Tidak tersedia"}</dd></div>
                         <div><dt>Status pembayaran</dt><dd>{selectedInvoice.status_pembayaran ?? selectedInvoice.status ?? "Tidak tersedia"}</dd></div>
                       </dl>
-                      <div className="invoice-receipt-total"><span>Total Top Up</span><strong>{formatRupiah(selectedInvoice.biaya_aktual)}</strong></div>
+                      <div className="invoice-receipt-total"><span>Total dibayar</span><strong>{formatRupiah(selectedInvoice.total_dibayar ?? selectedInvoice.biaya_aktual)}</strong></div>
                     </div>
                   ) : (
                     <>
@@ -2789,9 +2894,11 @@ export default function DriverDashboard({
                           <div><dt>Biaya charging</dt><dd>{selectedInvoice.biaya_charging == null ? "Tidak tersedia" : formatRupiah(selectedInvoice.biaya_charging)}</dd></div>
                           <div><dt>Biaya parkir</dt><dd>{selectedInvoice.biaya_parkir == null ? "Tidak tersedia" : formatRupiah(selectedInvoice.biaya_parkir)}</dd></div>
                           <div><dt>Metode pembayaran</dt><dd>{selectedInvoice.metode_pembayaran ?? "Tidak tersedia"}</dd></div>
+                          <div><dt>Sumber pembayaran</dt><dd>{selectedInvoice.sumber_pembayaran ?? "Dompet Digital"}</dd></div>
                           <div><dt>Status pembayaran</dt><dd>{selectedInvoice.status_pembayaran ?? selectedInvoice.status ?? "Tidak tersedia"}</dd></div>
                           <div><dt>Dana hold</dt><dd>{selectedInvoice.jumlah_hold == null ? "Tidak tersedia" : formatRupiah(selectedInvoice.jumlah_hold)}</dd></div>
                           <div><dt>Saldo dikembalikan</dt><dd>{selectedInvoice.selisih_dikembalikan == null ? "Tidak tersedia" : formatRupiah(selectedInvoice.selisih_dikembalikan)}</dd></div>
+                          {selectedInvoice.pernah_dijeda && <div><dt>Jeda sesi</dt><dd>{selectedInvoice.keterangan_jeda}</dd></div>}
                         </dl>
                         <div className="invoice-receipt-total"><span>Total dibayar</span><strong>{formatRupiah(selectedInvoice.biaya_aktual)}</strong></div>
                       </div>
@@ -2997,9 +3104,10 @@ export default function DriverDashboard({
                   onChange={handleEditFieldChange("nomor_telepon")}
                   maxLength={PHONE_MAX_DIGITS}
                   pattern={PHONE_PATTERN}
-                  title={`Hanya angka, maksimal ${PHONE_MAX_DIGITS} digit`}
+                  title={PHONE_VALIDATION_MESSAGE}
                   autoComplete="tel"
                 />
+                <small>{PHONE_VALIDATION_MESSAGE}</small>
               </div>
 
               <div className="profile-field">
@@ -3112,6 +3220,7 @@ export default function DriverDashboard({
                       <FiChevronRight aria-hidden="true" />
                     </span>
                   </button>
+                  <p className="settings-menu-section-title">Keamanan</p>
                   <button
                     className="settings-menu-item"
                     onClick={openPinScreen}
@@ -3119,7 +3228,7 @@ export default function DriverDashboard({
                     <span className="settings-menu-icon">
                       <FiLock aria-hidden="true" />
                     </span>
-                    <span className="settings-menu-label">PIN Keamanan</span>
+                    <span className="settings-menu-label">{wallet?.pin_sudah_diset ? "Ubah PIN" : "Buat PIN"}</span>
                     {wallet && !wallet.pin_sudah_diset && (
                       <span className="settings-menu-badge">Belum dibuat</span>
                     )}

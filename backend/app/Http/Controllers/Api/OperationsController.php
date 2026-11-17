@@ -625,11 +625,11 @@ class OperationsController extends Controller
             'nama_lengkap' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'regex:/^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*@ops\.ac\.id$/i', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'regex:/^(?=.*[A-Za-z])(?=.*\d).+$/'],
-            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,15}$/'],
+            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{8,15}$/'],
             'id_locations' => ['sometimes', 'array'],
             'id_locations.*' => ['integer', 'distinct', 'exists:location,id_location'],
         ], [
-            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+            'nomor_telepon.regex' => 'Nomor telepon 8 sampai 15 digit angka.',
         ]);
 
         $operator = DB::transaction(function () use ($data, $request): User {
@@ -768,10 +768,10 @@ class OperationsController extends Controller
         $data = $request->validate([
             'nama_lengkap' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['sometimes', 'required', 'email', 'max:255', 'unique:users,email,'.$user->id_user.',id_user'],
-            'nomor_telepon' => ['sometimes', 'required', 'string', 'regex:/^[0-9]{1,15}$/'],
+            'nomor_telepon' => ['sometimes', 'required', 'string', 'regex:/^[0-9]{8,15}$/'],
             'alamat' => ['sometimes', 'nullable', 'string', 'max:255'],
         ], [
-            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+            'nomor_telepon.regex' => 'Nomor telepon 8 sampai 15 digit angka.',
         ]);
 
         $before = [

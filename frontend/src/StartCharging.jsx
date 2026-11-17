@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiBarChart2, FiCheck, FiZap } from 'react-icons/fi';
 import './startCharging.css';
-import { getStationDetail, konektorLabel, sameConnector } from './api/station';
+import { getStationDetail, konektorLabel, sameConnector, portStatusLabel, chargerStatusLabel } from './api/station';
 import { prepareCharging, estimateCharging, startCharging } from './api/charging';
 
 const TARGET_PERCENT_SHORTCUTS = [80, 100];
@@ -102,8 +102,8 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                 charger.ports.forEach((port) => {
                     // Cek kecocokan konektor (case-insensitive) dan status port 'Available' / 'Tersedia'
                     const matchConnector = connector ? sameConnector(port.tipe_konektor, connector) : true;
-                    const isAvailable = port.status_port === 'Available' || port.status_port === 'Tersedia';
-                    const machineOk = !charger.status_mesin || charger.status_mesin === 'Active';
+                    const isAvailable = portStatusLabel(port.status_port).text === 'Tersedia';
+                    const machineOk = !charger.status_mesin || chargerStatusLabel(charger.status_mesin).text === 'Tersedia';
                     
                     if (matchConnector && isAvailable && machineOk) {
                         availablePorts.push({
@@ -311,7 +311,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
                                                 <span className="sd-port-main">
                                                     <span className="sd-port-code">{p.kode_perangkat} — {p.nomor_port}</span>
                                                     <span className="sd-port-meta">
-                                                        {konektorLabel(p.tipe_konektor)} · {p.tipe_charging} · {p.daya_maks_kw} kW
+                                                        {konektorLabel(p.tipe_konektor)} · {p.tipe_charging} · {p.daya_maks_kw} kW · {portStatusLabel(p.status_port).text}
                                                     </span>
                                                 </span>
                                                 <span className="sc-radio" aria-hidden="true" />

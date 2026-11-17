@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Models\Topup;
-use App\Services\NotificationService;
+use App\Services\TopupExpiryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,7 +14,7 @@ use Illuminate\Validation\Rule;
 /**
  * Top up berdiri sendiri: memakai tabel topup, dompet, metode_pembayaran,
  * dan user_profile (hanya untuk membaca nomor telepon driver).
- * Tabel payment (khusus pembayaran charging) tidak disentuh.
+ * Checkout Top Up mencatat Payment untuk riwayat, sementara saldo bertambah sebesar nominal saja.
  */
 /** Mengelola instruksi pembayaran top up dan pembaruan saldo dompet. */
 class TopupController extends Controller
@@ -91,7 +92,7 @@ class TopupController extends Controller
 
         $topup = Topup::create([
             'id_wallet' => $dompet->id_wallet,
-            'id_payment' => null, // top up tidak memakai tabel payment
+            'id_payment' => null, // diisi saat pembayaran diselesaikan
             'id_metode' => $metode->id_metode,
             'referensi' => 'EVT'.now()->format('Ymd').'-'.strtoupper(Str::random(6)),
             'kode_pembayaran' => $kodePembayaran,
@@ -140,15 +141,42 @@ class TopupController extends Controller
         DB::transaction(function () use ($topupId) {
             $topup = Topup::lockForUpdate()->find($topupId);
 
-            if (! $topup || $topup->status_topup !== 'Pending') {
+            if (! $topup || ! $topup->id_metode) {
                 return;
             }
 
-            // waktu_topup diperbarui menjadi waktu pembayaran diterima
-            $topup->update(['status_topup' => 'Sukses', 'waktu_topup' => now()]);
+            $shouldCreditWallet = $topup->status_topup === 'Pending';
+            if (! $shouldCreditWallet && ! ($topup->status_topup === 'Sukses' && ! $topup->id_payment)) {
+                return;
+            }
 
-            DB::table('dompet')->where('id_wallet', $topup->id_wallet)
-                ->increment('saldo', $topup->nominal, ['updated_at' => now()]);
+            $payment = $topup->id_payment
+                ? Payment::whereKey($topup->id_payment)->lockForUpdate()->first()
+                : null;
+            if (! $payment) {
+                $payment = Payment::create([
+                    'id_session' => null,
+                    'id_metode' => $topup->id_metode,
+                    'jenis_pembayaran' => 'topup',
+                    'total_bayar' => (int) $topup->nominal + (int) $topup->biaya_layanan,
+                    'status_pembayaran' => 'Sukses',
+                    'waktu_pembayaran' => now(),
+                    'referensi_gateway' => $topup->referensi,
+                ]);
+            }
+
+            $topup->id_payment = $payment->id_payment;
+            if ($shouldCreditWallet) {
+                // Waktu top up menjadi waktu pembayaran diterima; fee tidak menjadi saldo.
+                $topup->status_topup = 'Sukses';
+                $topup->waktu_topup = now();
+            }
+            $topup->save();
+
+            if ($shouldCreditWallet) {
+                DB::table('dompet')->where('id_wallet', $topup->id_wallet)
+                    ->increment('saldo', $topup->nominal, ['updated_at' => now()]);
+            }
         });
     }
 
@@ -223,20 +251,11 @@ class TopupController extends Controller
     /** Menandai instruksi yang melewati batas waktu sebagai kedaluwarsa. */
     private function expireIfNeeded(Topup $topup): Topup
     {
-        if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada->isPast()) {
-            $topup->update(['status_topup' => 'Gagal']);
-            try {
-                app(NotificationService::class)->notifyTopupFailed(
-                    (string) DB::table('dompet')->where('id_wallet', $topup->id_wallet)->value('id_user'),
-                    $topup->fresh(),
-                    'kedaluwarsa'
-                );
-            } catch (\Throwable $e) {
-                \Log::warning('Gagal mengirim notifikasi top up: '.$e->getMessage());
-            }
+        if ($topup->status_topup === 'Pending' && $topup->kedaluwarsa_pada?->lte(now())) {
+            app(TopupExpiryService::class)->expireIfDue((int) $topup->id_topup);
         }
 
-        return $topup;
+        return $topup->fresh();
     }
 
     /** Bentuk respons tetap sama dengan yang dipakai frontend: pending | paid | expired. */

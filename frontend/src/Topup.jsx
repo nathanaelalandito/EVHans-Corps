@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTopup, getTopup, getTopupMethods, simulatePayTopup } from './api/Topup';
 import { verifyPin } from './api/wallet';
+import { shouldShowTopupPollRetry } from './utils/topupPolling';
 import './Topup.css';
 
 const PRESETS = [20000, 50000, 100000, 200000, 500000];
@@ -76,12 +77,15 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
   const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pollError, setPollError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showPinPrompt, setShowPinPrompt] = useState(false);
   const [pin, setPin] = useState('');
   const [pinVerified, setPinVerified] = useState(skipPinConfirmation);
   const [hideBalance] = useState(() => localStorage.getItem('ev_hide_saldo') === '1');
   const pollRef = useRef(null);
+  const pollRetryRef = useRef(null);
+  const pollFailuresRef = useRef(0);
 
   useEffect(() => {
     getTopupMethods()
@@ -96,19 +100,27 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
     if (step !== 'pay' || !topup) return undefined;
 
     const tick = setInterval(() => setNow(Date.now()), 1000);
-    pollRef.current = setInterval(async () => {
+    const poll = async () => {
       try {
         const latest = await getTopup(topup.reference);
+        pollFailuresRef.current = 0;
+        setPollError('');
         setTopup(latest);
         if (latest.status === 'paid') setStep('success');
       } catch {
-        /* abaikan error jaringan sesaat */
+        pollFailuresRef.current += 1;
+        if (shouldShowTopupPollRetry(pollFailuresRef.current)) {
+          setPollError('Koneksi bermasalah. Periksa jaringan lalu coba lagi.');
+        }
       }
-    }, 3000);
+    };
+    pollRetryRef.current = poll;
+    pollRef.current = setInterval(() => void poll(), 3000);
 
     return () => {
       clearInterval(tick);
       clearInterval(pollRef.current);
+      pollRetryRef.current = null;
     };
   }, [step, topup?.reference]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -130,6 +142,8 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
     setLoading(true);
     try {
       const data = await createTopup({ method, amount });
+      pollFailuresRef.current = 0;
+      setPollError('');
       setTopup(data);
       setNow(Date.now());
       setStep('pay');
@@ -175,12 +189,15 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
   /** Menjalankan pembayaran simulasi dan mengirim saldo baru ke pemanggil. */
   const handleSimulate = async () => {
     setError('');
+    setLoading(true);
     try {
       const data = await simulatePayTopup(topup.reference);
       setTopup(data);
       setStep('success');
     } catch (e) {
       setError(errMessage(e));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -297,6 +314,14 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
         </section>
 
         {error && <p className="tu-error" role="alert">{error}</p>}
+        {pollError && !expired && (
+          <div className="tu-error" role="alert">
+            <span>{pollError}</span>{' '}
+            <button type="button" onClick={() => pollRetryRef.current?.()}>
+              Coba lagi
+            </button>
+          </div>
+        )}
 
         {expired ? (
           <button className="tu-btn" onClick={restart}>Buat Kode Baru</button>
@@ -305,8 +330,8 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
         )}
 
         {import.meta.env.DEV && !expired && (
-          <button className="tu-btn" onClick={handleSimulate}>
-            Simulasi bayar
+          <button className="tu-btn" onClick={handleSimulate} disabled={loading}>
+            {loading ? 'Memproses pembayaran…' : 'Simulasi bayar'}
           </button>
         )}
       </div>

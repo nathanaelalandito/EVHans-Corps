@@ -1,44 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiNavigation, FiX } from 'react-icons/fi';
 import './stationDetail.css';
-import { getStationDetail, konektorLabel, sameConnector } from './api/station';
+import { getStationDetail, konektorLabel, sameConnector, stationAvailabilityLabel, portStatusLabel, chargerStatusLabel } from './api/station';
 import { googleMapsDirectionsUrl } from './api/routing';
-
-const PORT_STATUS = {
-    Available: { text: 'Tersedia', tone: 'ok' },
-    tersedia: { text: 'Tersedia', tone: 'ok' },
-    Charging: { text: 'Digunakan', tone: 'warn' },
-    'sedang digunakan': { text: 'Digunakan', tone: 'warn' },
-    Reserved: { text: 'Dipesan', tone: 'warn' },
-    'Out of Order': { text: 'Perawatan', tone: 'danger' },
-    Maintenance: { text: 'Perawatan', tone: 'warn' },
-    offline: { text: 'Offline', tone: 'danger' },
-};
-/** Mengubah status port menjadi label dan gaya indikator untuk detail station. */
-const portStatus = (s) => PORT_STATUS[s] ?? { text: s || 'Tidak diketahui', tone: 'danger' };
 
 /** Memformat angka biaya ke format rupiah. */
 const rupiah = (v) => (v == null ? '-' : 'Rp' + Number(v).toLocaleString('id-ID'));
-
-/** Mengubah teks jam HH:mm menjadi jumlah menit untuk perbandingan waktu. */
-const toMinutes = (hhmm) => {
-    const [h, m] = String(hhmm).split(':').map(Number);
-    return h * 60 + (m || 0);
-};
-
-/** Menentukan apakah station buka saat ini, termasuk jam lintas tengah malam. */
-function operasional(buka, tutup) {
-    if (!buka || !tutup) return { label: '-', open: null };
-    if (buka === '00:00' && (tutup === '23:59' || tutup === '00:00')) {
-        return { label: '24 jam', open: true };
-    }
-    const now = new Date();
-    const cur = now.getHours() * 60 + now.getMinutes();
-    const b = toMinutes(buka);
-    const t = toMinutes(tutup);
-    const open = t > b ? cur >= b && cur < t : cur >= b || cur < t;
-    return { label: `${buka} – ${tutup}`, open };
-}
 
 /** Panel detail station dengan tarif, jam buka, konektor, dan port tersedia. */
 export default function StationDetail({ station, activeVehicle, onClose, onShowRoute }) {
@@ -69,8 +36,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
     }, [onClose]);
 
     const vehicleConnector = activeVehicle?.tipe_konektor ?? null;
-    const ops = operasional(station.jam_buka, station.jam_tutup);
-    const stationOk = station.status === 'Aktif';
+    const stationOk = station.can_start;
     const placeholder = status === 'loading' ? '…' : '-';
 
     // Ekstrak semua port dari setiap unit charger di stasiun ini
@@ -97,21 +63,23 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
             /** Mengelompokkan port agar jumlah total dan tersedia dihitung per konektor. */
             const k = (acc[tipe] ??= { tipe, total: 0, tersedia: 0 });
             k.total += 1;
-            if (p.status_port === 'Available' || p.status_port === 'tersedia') k.tersedia += 1;
+            if (station.can_start && portStatusLabel(p.status_port).text === 'Tersedia') k.tersedia += 1;
             return acc;
         }, {})
     );
 
-    const compatibleFree = vehicleConnector
-        ? allPorts.filter(
-              (p) =>
-                  sameConnector(p.tipe_konektor, vehicleConnector) &&
-                  (p.status_port === 'Available' || p.status_port === 'tersedia')
-          ).length
+    const compatiblePorts = vehicleConnector
+        ? allPorts.filter((p) => sameConnector(p.tipe_konektor, vehicleConnector)).length
         : null;
+    const compatibleFree = vehicleConnector
+        ? allPorts.filter((p) => sameConnector(p.tipe_konektor, vehicleConnector)
+            && station.can_start && portStatusLabel(p.status_port).text === 'Tersedia').length
+        : null;
+    const vehicleName = [activeVehicle?.merek, activeVehicle?.model].filter(Boolean).join(' ') || 'kendaraan aktif';
+    const chargerGroups = detail?.chargers ?? [];
 
-    const badgeTone = !stationOk ? 'warn' : station.charger_tersedia === 0 ? 'danger' : 'ok';
-    const badgeText = !stationOk ? station.status : station.charger_tersedia === 0 ? 'Penuh' : 'Tersedia';
+    const badgeText = stationAvailabilityLabel(station);
+    const badgeTone = stationOk ? 'ok' : ['Dalam Perawatan', 'Gangguan'].includes(badgeText) ? 'warn' : 'danger';
 
     return (
         <div className="sd-backdrop" onClick={onClose}>
@@ -138,7 +106,7 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
                     <div className="sd-summary">
                         <div className="sd-summary-item">
                             <span className="sd-summary-value">
-                                {station.charger_tersedia}/{station.charger_total}
+                                {station.port_tersedia} dari {station.jumlah_port}
                             </span>
                             <span className="sd-summary-label">Port tersedia</span>
                         </div>
@@ -147,9 +115,9 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
                             <span className="sd-summary-label">Daya maks.</span>
                         </div>
                         <div className="sd-summary-item">
-                            <span className="sd-summary-value">{ops.label}</span>
+                            <span className="sd-summary-value">{station.jam_buka && station.jam_tutup ? `${station.jam_buka} – ${station.jam_tutup}` : '24 jam'}</span>
                             <span className="sd-summary-label">
-                                {ops.open === null ? 'Jam operasional' : ops.open ? 'Buka sekarang' : 'Tutup sekarang'}
+                                {station.is_open ? 'Buka sekarang' : station.buka_berikutnya ? `Tutup · buka pukul ${station.buka_berikutnya} WIB` : 'Tutup sekarang'}
                             </span>
                         </div>
                     </div>
@@ -185,41 +153,54 @@ export default function StationDetail({ station, activeVehicle, onClose, onShowR
 
                     {status === 'ok' && (
                         <>
-                            {compatibleFree !== null && (
-                                <p className={`sd-fit ${compatibleFree > 0 ? 'ok' : 'none'}`}>
-                                    {compatibleFree > 0
-                                        ? `${compatibleFree} port ${konektorLabel(vehicleConnector)} tersedia untuk kendaraan Anda`
-                                        : `Tidak ada port ${konektorLabel(vehicleConnector)} yang tersedia saat ini`}
+                            {compatiblePorts !== null && (
+                                <p className={`sd-fit ${compatiblePorts > 0 ? 'ok' : 'none'}`}>
+                                    {compatiblePorts > 0
+                                        ? `Cocok dengan ${vehicleName}`
+                                        : `Konektor tidak cocok dengan ${vehicleName}`}
+                                    {compatiblePorts > 0 && compatibleFree === 0 && ' · Tidak ada port yang tersedia saat ini'}
                                 </p>
                             )}
 
                             <div className="sd-chips">
                                 {perKonektor.map((k) => (
                                     <span key={k.tipe} className="sd-chip">
-                                        {konektorLabel(k.tipe)} · {k.tersedia}/{k.total} tersedia
+                                        {konektorLabel(k.tipe)} · {k.tersedia} dari {k.total} tersedia
                                     </span>
                                 ))}
                             </div>
 
-                            <ul className="sd-ports">
-                                {allPorts.map((p) => {
-                                    const st = portStatus(p.status_port);
-                                    const fits = vehicleConnector && sameConnector(p.tipe_konektor, vehicleConnector);
+                            <div className="sd-charger-groups">
+                                {chargerGroups.map((charger) => {
+                                    const chargerState = chargerStatusLabel(charger.status_mesin);
                                     return (
-                                        <li key={p.id_port} className={`sd-port ${fits ? 'fits' : ''}`}>
-                                            <div className="sd-port-main">
-                                                <span className="sd-port-code">{p.kode_perangkat} — {p.nomor_port}</span>
-                                                <span className="sd-port-meta">
-                                                    {konektorLabel(p.tipe_konektor)} · {p.tipe_charging} · {p.daya_maks_kw} kW
-                                                    {fits && <span className="sd-port-fit"> · Cocok</span>}
-                                                </span>
+                                        <section className="sd-charger-group" key={charger.id_charger}>
+                                            <div className="sd-charger-heading">
+                                                <strong>{charger.kode_perangkat || 'Charger'}</strong>
+                                                <span>{charger.kap_tot_kw ?? '—'} kW · {charger.jumlah_port ?? charger.ports?.length ?? 0} port</span>
+                                                <span className={`sd-badge ${chargerState.tone}`}>{chargerState.text}</span>
                                             </div>
-                                            <span className={`sd-badge ${st.tone}`}>{st.text}</span>
-                                        </li>
+                                            <ul className="sd-ports">
+                                                {(charger.ports ?? []).map((port) => {
+                                                    const portState = portStatusLabel(port.status_port);
+                                                    return (
+                                                        <li key={port.id_port} className="sd-port">
+                                                            <div className="sd-port-main">
+                                                                <span className="sd-port-code">{port.nomor_port || `Port ${port.id_port}`}</span>
+                                                                <span className="sd-port-meta">
+                                                                    {konektorLabel(port.tipe_konektor)} · {port.tipe_charging || 'Jenis arus belum tersedia'} · {port.daya_maks_kw ?? '—'} kW · {rupiah(port.tarif_per_kwh ?? station.tarif_per_kwh)}/kWh
+                                                                </span>
+                                                            </div>
+                                                            <span className={`sd-badge ${portState.tone}`}>{portState.text}</span>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </section>
                                     );
                                 })}
-                                {allPorts.length === 0 && <li className="sd-muted">Belum ada port charger terdaftar.</li>}
-                            </ul>
+                                {allPorts.length === 0 && <p className="sd-muted">Belum ada port charger terdaftar.</p>}
+                            </div>
                         </>
                     )}
                 </div>

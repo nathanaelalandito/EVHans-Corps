@@ -73,7 +73,7 @@ class ParkingSettlementScenarioTest extends TestCase
             'nomor_port' => 'Port 1',
             'tipe_konektor' => 'ccs2',
             'tipe_charging' => 'DC',
-            'daya_maks_kw' => 50,
+            'daya_maks_kw' => 1,
             'status_port' => 'Charging',
         ]);
         $tarif = Tarif::create([
@@ -90,7 +90,7 @@ class ParkingSettlementScenarioTest extends TestCase
             'id_port' => $port->id_port,
             'id_tarif' => $tarif->id_tarif,
             'id_vehicle' => $vehicle->id_vehicle,
-            'waktu_mulai' => now()->subMinutes(10),
+            'waktu_mulai' => now(),
             'total_energi_kwh' => 0,
             'target_energi_kwh' => $targetKwh,
             'estimasi_biaya_charging' => 25000,
@@ -119,9 +119,16 @@ class ParkingSettlementScenarioTest extends TestCase
         return [$user, $wallet, $session];
     }
 
+    private function setSimulatedEnergy(ChargingSession $session, int $kwh): void
+    {
+        $this->travelTo(now());
+        $session->update(['waktu_mulai' => now()->subSeconds($kwh * 60)]);
+    }
+
     public function test_normal_scenario(): void
     {
         [$user, $wallet, $session] = $this->setupSession();
+        $this->setSimulatedEnergy($session, 6);
         Sanctum::actingAs($user);
 
         $response = $this->postJson("/api/charging-sessions/{$session->id_session}/finish", [
@@ -135,11 +142,22 @@ class ParkingSettlementScenarioTest extends TestCase
         $this->assertSame(0, (int) $wallet->saldo_hold);
         $this->assertSame('Selesai', $session->status);
         $this->assertEquals(17000, (int) $response->json('data.biaya_aktual'));
+
+        $payment = Payment::where('id_session', $session->id_session)->firstOrFail();
+        $this->getJson('/api/payments/'.$payment->id_payment)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.sumber_pembayaran', 'Dompet Digital')
+            ->assertJsonPath('data.tarif_per_kwh', 2500)
+            ->assertJsonPath('data.biaya_energi', 15000)
+            ->assertJsonPath('data.biaya_parkir_flat', 2000)
+            ->assertJsonPath('data.total_dibayar', 17000);
     }
 
     public function test_failed_zero_energy_charges_parking(): void
     {
         [$user, $wallet, $session] = $this->setupSession();
+        $this->setSimulatedEnergy($session, 0);
         Sanctum::actingAs($user);
 
         $response = $this->postJson("/api/charging-sessions/{$session->id_session}/interrupt", [
@@ -153,11 +171,20 @@ class ParkingSettlementScenarioTest extends TestCase
         $this->assertSame(98000, (int) $wallet->saldo);
         $this->assertSame(0, (int) $wallet->saldo_hold);
         $this->assertEquals(2000, (int) $response->json('data.biaya_aktual'));
+
+        $payment = Payment::where('id_session', $session->id_session)->firstOrFail();
+        $this->getJson('/api/payments/'.$payment->id_payment)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Gagal')
+            ->assertJsonPath('data.energi_kwh', 0)
+            ->assertJsonPath('data.biaya_parkir_flat', 2000)
+            ->assertJsonPath('data.total_dibayar', 2000);
     }
 
     public function test_actual_greater_than_hold_is_capped(): void
     {
         [$user, $wallet, $session] = $this->setupSession();
+        $this->setSimulatedEnergy($session, 10);
         Sanctum::actingAs($user);
 
         $response = $this->postJson("/api/charging-sessions/{$session->id_session}/finish", [

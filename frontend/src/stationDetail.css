@@ -197,3 +197,8 @@
     justify-content: center;
     gap: 6px;
 }
+.sd-charger-groups { display: grid; gap: 12px; }
+.sd-charger-group { border: 1px solid var(--ev-border, #dfe3d2); border-radius: 12px; padding: 10px; }
+.sd-charger-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.sd-charger-heading > span:first-of-type { color: var(--ev-text-muted, #5c655b); font-size: .875rem; }
+.sd-charger-heading .sd-badge { margin-left: auto; }

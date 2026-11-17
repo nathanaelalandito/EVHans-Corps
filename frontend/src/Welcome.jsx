@@ -74,6 +74,7 @@ export default function Welcome({ onNavigateToRegister, onLoginSuccess, registra
                             id="welcome-email"
                             type="email"
                             name="email"
+                            autoComplete="email"
                             value={formData.email}
                             onChange={handleChange}
                             placeholder="nama@email.com"
@@ -92,6 +93,7 @@ export default function Welcome({ onNavigateToRegister, onLoginSuccess, registra
                                 id="welcome-password"
                                 type={showPassword ? 'text' : 'password'}
                                 name="password"
+                            autoComplete="current-password"
                                 value={formData.password}
                                 onChange={handleChange}
                                 placeholder="Masukkan password"

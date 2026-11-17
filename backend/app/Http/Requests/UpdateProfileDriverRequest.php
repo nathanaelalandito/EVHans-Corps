@@ -17,7 +17,7 @@ class UpdateProfileDriverRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+        'nomor_telepon.regex' => 'Nomor telepon 8 sampai 15 digit angka.',
         ];
     }
 
@@ -26,7 +26,7 @@ class UpdateProfileDriverRequest extends FormRequest
     {
         return [
             'nama_lengkap' => ['sometimes', 'string', 'max:255'],
-            'nomor_telepon' => ['sometimes', 'string', 'regex:/^[0-9]{1,15}$/'],
+            'nomor_telepon' => ['sometimes', 'string', 'regex:/^[0-9]{8,15}$/'],
             'alamat' => ['sometimes', 'nullable', 'string'],
             'tanggal_lahir' => ['sometimes', 'date'],
             'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$this->user()->id_user.',id_user'],

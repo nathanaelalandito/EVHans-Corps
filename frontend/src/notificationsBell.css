@@ -2,6 +2,33 @@
     position: relative;
     display: inline-flex;
     flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+}
+
+.notifbell-new-toast {
+    position: absolute;
+    z-index: 1300;
+    top: calc(100% + 10px);
+    right: 0;
+    width: max-content;
+    max-width: min(320px, 80vw);
+    padding: 10px 14px;
+    border: 1px solid var(--ev-border, #d8e1e8);
+    border-radius: 10px;
+    background: var(--ev-surface, #fff);
+    color: var(--ev-ink, #173044);
+    box-shadow: 0 8px 24px rgb(20 45 65 / 18%);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.notifbell-poll-error {
+    color: #8b4c12;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
 }
 
 .notifbell-trigger {

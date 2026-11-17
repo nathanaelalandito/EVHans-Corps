@@ -96,7 +96,7 @@ class PaymentController extends Controller
             'tanggal' => $payment->waktu_pembayaran?->timezone('Asia/Jakarta')->translatedFormat('d M Y, H:i'),
             'energi_kwh' => $session ? (float) $session->total_energi_kwh : null,
             'total' => $payment->total_bayar,
-            'status' => $this->paymentStatusLabel($payment->status_pembayaran),
+            'status' => $this->sessionStatusLabel($session?->status, $payment->status_pembayaran),
             'status_pembayaran' => $payment->status_pembayaran,
             'metode_pembayaran' => $payment->method?->nama_metode,
         ];
@@ -112,20 +112,25 @@ class PaymentController extends Controller
                 'nama_lokasi' => 'Top Up Dompet Digital',
                 'kode_station' => null,
                 'kode_charger' => '-',
+                'nominal' => (int) ($payment->topup?->nominal ?? 0),
+                'biaya_layanan' => (int) ($payment->topup?->biaya_layanan ?? 0),
+                'total_dibayar' => (int) $payment->total_bayar,
                 'metode_pembayaran' => $payment->method?->nama_metode,
                 'biaya_aktual' => $payment->total_bayar,
                 'jumlah_hold' => 0,
                 'selisih_dikembalikan' => 0,
                 'status' => $this->paymentStatusLabel($payment->status_pembayaran),
+                'status_topup' => $payment->topup?->status_topup,
                 'status_pembayaran' => $payment->status_pembayaran,
-                'referensi_gateway' => $payment->referensi_gateway,
+                'referensi_gateway' => $payment->topup?->referensi ?? $payment->referensi_gateway,
+                'waktu_topup' => $payment->topup?->waktu_topup?->toISOString(),
                 'waktu_pembayaran' => $payment->waktu_pembayaran?->toISOString(),
             ];
         }
 
         $session = $payment->session;
         $actualKwh = $session ? (float) $session->total_energi_kwh : 0;
-        $costBreakdown = $session && $actualKwh > 0
+        $costBreakdown = $session
             ? $session->tarif->costFor($actualKwh, (float) ($session->port?->daya_maks_kw ?? $session->charger?->kap_tot_kw ?? 1))
             : null;
 
@@ -150,13 +155,22 @@ class PaymentController extends Controller
             'tarif_per_kwh' => $session?->tarif?->harga_per_kwh ?? 0,
             'biaya_charging' => $costBreakdown['biaya_charging'] ?? 0,
             'biaya_parkir' => $costBreakdown['biaya_parkir'] ?? 0,
+            'biaya_energi' => $costBreakdown['biaya_charging'] ?? 0,
+            'biaya_parkir_flat' => $costBreakdown['biaya_parkir'] ?? 0,
             'biaya_aktual' => $payment->total_bayar,
+            'total_dibayar' => $payment->total_bayar,
             'saldo_hold' => $session?->saldo_hold ?? 0,
             'jumlah_hold' => $session?->saldo_hold ?? 0,
             'selisih_dikembalikan' => $session ? max(0, (int) $session->saldo_hold - (int) $payment->total_bayar) : 0,
             'metode_pembayaran' => $payment->method?->nama_metode,
-            'status' => $this->paymentStatusLabel($payment->status_pembayaran),
+            'sumber_pembayaran' => 'Dompet Digital',
+            'status' => $this->sessionStatusLabel($session?->status, $payment->status_pembayaran),
             'status_pembayaran' => $payment->status_pembayaran,
+            'total_jeda_detik' => (int) ($session?->total_jeda_detik ?? 0),
+            'pernah_dijeda' => (int) ($session?->total_jeda_detik ?? 0) > 0,
+            'keterangan_jeda' => (int) ($session?->total_jeda_detik ?? 0) > 0
+                ? 'Sesi pernah dijeda selama '.(int) $session->total_jeda_detik.' detik.'
+                : null,
             'referensi_gateway' => $payment->referensi_gateway,
             'waktu_mulai' => $session?->waktu_mulai?->toISOString(),
             'waktu_selesai' => $session?->waktu_selesai?->toISOString(),
@@ -172,6 +186,23 @@ class PaymentController extends Controller
             'sukses' => 'Sukses',
             'gagal' => 'Gagal',
             default => ucfirst($status),
+        };
+    }
+
+    /** Memakai status sesi agar charging gagal tetap tampil gagal pada riwayat. */
+    private function sessionStatusLabel(?string $sessionStatus, string $paymentStatus): string
+    {
+        if ($sessionStatus === null) {
+            return $this->paymentStatusLabel($paymentStatus);
+        }
+
+        return match (strtolower($sessionStatus)) {
+            'pending' => 'Estimasi',
+            'berlangsung' => 'Berjalan',
+            'selesai' => 'Selesai',
+            'dibatalkan' => 'Terhenti',
+            'gagal' => 'Gagal',
+            default => ucfirst($sessionStatus),
         };
     }
 }

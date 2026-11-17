@@ -19,7 +19,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -30,9 +30,8 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Kelola PIN dompet (semua butuh login via Sanctum)
-Route::middleware('auth:sanctum')->prefix('wallet')->group(function () {
+Route::middleware(['auth:sanctum', 'role:driver'])->prefix('wallet')->group(function () {
     Route::get('/', [DompetPinController::class, 'show']);
-    Route::post('/topup', [DompetPinController::class, 'topUp']);
     Route::post('/pin', [DompetPinController::class, 'setPin']);
     Route::put('/pin', [DompetPinController::class, 'changePin']);
     Route::post('/pin/verify', [DompetPinController::class, 'verifyPin']);
@@ -40,12 +39,12 @@ Route::middleware('auth:sanctum')->prefix('wallet')->group(function () {
     Route::delete('/pin', [DompetPinController::class, 'disablePin']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'role:driver'])->group(function () {
     Route::get('/driver/profile', [ProfileDriverController::class, 'show']);
     Route::put('/driver/profile', [ProfileDriverController::class, 'update']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'role:driver'])->group(function () {
     Route::get('/vehicles', [VehicleController::class, 'index']);
     Route::post('/vehicles', [VehicleController::class, 'store']);
     Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
@@ -95,7 +94,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::put('/operations/drivers/{driver}/status', [OperationsController::class, 'updateDriverStatus']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'role:driver'])->group(function () {
     Route::get('/charging-sessions/history', [ChargingSessionController::class, 'history']);
     Route::get('/charging-settings', [ChargingSessionController::class, 'settings']);
     Route::get('/charging-sessions/active', [ChargingSessionController::class, 'active']);
@@ -109,13 +108,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/charging-sessions/{session}/interrupt', [ChargingSessionController::class, 'interrupt']);
 Route::post('/charging-sessions/{session}/pause', [ChargingSessionController::class, 'pause']);
 Route::post('/charging-sessions/{session}/resume', [ChargingSessionController::class, 'resume']);
-    Route::post('/operator/sessions/{session}/stop', [ChargingSessionController::class, 'stopByOperator']);
-
     // Top up checkout (QR / Virtual Account)
     Route::get('/topup/methods', [TopupController::class, 'methods']);
     Route::post('/topup', [TopupController::class, 'store']);
     Route::get('/topup/{reference}', [TopupController::class, 'show']);
     Route::post('/topup/{reference}/simulate-pay', [TopupController::class, 'simulatePay']);
+});
+Route::middleware(['auth:sanctum', 'role:operator,admin'])->group(function () {
+    Route::post('/operator/sessions/{session}/stop', [ChargingSessionController::class, 'stopByOperator']);
 });
 Route::middleware(['auth:sanctum', 'role:operator,admin'])->group(function () {
     Route::get('/operator/stations', [OperatorController::class, 'getAssignedStations']);

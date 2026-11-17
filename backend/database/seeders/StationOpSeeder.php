@@ -24,6 +24,10 @@ class StationOpSeeder extends Seeder
     /** Menugaskan setiap operator ke satu stasiun lokasi kerjanya secara idempotent. */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Demo station assignment seeding is disabled in production.');
+        }
+
         $assigned = 0;
 
         foreach (self::STATION_OPERATOR_EMAILS as $stationCode => $operatorEmail) {

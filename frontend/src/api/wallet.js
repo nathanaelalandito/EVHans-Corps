@@ -9,16 +9,6 @@ export async function getWallet() {
     return data;
 }
 
-/** Menambahkan saldo melalui endpoint top up dompet dan metode yang dipilih. */
-export async function topUpWallet(nominal, metodePembayaran, pin = '') {
-    const { data } = await api.post('/wallet/topup', {
-        nominal,
-        metode_pembayaran: metodePembayaran,
-        pin,
-    });
-    return data;
-}
-
 /** Menetapkan PIN transaksi pertama beserta konfirmasi nilainya. */
 export async function createPin(pin, pinConfirmation) {
     const { data } = await api.post('/wallet/pin', {

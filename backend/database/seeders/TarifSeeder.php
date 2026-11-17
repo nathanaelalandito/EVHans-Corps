@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use RuntimeException;
 
 class TarifSeeder extends Seeder
 {
@@ -13,6 +14,10 @@ class TarifSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Demo tariff seeding is disabled in production.');
+        }
+
             DB::table('tarif')->insert([
                 'id_location'        => 2,
                 'harga_per_kwh'      => 2466,        // Tarif resmi curah SPKLU PLN (Rp/kWh)

@@ -21,11 +21,11 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => 'required|string|min:8|regex:/^(?=.*[A-Za-z])(?=.*\d).+$/',
-            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,15}$/'],
+            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{8,15}$/'],
             'alamat' => 'required|string|max:255',
             'tanggal_lahir' => 'required|date',
         ], [
-            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+            'nomor_telepon.regex' => 'Nomor telepon 8 sampai 15 digit angka.',
         ]);
 
         if ($validator->fails()) {
@@ -88,10 +88,10 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            logger()->error('Registrasi driver gagal.', ['exception' => $e]);
 
             return response()->json([
                 'message' => 'Terjadi kesalahan pada server.',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }

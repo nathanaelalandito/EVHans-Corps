@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
+import { AUTH_EXPIRED_EVENT } from './api/client';
 
 const Welcome = lazy(() => import('./Welcome'));
 const Registrasi = lazy(() => import('./Registrasi'));
@@ -39,9 +40,22 @@ export default function App() {
         }
     });
 
+    useEffect(() => {
+        const handleAuthExpired = () => {
+            setUser(null);
+            setCurrentPage('welcome');
+            setSelectedCharger(null);
+            setResumeChargingContext(null);
+        };
+        window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+        return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    }, []);
+
     /** Menyimpan akun hasil login dan mengarahkan pengguna ke dashboard perannya. */
     const handleLoginSuccess = (userData) => {
         setUser(userData);
+        setSelectedCharger(null);
+        setResumeChargingContext(null);
     
         const email = userData.email || '';
         const peran = userData.peran || '';
@@ -73,6 +87,8 @@ export default function App() {
         await logout().catch(() => {});
         setUser(null);
         setCurrentPage('welcome');
+        setSelectedCharger(null);
+        setResumeChargingContext(null);
     };
 
     return (

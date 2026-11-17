@@ -31,7 +31,7 @@ import {
     updatePaymentMethod,
     updatePaymentMethodStatus
 } from './api/operations';
-import { PHONE_MAX_DIGITS, PHONE_PATTERN, normalizePhone } from './utils/phone';
+import { PHONE_MAX_DIGITS, PHONE_PATTERN, PHONE_VALIDATION_MESSAGE, normalizePhone } from './utils/phone';
 import NotificationsBell from './NotificationsBell';
 import MalfunctionReportModal from './MalfunctionReportModal';
 
@@ -1184,7 +1184,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                                             <label>Nama lengkap<input required value={stationCreationNewOperator.nama_lengkap} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, nama_lengkap: event.target.value }))} /></label>
                                             <label>Nama email Operator<div className="ops-email-field"><input required type="text" name="operator-local-part-station" autoComplete="new-password" autoCapitalize="none" spellCheck={false} pattern="[A-Za-z0-9]+([._-][A-Za-z0-9]+)*" title="Gunakan huruf/angka; titik, garis bawah, dan tanda hubung hanya di antara teks." placeholder="nama.operator" value={stationCreationNewOperator.email} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, email: event.target.value }))} /><span>@ops.ac.id</span></div></label>
                                             <label>Password awal<input required type="password" minLength="6" value={stationCreationNewOperator.password} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, password: event.target.value }))} /></label>
-                                            <label>Nomor telepon (maks. 15 digit)<input required type="tel" inputMode="numeric" pattern={PHONE_PATTERN} maxLength={PHONE_MAX_DIGITS} placeholder="08xxxxxxxxxx" value={stationCreationNewOperator.nomor_telepon} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, nomor_telepon: normalizeOperatorPhone(event.target.value) }))} /></label>
+                                            <label>Nomor telepon<input required type="tel" inputMode="numeric" pattern={PHONE_PATTERN} maxLength={PHONE_MAX_DIGITS} title={PHONE_VALIDATION_MESSAGE} placeholder="08xxxxxxxxxx" value={stationCreationNewOperator.nomor_telepon} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, nomor_telepon: normalizeOperatorPhone(event.target.value) }))} /></label><small>{PHONE_VALIDATION_MESSAGE}</small>
                                         </div>
                                     </div>}
                                 </section>}
@@ -1493,7 +1493,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                             <label>Nama lengkap<input placeholder="Nama Operator" value={operatorForm.nama_lengkap} onChange={(e) => setOperatorForm((p) => ({ ...p, nama_lengkap: e.target.value }))} required /></label>
                             <label>Nama email Operator<div className="ops-email-field"><input required type="text" name="operator-local-part-admin" autoComplete="new-password" autoCapitalize="none" spellCheck={false} pattern="[A-Za-z0-9]+([._-][A-Za-z0-9]+)*" title="Gunakan huruf/angka; titik, garis bawah, dan tanda hubung hanya di antara teks." placeholder="nama.operator" value={operatorForm.email} onChange={(e) => setOperatorForm((p) => ({ ...p, email: e.target.value }))} /><span>@ops.ac.id</span></div></label>
                             <label>Password awal<input placeholder="Minimal 6 karakter" type="password" value={operatorForm.password} onChange={(e) => setOperatorForm((p) => ({ ...p, password: e.target.value }))} required /></label>
-                            <label>Nomor telepon (maks. 15 digit)<input type="tel" inputMode="numeric" pattern={PHONE_PATTERN} maxLength={PHONE_MAX_DIGITS} placeholder="08xxxxxxxxxx" value={operatorForm.nomor_telepon} onChange={(e) => setOperatorForm((p) => ({ ...p, nomor_telepon: normalizeOperatorPhone(e.target.value) }))} required /></label>
+                            <label>Nomor telepon<input type="tel" inputMode="numeric" pattern={PHONE_PATTERN} maxLength={PHONE_MAX_DIGITS} title={PHONE_VALIDATION_MESSAGE} placeholder="08xxxxxxxxxx" value={operatorForm.nomor_telepon} onChange={(e) => setOperatorForm((p) => ({ ...p, nomor_telepon: normalizeOperatorPhone(e.target.value) }))} required /></label><small>{PHONE_VALIDATION_MESSAGE}</small>
                         </div>
                         <button type="submit" className="ops-button-primary" disabled={operatorSubmitting}>{operatorSubmitting ? 'Membuat akun...' : 'Buat akun Operator'}</button>
                     </form>

@@ -2,6 +2,7 @@ import axios from 'axios';
 
 // Ganti sesuai alamat backend Laravel kamu kalau berbeda.
 export const API_BASE_URL = 'http://127.0.0.1:8000/api';
+export const AUTH_EXPIRED_EVENT = 'evchargehub:auth-expired';
 
 /** Instance HTTP bersama untuk API Laravel, termasuk format respons JSON. */
 const api = axios.create({
@@ -34,6 +35,7 @@ api.interceptors.response.use(
         if (error.response && error.response.status === 401) {
             localStorage.removeItem('ev_token');
             localStorage.removeItem('ev_user');
+            window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
         }
         return Promise.reject(error);
     }

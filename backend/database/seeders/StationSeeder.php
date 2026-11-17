@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class StationSeeder extends Seeder
 {
@@ -24,6 +25,10 @@ class StationSeeder extends Seeder
     /** Mengisi station, tarif, unit charger, dan port demo secara idempotent. */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Demo station seeding is disabled in production.');
+        }
+
         $now = now();
         $stations = [
             [

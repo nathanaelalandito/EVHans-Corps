@@ -17,6 +17,7 @@ use App\Models\Tarif;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\NotificationService;
+use App\Support\StationOperatingHours;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -342,7 +343,6 @@ class ChargingSessionController extends Controller
     public function finish(Request $request, ChargingSession $session): JsonResponse
     {
         $data = $request->validate([
-            'energi_kwh' => ['nullable', 'numeric', 'min:0.1', 'max:'.self::MAX_TARGET_KWH],
             'soc_akhir' => ['nullable', 'integer', 'min:0', 'max:100'],
         ]);
 
@@ -404,9 +404,9 @@ class ChargingSessionController extends Controller
     /** Sesi dihentikan karena dibatalkan / gangguan (laporan driver). */
     public function interrupt(Request $request, ChargingSession $session): JsonResponse
     {
+        $reporterId = (string) $request->user()->id_user;
         $data = $request->validate([
             'status' => ['required', 'in:dibatalkan,gagal,Dibatalkan,Gagal'],
-            'energi_kwh' => ['nullable', 'numeric', 'min:0', 'max:'.self::MAX_TARGET_KWH],
             'soc_akhir' => ['nullable', 'integer', 'min:0', 'max:100'],
             'alasan' => ['nullable', 'string', 'max:160'],
         ]);
@@ -428,7 +428,12 @@ class ChargingSessionController extends Controller
 
         if ($finalStatus === 'Gagal' && $settled->charger) {
             try {
-                app(NotificationService::class)->notifyChargerIssue($settled->charger, 'Out of Order', $data['alasan'] ?? null);
+                app(NotificationService::class)->notifyChargerIssue(
+                    $settled->charger,
+                    'Out of Order',
+                    $data['alasan'] ?? null,
+                    [$reporterId],
+                );
             } catch (\Throwable $e) {
                 logger()->warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
             }
@@ -586,9 +591,7 @@ class ChargingSessionController extends Controller
             $port = $session->id_port ? Port::whereKey($session->id_port)->lockForUpdate()->first() : null;
 
             $simulation = $this->simulate($session);
-            $actualKwh = isset($data['energi_kwh'])
-                ? round((float) $data['energi_kwh'], 2)
-                : $simulation['energi_kwh'];
+            $actualKwh = $simulation['energi_kwh'];
             $finalSoc = $data['soc_akhir'] ?? $simulation['soc_sekarang'];
 
             $hold = (int) $session->saldo_hold;
@@ -912,19 +915,31 @@ class ChargingSessionController extends Controller
     /** Menyelesaikan jeda yang sudah lewat batas (apply-on-read). */
     private function resolvePause(ChargingSession $session): void
     {
-        if (! $session->dijeda_pada) {
-            return;
-        }
+        DB::transaction(function () use ($session): void {
+            $locked = ChargingSession::whereKey($session->getKey())
+                ->lockForUpdate()
+                ->first();
 
-        $max = (int) config('charging.pause_max_seconds', 300);
-        $elapsed = now()->getTimestamp() - $session->dijeda_pada->getTimestamp();
+            if (! $locked?->dijeda_pada) {
+                return;
+            }
 
-        if ($elapsed >= $max) {
-            $session->total_jeda_detik = (int) $session->total_jeda_detik + $max;
+            $max = (int) config('charging.pause_max_seconds', 300);
+            $elapsed = now()->getTimestamp() - $locked->dijeda_pada->getTimestamp();
+
+            if ($elapsed < $max) {
+                return;
+            }
+
+            $locked->total_jeda_detik = (int) $locked->total_jeda_detik + $max;
+            $locked->dijeda_pada = null;
+            $locked->jeda_berakhir_pada = null;
+            $locked->save();
+
+            $session->total_jeda_detik = $locked->total_jeda_detik;
             $session->dijeda_pada = null;
             $session->jeda_berakhir_pada = null;
-            $session->save();
-        }
+        });
     }
 
     // ------------------------------------------------------------------
@@ -992,6 +1007,7 @@ class ChargingSessionController extends Controller
             'kode_charger' => $session->charger->kode_perangkat,
             'id_port' => $session->id_port,
             'nomor_port' => $session->port?->nomor_port,
+            'status_port' => $session->port?->status_port,
             'daya_kw' => $power,
             'status' => $session->dijeda_pada ? 'Dijeda' : 'Charging',
             'dijeda' => (bool) $session->dijeda_pada,
@@ -1054,6 +1070,10 @@ class ChargingSessionController extends Controller
             'biaya_charging' => $actualKwh > 0 ? $cost['biaya_charging'] : 0,
             'biaya_parkir' => $actualKwh > 0 ? $cost['biaya_parkir'] : (int) $session->tarif->biaya_parkir_flat,
             'biaya_aktual' => $actualCost,
+            'total_dibayar' => $actualCost,
+            'biaya_energi' => $actualKwh > 0 ? $cost['biaya_charging'] : 0,
+            'biaya_parkir_flat' => $actualKwh > 0 ? $cost['biaya_parkir'] : (int) $session->tarif->biaya_parkir_flat,
+            'sumber_pembayaran' => 'Dompet Digital',
             'saldo_hold' => $hold,
             'jumlah_hold' => $hold,
             'selisih_dikembalikan' => max(0, $hold - $actualCost),
@@ -1062,6 +1082,11 @@ class ChargingSessionController extends Controller
             'status_pembayaran' => $session->payment?->status_pembayaran,
             'referensi_gateway' => $session->payment?->referensi_gateway,
             'status' => $this->sessionStatusLabel($session->status),
+            'total_jeda_detik' => (int) ($session->total_jeda_detik ?? 0),
+            'pernah_dijeda' => (int) ($session->total_jeda_detik ?? 0) > 0,
+            'keterangan_jeda' => (int) ($session->total_jeda_detik ?? 0) > 0
+                ? 'Sesi pernah dijeda selama '.(int) $session->total_jeda_detik.' detik.'
+                : null,
             'waktu_mulai' => $session->waktu_mulai?->toISOString(),
             'waktu_selesai' => $session->waktu_selesai?->toISOString(),
         ];
@@ -1091,7 +1116,7 @@ class ChargingSessionController extends Controller
             'pending' => 'Estimasi',
             'berlangsung' => 'Berjalan',
             'selesai' => 'Selesai',
-            'dibatalkan' => 'Dibatalkan',
+            'dibatalkan' => 'Terhenti',
             'gagal' => 'Gagal',
             default => ucfirst($status),
         };
@@ -1132,21 +1157,6 @@ class ChargingSessionController extends Controller
     /** 00:00–23:59 = 24 jam; jam tutup <= jam buka berarti lewat tengah malam. */
     private function isOpenNow(?string $openTime, ?string $closeTime): bool
     {
-        if (! $openTime || ! $closeTime) {
-            return true;
-        }
-
-        $openTime = substr($openTime, 0, 5);
-        $closeTime = substr($closeTime, 0, 5);
-
-        if ($openTime === '00:00' && in_array($closeTime, ['23:59', '00:00'], true)) {
-            return true;
-        }
-
-        $now = now('Asia/Jakarta')->format('H:i');
-
-        return $closeTime > $openTime
-            ? ($now >= $openTime && $now < $closeTime)
-            : ($now >= $openTime || $now < $closeTime);
+        return StationOperatingHours::isOpen($openTime, $closeTime);
     }
 }

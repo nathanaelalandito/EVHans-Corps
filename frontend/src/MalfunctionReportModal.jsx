@@ -22,8 +22,10 @@ function statusClass(status) {
 }
 
 /** Modal rincian satu laporan gangguan dengan aksi cetak dan bagikan PDF. */
-export default function MalfunctionReportModal({ log, onClose }) {
+export default function MalfunctionReportModal({ log, onClose, onSetHandling }) {
     const [message, setMessage] = useState('');
+    const [reason, setReason] = useState('');
+    const [savingStatus, setSavingStatus] = useState(false);
 
     if (!log) return null;
 
@@ -33,6 +35,23 @@ export default function MalfunctionReportModal({ log, onClose }) {
     const handlePrint = () => {
         setMessage('');
         window.print();
+    };
+
+    const updateHandling = async (nextStatus) => {
+        if (!onSetHandling) return;
+        if (reason.trim().length < 5) {
+            setMessage('Alasan tindak lanjut minimal 5 karakter.');
+            return;
+        }
+        setSavingStatus(true);
+        setMessage('');
+        try {
+            await onSetHandling(nextStatus, reason.trim());
+        } catch (error) {
+            setMessage(error?.message || 'Status laporan tidak dapat diperbarui.');
+        } finally {
+            setSavingStatus(false);
+        }
     };
 
     const handleShare = async () => {
@@ -108,6 +127,19 @@ export default function MalfunctionReportModal({ log, onClose }) {
                         <p>{log.deskripsi || 'Tidak ada deskripsi yang dicatat untuk laporan ini.'}</p>
                     </section>
                 </div>
+
+                {onSetHandling && status !== 'Selesai' && (
+                    <section className="malfunction-modal-description" aria-label="Tindak lanjut Operator">
+                        <h3>Tindak lanjut Operator</h3>
+                        <label>Alasan perubahan status
+                            <textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={500} />
+                        </label>
+                        <div className="malfunction-modal-handling-actions">
+                            {status === 'Menunggu' && <button type="button" disabled={savingStatus || reason.trim().length < 5} onClick={() => updateHandling('Sedang Ditangani')}>Mulai penanganan</button>}
+                            <button type="button" disabled={savingStatus || reason.trim().length < 5} onClick={() => updateHandling('Selesai')}>{savingStatus ? 'Menyimpan…' : 'Tandai selesai'}</button>
+                        </div>
+                    </section>
+                )}
 
                 <footer className="malfunction-modal-actions">
                     <button type="button" className="malfunction-modal-button is-secondary" onClick={onClose}>Tutup</button>

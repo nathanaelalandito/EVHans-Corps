@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './registrasi.css';
 import { login } from './api/auth';
 
@@ -53,6 +53,7 @@ export default function Login({ onBackToWelcome, onLoginSuccess }) {
                         <input
                             type="email"
                             name="email"
+                            autoComplete="email"
                             value={formData.email}
                             onChange={handleChange}
                             required
@@ -66,6 +67,7 @@ export default function Login({ onBackToWelcome, onLoginSuccess }) {
                         <input
                             type="password"
                             name="password"
+                            autoComplete="current-password"
                             value={formData.password}
                             onChange={handleChange}
                             required

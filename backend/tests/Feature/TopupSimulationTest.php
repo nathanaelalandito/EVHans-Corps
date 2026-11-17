@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Dompet;
 use App\Models\MetodePembayaran;
+use App\Models\Topup;
+use App\Models\Notifikasi;
 use App\Models\User;
 use App\Models\UserProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -79,6 +81,10 @@ class TopupSimulationTest extends TestCase
             'id_user' => $a->id_user,
             'saldo' => 10000,
         ]);
+        $this->assertDatabaseCount('payment', 1);
+        $topup = Topup::firstOrFail();
+        $this->assertNotNull($topup->id_payment);
+        $this->assertSame(10000, (int) $topup->payment->total_bayar);
     }
 
     public function test_simulation_disabled_returns_403(): void
@@ -91,5 +97,38 @@ class TopupSimulationTest extends TestCase
         $ref = $create->json('data.reference');
 
         $this->postJson("/api/topup/{$ref}/simulate-pay")->assertStatus(403);
+    }
+
+    public function test_scheduled_expiry_command_notifies_without_polling_and_is_idempotent(): void
+    {
+        $this->travelTo(now());
+        $driver = $this->makeDriver('expired@test.com', 'DRV0000000001');
+        $wallet = $driver->dompet;
+        $method = $this->makeMethod();
+        $topup = Topup::create([
+            'id_wallet' => $wallet->id_wallet,
+            'id_payment' => null,
+            'id_metode' => $method->id_metode,
+            'referensi' => 'EVT-EXPIRED-COMMAND',
+            'kode_pembayaran' => '081234567890',
+            'nominal' => 10000,
+            'biaya_layanan' => 0,
+            'status_topup' => 'Pending',
+            'waktu_topup' => now()->subDay(),
+            'kedaluwarsa_pada' => now()->subMinute(),
+        ]);
+
+        $this->artisan('topups:expire')->expectsOutput('Expired 1 top up(s).')->assertExitCode(0);
+        $this->artisan('topups:expire')->expectsOutput('Expired 0 top up(s).')->assertExitCode(0);
+
+        $this->assertSame('Gagal', $topup->fresh()->status_topup);
+        $this->assertDatabaseCount('notifikasi', 1);
+        $this->assertDatabaseHas('notifikasi', [
+            'id_user' => $driver->id_user,
+            'tipe' => 'topup_gagal',
+            'dedup_key' => "topup_failed:{$topup->id_topup}:kedaluwarsa",
+        ]);
+        $this->assertSame(0, (int) $wallet->fresh()->saldo);
+        $this->assertDatabaseCount('payment', 0);
     }
 }

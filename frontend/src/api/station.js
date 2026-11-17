@@ -1,10 +1,14 @@
 import api from './client';
+import { stationAvailabilityLabel } from '../utils/stationAvailability.js';
+import { chargerStatusLabel, portStatusLabel } from '../utils/stationStatus.js';
+export { stationAvailabilityLabel };
+export { chargerStatusLabel, portStatusLabel };
 
 const KONEKTOR_LABEL = { type_2: 'Type 2', ccs2: 'CCS2', chademo: 'CHAdeMO', gbt: 'GB/T' };
 /** Mengubah kode konektor backend menjadi label yang ditampilkan di UI. */
 export const konektorLabel = (v) => KONEKTOR_LABEL[v] ?? v;
 
-const STATUS_LOKASI = { Aktif: 'Aktif', Maintenance: 'Dalam Perawatan', Nonaktif: 'Nonaktif' };
+const STATUS_LOKASI = { Aktif: 'Aktif', Maintenance: 'Dalam Perawatan', 'Tutup Sementara': 'Tutup Sementara', Gangguan: 'Gangguan', Nonaktif: 'Nonaktif' };
 
 // Bentuk respons API -> bentuk yang dipakai peta/daftar di DriverDashboard.
 /** Menyesuaikan nama field station API dengan struktur dashboard driver. */
@@ -17,8 +21,13 @@ function toDashboardStation(s) {
         lat: s.lat ?? s.latitude,       // Menangani kedua kemungkinan nama key
         lng: s.lng ?? s.longitude,
         status: STATUS_LOKASI[s.status] ?? s.status,
+        is_open: s.is_open,
+        can_start: s.can_start ?? (s.status === 'Aktif'),
+        buka_berikutnya: s.buka_berikutnya,
         charger_tersedia: s.charger_tersedia,
         charger_total: s.charger_total,
+        port_tersedia: s.port_tersedia ?? s.charger_tersedia,
+        jumlah_port: s.jumlah_port ?? s.charger_total,
         tipe_konektor: (s.tipe_konektor ?? []).map(konektorLabel),
         daya_kw_max: s.daya_kw_max,
         tarif_per_kwh: s.tarif?.harga_per_kwh ?? s.tarif_per_kwh ?? null,

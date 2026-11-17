@@ -7,6 +7,7 @@ use App\Models\Charger;
 use App\Models\Location;
 use App\Models\Port;
 use App\Models\StationOperator;
+use App\Support\StationOperatingHours;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -35,6 +36,7 @@ class StationController extends Controller
                 'tarifs' => fn ($query) => $query->latest('periode_mulai'),
             ])
             ->when($assignedLocationIds !== null, fn ($query) => $query->whereIn('id_location', $assignedLocationIds))
+            ->when($request->user()?->peran === 'driver', fn ($query) => $query->where('status_loc', '!=', 'Nonaktif'))
             ->when($connector, function ($query) use ($connector): void {
                 $cleanConnector = strtolower(str_replace(' ', '', $connector));
                 $query->whereHas('chargers.ports', function ($portQuery) use ($cleanConnector) {
@@ -99,6 +101,10 @@ class StationController extends Controller
 
         $totalPorts = $allPorts->count();
 
+        $isOpen = StationOperatingHours::isOpen($location->jam_buka, $location->jam_tutup);
+        $stationStatus = $this->stationStatus($location, $availableCount, $isOpen);
+        $canStart = $location->status_loc === 'Aktif' && $isOpen && $availableCount > 0;
+
         $data = [
             'id_location' => $location->id_location,
             'kode_station' => $location->kode_station,
@@ -109,9 +115,14 @@ class StationController extends Controller
             'jarak_km' => $driverLat !== null && $driverLng !== null
                 ? $this->distanceKm($driverLat, $driverLng, (float) $location->latitude, (float) $location->longitude)
                 : null,
-            'status' => $this->stationStatus($location, $availableCount),
-            'charger_tersedia' => $availableCount,
+            'status' => $stationStatus,
+            'is_open' => $isOpen,
+            'can_start' => $canStart,
+            'buka_berikutnya' => StationOperatingHours::nextOpenTime($location->jam_buka, $location->jam_tutup),
+            'charger_tersedia' => $canStart ? $availableCount : 0,
+            'port_tersedia' => $canStart ? $availableCount : 0,
             'charger_total' => $totalPorts > 0 ? $totalPorts : $chargers->count(),
+            'jumlah_port' => $totalPorts,
             'tipe_konektor' => $this->connectorLabels($allPorts),
             'daya_kw_max' => $allPorts->max('daya_maks_kw') ?? $chargers->max('kap_tot_kw') ?? 0,
             'tarif_per_kwh' => $tarif?->harga_per_kwh ?? 0,
@@ -124,7 +135,8 @@ class StationController extends Controller
 
         // Daftar charger + port selalu disertakan: dashboard driver memakainya untuk
         // memilih port langsung dari daftar station.
-        $data['chargers'] = $chargers->map(fn (Charger $charger) => $this->presentCharger($charger))->values();
+        $tarifPerKwh = $tarif?->harga_per_kwh === null ? null : (int) $tarif->harga_per_kwh;
+        $data['chargers'] = $chargers->map(fn (Charger $charger) => $this->presentCharger($charger, $tarifPerKwh))->values();
 
         if ($detail) {
             $data['tarif'] = $tarif ? [
@@ -138,7 +150,7 @@ class StationController extends Controller
     }
 
     /** Membentuk ringkasan unit charger dan daftar port untuk API driver. */
-    private function presentCharger(Charger $charger): array
+    private function presentCharger(Charger $charger, ?int $tarifPerKwh): array
     {
         return [
             'id_charger' => $charger->id_charger,
@@ -146,6 +158,7 @@ class StationController extends Controller
             'merek_model' => $charger->merek_model,
             'kap_tot_kw' => $charger->kap_tot_kw,
             'status_mesin' => $charger->status_mesin,
+            'jumlah_port' => $charger->ports->count(),
             'ports' => $charger->ports->map(fn (Port $port) => [
                 'id_port' => $port->id_port,
                 'nomor_port' => $port->nomor_port,
@@ -153,6 +166,7 @@ class StationController extends Controller
                 'tipe_charging' => $port->tipe_charging,
                 'daya_maks_kw' => $port->daya_maks_kw,
                 'status_port' => $port->status_port,
+                'tarif_per_kwh' => $tarifPerKwh,
             ])->values(),
         ];
     }
@@ -169,14 +183,22 @@ class StationController extends Controller
     }
 
     /** Menentukan status station dari status lokasi dan jumlah port yang tersedia. */
-    private function stationStatus(Location $location, int $availableCount): string
+    private function stationStatus(Location $location, int $availableCount, bool $isOpen): string
     {
         if ($location->status_loc === 'Maintenance') {
             return 'Dalam Perawatan';
         }
 
-        if ($location->status_loc === 'Nonaktif') {
+        if ($location->status_loc === 'Gangguan') {
+            return 'Gangguan';
+        }
+
+        if ($location->status_loc === 'Tutup Sementara' || ! $isOpen) {
             return 'Tutup Sementara';
+        }
+
+        if ($location->status_loc === 'Nonaktif') {
+            return 'Nonaktif';
         }
 
         return $availableCount > 0 ? 'Aktif' : 'Penuh';

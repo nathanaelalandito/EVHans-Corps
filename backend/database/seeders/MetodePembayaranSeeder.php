@@ -4,11 +4,16 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class MetodePembayaranSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new RuntimeException('Demo payment method seeding is disabled in production.');
+        }
+
         // Nama yang mengandung "VA" otomatis dianggap Virtual Account (tampil nomor VA, bukan QR).
         $metode = [
             ['nama_metode' => 'GoPay',   'tipe_metode' => 'ewallet', 'biaya_layanan' => 0],

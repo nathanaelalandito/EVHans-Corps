@@ -42,12 +42,29 @@ class OperatorController extends Controller
     /** Mengirim seluruh station yang boleh dikelola; urutan pertama menjadi default UI. */
     public function getAssignedStations(Request $request)
     {
-        $stations = DB::table('station_operators')
+        $paged = $request->hasAny(['q', 'page', 'per_page']);
+        $data = $paged ? $request->validate([
+            'q' => 'sometimes|string|max:100',
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1',
+        ]) : [];
+        $query = DB::table('station_operators')
             ->join('location', 'station_operators.id_location', '=', 'location.id_location')
             ->where('station_operators.id_user', $request->user()->id_user)
             ->orderBy('station_operators.id_station_operator')
-            ->select('location.id_location', 'location.kode_station', 'location.nama_lokasi', 'location.alamat')
-            ->get();
+            ->select('location.id_location', 'location.kode_station', 'location.nama_lokasi', 'location.alamat');
+
+        if ($request->filled('q')) {
+            $search = '%'.trim($data['q']).'%';
+            $query->where(function ($filter) use ($search): void {
+                $filter->where('location.nama_lokasi', 'like', $search)
+                    ->orWhere('location.kode_station', 'like', $search);
+            });
+        }
+
+        $stations = $paged
+            ? $query->paginate(min(100, (int) ($data['per_page'] ?? 20)))
+            : $query->get();
 
         return response()->json(['status' => 'success', 'data' => $stations]);
     }
@@ -286,11 +303,12 @@ class OperatorController extends Controller
     /** Mendaftarkan unit charger baru pada station yang dapat dikelola operator. */
     public function storeCharger(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'kode_perangkat' => 'required|string|unique:charger,kode_perangkat|max:12',
             'merek_model' => 'required|string|max:100',
             'kap_tot_kw' => 'required|numeric',
             'status_mesin' => 'sometimes|in:Active,Maintenance,Offline',
+            'alasan' => 'sometimes|string|min:5|max:500',
         ]);
 
         $assignment = $this->getOperatorAssignment($request->user());
@@ -298,15 +316,30 @@ class OperatorController extends Controller
             return response()->json(['message' => 'Akun operator belum ditugaskan ke station manapun.'], 403);
         }
 
-        $chargerId = DB::table('charger')->insertGetId([
+        $chargerValues = [
             'id_location' => $assignment->id_location,
-            'kode_perangkat' => $request->kode_perangkat,
-            'merek_model' => $request->merek_model,
-            'kap_tot_kw' => $request->kap_tot_kw,
-            'status_mesin' => $request->input('status_mesin', 'Active'),
+            'kode_perangkat' => $data['kode_perangkat'],
+            'merek_model' => $data['merek_model'],
+            'kap_tot_kw' => $data['kap_tot_kw'],
+            'status_mesin' => $data['status_mesin'] ?? 'Active',
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ];
+        $chargerId = DB::transaction(function () use ($request, $assignment, $data, $chargerValues): int {
+            $id = DB::table('charger')->insertGetId($chargerValues);
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'id_location' => $assignment->id_location,
+                'aksi' => 'buat_charger',
+                'entitas' => 'charger',
+                'id_entitas' => (string) $id,
+                'data_sebelum' => null,
+                'data_sesudah' => array_intersect_key($chargerValues, array_flip(['kode_perangkat', 'merek_model', 'kap_tot_kw', 'status_mesin'])),
+                'alasan' => $data['alasan'] ?? null,
+            ]);
+
+            return $id;
+        });
 
         return response()->json([
             'status' => 'success',
@@ -337,27 +370,34 @@ class OperatorController extends Controller
             'merek_model' => 'sometimes|string|max:100',
             'kap_tot_kw' => 'sometimes|numeric',
             'status_mesin' => 'sometimes|in:Active,Maintenance,Offline',
+            'alasan' => 'sometimes|string|min:5|max:500',
         ]);
+        $before = [
+            'kode_perangkat' => $charger->kode_perangkat,
+            'merek_model' => $charger->merek_model,
+            'kap_tot_kw' => $charger->kap_tot_kw,
+            'status_mesin' => $charger->status_mesin,
+        ];
+        $after = [
+            'kode_perangkat' => $data['kode_perangkat'] ?? $charger->kode_perangkat,
+            'merek_model' => $data['merek_model'] ?? $charger->merek_model,
+            'kap_tot_kw' => $data['kap_tot_kw'] ?? $charger->kap_tot_kw,
+            'status_mesin' => $data['status_mesin'] ?? $charger->status_mesin,
+        ];
 
-        if (($data['status_mesin'] ?? $charger->status_mesin) !== $charger->status_mesin) {
+        DB::transaction(function () use ($request, $charger, $id, $data, $before, $after): void {
+            DB::table('charger')->where('id_charger', $id)->update($after + ['updated_at' => now()]);
             AuditLog::create([
                 'id_user' => $request->user()->id_user,
                 'id_location' => $charger->id_location,
-                'aksi' => 'ubah_status_charger',
+                'aksi' => 'ubah_charger',
                 'entitas' => 'charger',
                 'id_entitas' => (string) $charger->id_charger,
-                'data_sebelum' => ['status' => $charger->status_mesin],
-                'data_sesudah' => ['status' => $data['status_mesin']],
+                'data_sebelum' => $before,
+                'data_sesudah' => $after,
+                'alasan' => $data['alasan'] ?? null,
             ]);
-        }
-
-        DB::table('charger')->where('id_charger', $id)->update([
-            'kode_perangkat' => $request->input('kode_perangkat', $charger->kode_perangkat),
-            'merek_model' => $request->input('merek_model', $charger->merek_model),
-            'kap_tot_kw' => $request->input('kap_tot_kw', $charger->kap_tot_kw),
-            'status_mesin' => $request->input('status_mesin', $charger->status_mesin),
-            'updated_at' => now(),
-        ]);
+        });
 
         return response()->json(['status' => 'success', 'message' => 'Mesin charger berhasil diperbarui.']);
     }
@@ -559,12 +599,13 @@ class OperatorController extends Controller
     /** Membuat port baru pada unit charger yang dapat dikelola operator. */
     public function storePort(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'id_charger' => 'required|exists:charger,id_charger',
             'nomor_port' => 'required|string|max:50',
             'tipe_konektor' => 'required|string|max:50',
-            'tipe_charging' => 'required|string|max:50',
+            'tipe_charging' => 'required|in:AC,DC',
             'daya_maks_kw' => 'required|numeric',
+            'alasan' => 'sometimes|string|min:5|max:500',
         ]);
 
         $assignment = $this->getOperatorAssignment($request->user());
@@ -581,16 +622,31 @@ class OperatorController extends Controller
             return response()->json(['message' => 'Mesin charger induk tidak valid di lokasi Anda.'], 403);
         }
 
-        $portId = DB::table('ports')->insertGetId([
-            'id_charger' => $request->id_charger,
-            'nomor_port' => $request->nomor_port,
-            'tipe_konektor' => $request->tipe_konektor,
-            'tipe_charging' => $request->tipe_charging,
-            'daya_maks_kw' => $request->daya_maks_kw,
+        $portValues = [
+            'id_charger' => $data['id_charger'],
+            'nomor_port' => $data['nomor_port'],
+            'tipe_konektor' => $data['tipe_konektor'],
+            'tipe_charging' => $data['tipe_charging'],
+            'daya_maks_kw' => $data['daya_maks_kw'],
             'status_port' => 'Available',
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ];
+        $portId = DB::transaction(function () use ($request, $charger, $data, $portValues): int {
+            $id = DB::table('ports')->insertGetId($portValues);
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'id_location' => $charger->id_location,
+                'aksi' => 'buat_port',
+                'entitas' => 'port',
+                'id_entitas' => (string) $id,
+                'data_sebelum' => null,
+                'data_sesudah' => array_intersect_key($portValues, array_flip(['id_charger', 'nomor_port', 'tipe_konektor', 'tipe_charging', 'daya_maks_kw', 'status_port'])),
+                'alasan' => $data['alasan'] ?? null,
+            ]);
+
+            return $id;
+        });
 
         return response()->json([
             'status' => 'success',
@@ -611,27 +667,45 @@ class OperatorController extends Controller
             ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
             ->where('ports.id_port', $id)
             ->where('charger.id_location', $assignment->id_location)
-            ->select('ports.*')
+            ->select('ports.*', 'charger.id_location as id_location')
             ->first();
 
         if (! $port) {
             return response()->json(['message' => 'Port tidak ditemukan atau di luar wilayah penugasan.'], 404);
         }
 
-        $request->validate([
+        $data = $request->validate([
             'nomor_port' => 'sometimes|string|max:50',
             'tipe_konektor' => 'sometimes|string|max:50',
-            'tipe_charging' => 'sometimes|string|max:50',
+            'tipe_charging' => 'sometimes|in:AC,DC',
             'daya_maks_kw' => 'sometimes|numeric',
+            'alasan' => 'sometimes|string|min:5|max:500',
         ]);
+        $after = [
+            'nomor_port' => $data['nomor_port'] ?? $port->nomor_port,
+            'tipe_konektor' => $data['tipe_konektor'] ?? $port->tipe_konektor,
+            'tipe_charging' => $data['tipe_charging'] ?? $port->tipe_charging,
+            'daya_maks_kw' => $data['daya_maks_kw'] ?? $port->daya_maks_kw,
+        ];
 
-        DB::table('ports')->where('id_port', $id)->update([
-            'nomor_port' => $request->input('nomor_port', $port->nomor_port),
-            'tipe_konektor' => $request->input('tipe_konektor', $port->tipe_konektor),
-            'tipe_charging' => $request->input('tipe_charging', $port->tipe_charging),
-            'daya_maks_kw' => $request->input('daya_maks_kw', $port->daya_maks_kw),
-            'updated_at' => now(),
-        ]);
+        DB::transaction(function () use ($request, $port, $id, $data, $after): void {
+            DB::table('ports')->where('id_port', $id)->update($after + ['updated_at' => now()]);
+            AuditLog::create([
+                'id_user' => $request->user()->id_user,
+                'id_location' => $port->id_location,
+                'aksi' => 'ubah_port',
+                'entitas' => 'port',
+                'id_entitas' => (string) $port->id_port,
+                'data_sebelum' => [
+                    'nomor_port' => $port->nomor_port,
+                    'tipe_konektor' => $port->tipe_konektor,
+                    'tipe_charging' => $port->tipe_charging,
+                    'daya_maks_kw' => $port->daya_maks_kw,
+                ],
+                'data_sesudah' => $after,
+                'alasan' => $data['alasan'] ?? null,
+            ]);
+        });
 
         return response()->json(['status' => 'success', 'message' => 'Port berhasil diperbarui.']);
     }
@@ -814,6 +888,65 @@ class OperatorController extends Controller
                 ->sum('payment.total_bayar'),
         ];
 
+        // Utilisasi = detik port aktif dibagi seluruh detik-port yang ditugaskan.
+        // Bila tanggal tidak dikirim, gunakan bulan berjalan seperti tampilan laporan.
+        $periodStart = $request->filled('start_date')
+            ? Carbon::parse($request->start_date)->startOfDay()
+            : now()->startOfMonth();
+        $periodEnd = $request->filled('end_date')
+            ? Carbon::parse($request->end_date)->endOfDay()
+            : now()->endOfDay();
+        $periodSeconds = max(0, $periodEnd->getTimestamp() - $periodStart->getTimestamp() + 1);
+        $assignedPorts = DB::table('ports')
+            ->join('charger', 'ports.id_charger', '=', 'charger.id_charger')
+            ->where('charger.id_location', $assignment->id_location)
+            ->count('ports.id_port');
+        $chargingSeconds = 0;
+        if ($periodSeconds > 0) {
+            $sessionsForUtilization = DB::table('charging_session')
+                ->join('charger', 'charging_session.id_charger', '=', 'charger.id_charger')
+                ->where('charger.id_location', $assignment->id_location)
+                ->whereNotNull('charging_session.waktu_mulai')
+                ->where('charging_session.waktu_mulai', '<=', $periodEnd)
+                ->where(function ($sessions) use ($periodStart) {
+                    $sessions->whereNull('charging_session.waktu_selesai')
+                        ->orWhere('charging_session.waktu_selesai', '>=', $periodStart);
+                })
+                ->get([
+                    'charging_session.waktu_mulai', 'charging_session.waktu_selesai',
+                    'charging_session.total_jeda_detik', 'charging_session.dijeda_pada',
+                ]);
+            foreach ($sessionsForUtilization as $session) {
+                $sessionStart = Carbon::parse($session->waktu_mulai);
+                $sessionEnd = $session->waktu_selesai
+                    ? Carbon::parse($session->waktu_selesai)
+                    : now();
+                $overlapStart = $sessionStart->greaterThan($periodStart) ? $sessionStart : $periodStart;
+                $overlapEnd = $sessionEnd->lessThan($periodEnd) ? $sessionEnd : $periodEnd;
+                $overlapSeconds = max(0, $overlapEnd->getTimestamp() - $overlapStart->getTimestamp());
+                $pausedSeconds = min($overlapSeconds, (int) ($session->total_jeda_detik ?? 0));
+                if ($session->dijeda_pada) {
+                    $pauseStart = Carbon::parse($session->dijeda_pada);
+                    $pauseOverlapStart = $pauseStart->greaterThan($periodStart) ? $pauseStart : $periodStart;
+                    $pauseOverlapEnd = now()->lessThan($periodEnd) ? now() : $periodEnd;
+                    $activePauseSeconds = $pauseOverlapEnd->greaterThan($pauseOverlapStart)
+                        ? $pauseOverlapEnd->getTimestamp() - $pauseOverlapStart->getTimestamp()
+                        : 0;
+                    $pausedSeconds = min($overlapSeconds, $pausedSeconds + $activePauseSeconds);
+                }
+                $chargingSeconds += max(0, $overlapSeconds - $pausedSeconds);
+            }
+        }
+        $denominatorSeconds = $assignedPorts * $periodSeconds;
+        $summary['utilization'] = [
+            'charging_seconds' => $chargingSeconds,
+            'denominator_seconds' => $denominatorSeconds,
+            'percent' => $denominatorSeconds > 0 ? round($chargingSeconds * 100 / $denominatorSeconds, 2) : 0,
+            'assigned_ports' => $assignedPorts,
+            'period_start' => $periodStart->toDateTimeString(),
+            'period_end' => $periodEnd->toDateTimeString(),
+        ];
+
         // Menggunakan paginate agar respons ringan
         $transactions = $query->orderBy('charging_session.created_at', 'desc')->paginate(15);
 
@@ -925,10 +1058,10 @@ class OperatorController extends Controller
     public function updateProfile(Request $request)
     {
         $data = $request->validate([
-            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{1,15}$/'],
+            'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{8,15}$/'],
             'alamat' => 'nullable|string|max:1000',
         ], [
-            'nomor_telepon.regex' => 'Nomor telepon hanya boleh berisi angka, maksimal 15 digit.',
+            'nomor_telepon.regex' => 'Nomor telepon 8 sampai 15 digit angka.',
         ]);
         DB::table('user_profile')->updateOrInsert(
             ['id_user' => $request->user()->id_user],

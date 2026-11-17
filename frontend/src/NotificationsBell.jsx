@@ -13,6 +13,7 @@ import {
     FiZap,
 } from 'react-icons/fi';
 import api from './api/client';
+import { findUnseenNotificationIds, hasUnreadCountIncreased } from './utils/notificationPolling';
 import './notificationsBell.css';
 
 const TYPE_META = {
@@ -80,14 +81,16 @@ function startOfDay(date) {
 }
 
 /** Komponen bell notifikasi dengan polling, panel modal, dan tandai baca. */
-export default function NotificationsBell() {
+export default function NotificationsBell({ toastOnNew = false }) {
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState([]);
     const [unread, setUnread] = useState(0);
+    const [unreadPollError, setUnreadPollError] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [readingId, setReadingId] = useState(null);
     const [markingAll, setMarkingAll] = useState(false);
+    const [newNotificationToast, setNewNotificationToast] = useState('');
 
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
@@ -103,16 +106,29 @@ export default function NotificationsBell() {
     const timerRef = useRef(null);
     const panelRef = useRef(null);
     const triggerRef = useRef(null);
+    const unreadRef = useRef(0);
+    const panelOpenRef = useRef(false);
+    const pollInitializedRef = useRef(false);
+    const knownNotificationIdsRef = useRef(null);
 
-    const fetchUnread = useCallback(async () => {
-        if (document.hidden) return;
+    const pollRecentNotifications = useCallback(async (seedOnly = false) => {
         try {
-            const { data } = await api.get('/notifications/unread-count');
-            setUnread(data?.data?.unread ?? 0);
+            const { data } = await api.get('/notifications', { params: { page: 1, per_page: 20 } });
+            const paginator = data?.data ?? {};
+            const recent = Array.isArray(paginator?.data) ? paginator.data : (Array.isArray(data?.data) ? data.data : []);
+            if (knownNotificationIdsRef.current === null || seedOnly) {
+                knownNotificationIdsRef.current = new Set(recent.map((item) => String(item.id_notifikasi)));
+                return;
+            }
+            const newItems = findUnseenNotificationIds(recent, knownNotificationIdsRef.current);
+            recent.forEach((item) => knownNotificationIdsRef.current.add(String(item.id_notifikasi)));
+            if (toastOnNew && newItems.length > 0) {
+                setNewNotificationToast(newItems[0].judul || 'Notifikasi baru diterima.');
+            }
         } catch {
-            // Abaikan error jaringan agar tidak mengganggu UI.
+            // Polling badge melaporkan kegagalan sendiri; toast baru bersifat tambahan.
         }
-    }, []);
+    }, [toastOnNew]);
 
     const fetchList = useCallback(async (nextPage = 1, append = false) => {
         if (append) setLoadingMore(true);
@@ -139,6 +155,31 @@ export default function NotificationsBell() {
             else setLoading(false);
         }
     }, []);
+
+    const fetchUnread = useCallback(async () => {
+        if (document.hidden) return;
+        try {
+            const { data } = await api.get('/notifications/unread-count');
+            const nextUnread = data?.data?.unread ?? 0;
+            const hasNewNotifications = hasUnreadCountIncreased(unreadRef.current, nextUnread);
+            const isInitialPoll = !pollInitializedRef.current;
+            pollInitializedRef.current = true;
+            unreadRef.current = nextUnread;
+            setUnread(nextUnread);
+            setUnreadPollError(false);
+            if (toastOnNew && isInitialPoll) await pollRecentNotifications(true);
+            else if (toastOnNew && hasNewNotifications) await pollRecentNotifications(false);
+            if (hasNewNotifications && panelOpenRef.current) {
+                fetchList(1, false);
+            }
+        } catch {
+            setUnreadPollError(true);
+        }
+    }, [fetchList, pollRecentNotifications, toastOnNew]);
+
+    useEffect(() => {
+        panelOpenRef.current = open;
+    }, [open]);
 
     useEffect(() => {
         const initialFetch = setTimeout(fetchUnread, 0);
@@ -206,6 +247,12 @@ export default function NotificationsBell() {
         };
     }, [open, fetchList]);
 
+    useEffect(() => {
+        if (!newNotificationToast) return undefined;
+        const timer = window.setTimeout(() => setNewNotificationToast(''), 4500);
+        return () => window.clearTimeout(timer);
+    }, [newNotificationToast]);
+
     const markRead = async (id) => {
         const target = items.find((item) => String(item.id_notifikasi) === String(id));
         if (!target || target.dibaca_pada) return;
@@ -215,7 +262,8 @@ export default function NotificationsBell() {
                 ? { ...item, dibaca_pada: new Date().toISOString() }
                 : item
         )));
-        setUnread((prev) => Math.max(0, prev - 1));
+        unreadRef.current = Math.max(0, unreadRef.current - 1);
+        setUnread(unreadRef.current);
 
         setReadingId(id);
         try {
@@ -226,7 +274,8 @@ export default function NotificationsBell() {
                     ? { ...item, dibaca_pada: target.dibaca_pada }
                     : item
             )));
-            setUnread((prev) => prev + 1);
+            unreadRef.current += 1;
+            setUnread(unreadRef.current);
         } finally {
             setReadingId(null);
         }
@@ -237,11 +286,15 @@ export default function NotificationsBell() {
         setMarkingAll(true);
         const previous = items;
         setItems((prev) => prev.map((item) => ({ ...item, dibaca_pada: new Date().toISOString() })));
+        const previousUnread = unreadRef.current;
+        unreadRef.current = 0;
         setUnread(0);
         try {
             await api.put('/notifications/read-all');
         } catch {
             setItems(previous);
+            unreadRef.current = previousUnread;
+            setUnread(previousUnread);
             fetchUnread();
         } finally {
             setMarkingAll(false);
@@ -250,6 +303,7 @@ export default function NotificationsBell() {
 
     const togglePanel = () => {
         const nextOpen = !open;
+        panelOpenRef.current = nextOpen;
         setOpen(nextOpen);
         if (nextOpen) {
             setStatusFilter('all');
@@ -403,8 +457,20 @@ export default function NotificationsBell() {
         </button>
     );
 
+    const bellControl = (
+        <div className="notifbell-root">
+            {bellButton}
+            {toastOnNew && newNotificationToast && <span className="notifbell-new-toast" role="status">{newNotificationToast}</span>}
+            {unreadPollError && (
+                <span className="notifbell-poll-error" role="status" title="Jumlah belum dibaca mungkin sudah lama.">
+                    Status tertunda
+                </span>
+            )}
+        </div>
+    );
+
     if (!open || !portalTarget) {
-        return bellButton;
+        return bellControl;
     }
 
     const modal = (
@@ -703,7 +769,7 @@ export default function NotificationsBell() {
 
     return (
         <>
-            {bellButton}
+            {bellControl}
             {createPortal(modal, portalTarget)}
         </>
     );
