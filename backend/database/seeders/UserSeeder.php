@@ -13,6 +13,15 @@ class UserSeeder extends Seeder
     {
         $users = [
             [
+                'email' => 'bona@gmail.com',
+                'peran' => 'driver',
+                'status_akun' => 'Aktif',
+                'nama_lengkap' => 'Bona',
+                'nomor_telepon' => '081200000000',
+                'alamat' => 'Jl. Bona No. 1, Yogyakarta',
+                'tanggal_lahir' => '1997-01-01',
+            ],
+            [
                 'email' => 'budi.driver@ac.id',
                 'peran' => 'driver',
                 'status_akun' => 'Aktif',

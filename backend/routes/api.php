@@ -107,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/charging-sessions/{session}/finish', [ChargingSessionController::class, 'finish']);
     Route::post('/charging-sessions/{session}/stop', [ChargingSessionController::class, 'stop']); // alias finish
     Route::post('/charging-sessions/{session}/interrupt', [ChargingSessionController::class, 'interrupt']);
+Route::post('/charging-sessions/{session}/pause', [ChargingSessionController::class, 'pause']);
+Route::post('/charging-sessions/{session}/resume', [ChargingSessionController::class, 'resume']);
     Route::post('/operator/sessions/{session}/stop', [ChargingSessionController::class, 'stopByOperator']);
 
     // Top up checkout (QR / Virtual Account)

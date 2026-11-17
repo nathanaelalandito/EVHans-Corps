@@ -631,7 +631,7 @@ class ChargingFlowController extends Controller
             return true;
         }
 
-        $cur = now()->format('H:i');
+        $cur = now('Asia/Jakarta')->format('H:i');
 
         return $tutup > $buka
             ? ($cur >= $buka && $cur < $tutup)

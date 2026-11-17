@@ -22,6 +22,9 @@ class ChargingSession extends Model
     protected $casts = [
         'waktu_mulai' => 'datetime',
         'waktu_selesai' => 'datetime',
+        'dijeda_pada' => 'datetime',
+        'jeda_berakhir_pada' => 'datetime',
+        'total_jeda_detik' => 'integer',
         'total_energi_kwh' => 'float',
         'target_energi_kwh' => 'float',
         'estimasi_biaya_charging' => 'integer',

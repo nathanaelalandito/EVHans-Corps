@@ -24,6 +24,18 @@ export async function interruptChargingSession(id, payload = {}) {
     return data.data ?? data;
 }
 
+/** Menjeda sementara sesi charging yang sedang berjalan. */
+export async function pauseChargingSession(id) {
+    const { data } = await api.post(`/charging-sessions/${id}/pause`);
+    return data.data ?? data;
+}
+
+/** Melanjutkan sesi charging yang sedang dijeda. */
+export async function resumeChargingSession(id) {
+    const { data } = await api.post(`/charging-sessions/${id}/resume`);
+    return data.data ?? data;
+}
+
 /** Mengambil sesi aktif yang akan dipulihkan pada tampilan pengemudi. */
 export async function getActiveChargingSession() {
     const { data } = await api.get('/charging-sessions/active');

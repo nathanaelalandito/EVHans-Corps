@@ -357,7 +357,7 @@ class ChargingSessionController extends Controller
         try {
             app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
         } catch (\Throwable $e) {
-            \Log::warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
+            logger()->warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }
 
         return response()->json([
@@ -392,7 +392,7 @@ class ChargingSessionController extends Controller
         try {
             app(NotificationService::class)->notifySessionCompleted($settled, $actualCost, $refund);
         } catch (\Throwable $e) {
-            \Log::warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
+            logger()->warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }
 
         return response()->json([
@@ -423,14 +423,14 @@ class ChargingSessionController extends Controller
         try {
             app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
         } catch (\Throwable $e) {
-            \Log::warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
+            logger()->warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }
 
         if ($finalStatus === 'Gagal' && $settled->charger) {
             try {
                 app(NotificationService::class)->notifyChargerIssue($settled->charger, 'Out of Order', $data['alasan'] ?? null);
             } catch (\Throwable $e) {
-                \Log::warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
+                logger()->warning('Gagal mengirim notifikasi charger: '.$e->getMessage());
             }
         }
 
@@ -442,6 +442,107 @@ class ChargingSessionController extends Controller
             'message' => $message,
             'data' => $this->presentInvoice($settled),
         ]);
+    }
+
+    /** Menjeda sesi charging yang sedang berjalan. */
+    public function pause(Request $request, ChargingSession $session): JsonResponse
+    {
+        return DB::transaction(function () use ($request, $session) {
+            $session = ChargingSession::with(['charger.location', 'port'])
+                ->whereKey($session->id_session)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($session->id_user !== $request->user()->id_user) {
+                abort(404);
+            }
+
+            if ($session->status !== 'Berlangsung') {
+                return $this->fail('Sesi charging tidak sedang berjalan.', 422);
+            }
+
+            $this->resolvePause($session);
+
+            if (! $session->dijeda_pada) {
+                $max = (int) config('charging.pause_max_seconds', 300);
+                $session->dijeda_pada = now();
+                $session->jeda_berakhir_pada = now()->addSeconds($max);
+                $session->save();
+
+                AuditLog::create([
+                    'id_user' => $request->user()->id_user,
+                    'id_location' => $session->charger->id_location,
+                    'aksi' => 'jeda_sesi',
+                    'entitas' => 'charging_session',
+                    'id_entitas' => (string) $session->id_session,
+                    'data_sebelum' => ['dijeda' => false],
+                    'data_sesudah' => ['dijeda' => true, 'batas_detik' => $max],
+                    'alasan' => 'Driver menjeda sesi charging.',
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Sesi charging dijeda.',
+                'data' => [
+                    'dijeda' => true,
+                    'jeda_berakhir_pada' => $session->jeda_berakhir_pada?->getTimestampMs(),
+                    'sisa_jeda_detik' => $session->jeda_berakhir_pada
+                        ? max(0, $session->jeda_berakhir_pada->getTimestamp() - now()->getTimestamp())
+                        : 0,
+                ],
+            ]);
+        });
+    }
+
+    /** Melanjutkan sesi charging yang dijeda. */
+    public function resume(Request $request, ChargingSession $session): JsonResponse
+    {
+        return DB::transaction(function () use ($request, $session) {
+            $session = ChargingSession::with(['charger.location', 'port'])
+                ->whereKey($session->id_session)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($session->id_user !== $request->user()->id_user) {
+                abort(404);
+            }
+
+            if ($session->status !== 'Berlangsung') {
+                return $this->fail('Sesi charging tidak sedang berjalan.', 422);
+            }
+
+            $this->resolvePause($session);
+
+            if ($session->dijeda_pada) {
+                $max = (int) config('charging.pause_max_seconds', 300);
+                $elapsed = (int) (now()->getTimestamp() - $session->dijeda_pada->getTimestamp());
+                $add = min($max, max(0, $elapsed));
+                $session->total_jeda_detik = (int) $session->total_jeda_detik + $add;
+                $session->dijeda_pada = null;
+                $session->jeda_berakhir_pada = null;
+                $session->save();
+
+                AuditLog::create([
+                    'id_user' => $request->user()->id_user,
+                    'id_location' => $session->charger->id_location,
+                    'aksi' => 'lanjut_sesi',
+                    'entitas' => 'charging_session',
+                    'id_entitas' => (string) $session->id_session,
+                    'data_sebelum' => ['dijeda' => true],
+                    'data_sesudah' => ['dijeda' => false, 'tambahan_jeda_detik' => $add],
+                    'alasan' => 'Driver melanjutkan sesi charging.',
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'Sesi charging dilanjutkan.',
+                'data' => [
+                    'dijeda' => false,
+                    'jeda_berakhir_pada' => null,
+                    'sisa_jeda_detik' => 0,
+                ],
+            ]);
+        });
     }
 
     /**
@@ -461,6 +562,8 @@ class ChargingSessionController extends Controller
                 ->whereKey($session->id_session)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $this->resolvePause($session);
 
             if ($operatorReason !== null) {
                 $assignment = DB::table('station_operators')
@@ -774,12 +877,19 @@ class ChargingSessionController extends Controller
     /** Menghasilkan telemetri simulasi selama perangkat charger belum terintegrasi. */
     private function simulate(ChargingSession $session): array
     {
+        $this->resolvePause($session);
+
         $target = (float) ($session->target_energi_kwh ?? 0);
         $power = max(1, $this->powerOf($session));
         $speed = max(0.1, (float) config('charging.simulation_speed', 60));
 
+        $pausedSeconds = (int) ($session->total_jeda_detik ?? 0);
+        if ($session->dijeda_pada) {
+            $pausedSeconds += max(0, now()->getTimestamp() - $session->dijeda_pada->getTimestamp());
+        }
+
         $realSeconds = $session->waktu_mulai
-            ? max(0, now()->getTimestamp() - $session->waktu_mulai->getTimestamp())
+            ? max(0, now()->getTimestamp() - $session->waktu_mulai->getTimestamp() - $pausedSeconds)
             : 0;
         $simSeconds = $realSeconds * $speed;
         $kwh = min($target, $power * $simSeconds / 3600);
@@ -797,6 +907,24 @@ class ChargingSessionController extends Controller
             'sudah_penuh' => $isFull,
             'kecepatan' => $speed,
         ];
+    }
+
+    /** Menyelesaikan jeda yang sudah lewat batas (apply-on-read). */
+    private function resolvePause(ChargingSession $session): void
+    {
+        if (! $session->dijeda_pada) {
+            return;
+        }
+
+        $max = (int) config('charging.pause_max_seconds', 300);
+        $elapsed = now()->getTimestamp() - $session->dijeda_pada->getTimestamp();
+
+        if ($elapsed >= $max) {
+            $session->total_jeda_detik = (int) $session->total_jeda_detik + $max;
+            $session->dijeda_pada = null;
+            $session->jeda_berakhir_pada = null;
+            $session->save();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -865,7 +993,12 @@ class ChargingSessionController extends Controller
             'id_port' => $session->id_port,
             'nomor_port' => $session->port?->nomor_port,
             'daya_kw' => $power,
-            'status' => 'Charging',
+            'status' => $session->dijeda_pada ? 'Dijeda' : 'Charging',
+            'dijeda' => (bool) $session->dijeda_pada,
+            'jeda_berakhir_pada' => $session->jeda_berakhir_pada?->getTimestampMs(),
+            'sisa_jeda_detik' => $session->dijeda_pada && $session->jeda_berakhir_pada
+                ? max(0, $session->jeda_berakhir_pada->getTimestamp() - now()->getTimestamp())
+                : 0,
             'sudah_penuh' => $sim['sudah_penuh'],
             'energi_kwh' => $sim['energi_kwh'],
             'target_energi_kwh' => (float) $session->target_energi_kwh,
@@ -1010,7 +1143,7 @@ class ChargingSessionController extends Controller
             return true;
         }
 
-        $now = now()->format('H:i');
+        $now = now('Asia/Jakarta')->format('H:i');
 
         return $closeTime > $openTime
             ? ($now >= $openTime && $now < $closeTime)

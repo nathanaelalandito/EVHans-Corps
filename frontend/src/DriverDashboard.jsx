@@ -1,4 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { sessionStatusTone } from "./utils/sessionStatus";
+import { API_BASE_URL } from "./api/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -53,7 +56,10 @@ import {
 import { getActiveSession, getChargingSettings } from "./api/charging";
 import {
   finishChargingSession,
+  getActiveChargingSession,
   interruptChargingSession,
+  pauseChargingSession,
+  resumeChargingSession,
 } from "./api/chargingSessions";
 import { getPaymentDetail, getPaymentHistory } from "./api/payments";
 import { createInvoicePdf, invoicePdfName } from "./utils/invoicePdf";
@@ -207,6 +213,12 @@ export default function DriverDashboard({
   const [showStartCharging, setShowStartCharging] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [stoppingSession, setStoppingSession] = useState(false);
+  const [pausingSession, setPausingSession] = useState(false);
+  const [showInterruptModal, setShowInterruptModal] = useState(false);
+  const [interruptReason, setInterruptReason] = useState("");
+  const [pauseCountdown, setPauseCountdown] = useState(0);
+  const interruptPanelRef = useRef(null);
+  const interruptTriggerRef = useRef(null);
   const [startPortId, setStartPortId] = useState(null); // port yang dipilih dari daftar station
   const [invoice, setInvoice] = useState(null);
   const [transactionHistory, setTransactionHistory] = useState([]);
@@ -227,6 +239,143 @@ export default function DriverDashboard({
   const [maximumPriceFilter, setMaximumPriceFilter] = useState("all");
   const [showStationFilters, setShowStationFilters] = useState(false);
   const [activeSession, setActiveSession] = useState(DUMMY_ACTIVE_SESSION);
+
+  const openInterruptModal = async () => {
+    if (!activeSession || pausingSession) return;
+    setPausingSession(true);
+    setSessionError("");
+    try {
+      const paused = await pauseChargingSession(activeSession.id_session);
+      setActiveSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              dijeda: true,
+              jeda_berakhir_pada: paused?.jeda_berakhir_pada ?? prev.jeda_berakhir_pada,
+              sisa_jeda_detik: paused?.sisa_jeda_detik ?? prev.sisa_jeda_detik,
+              status: "Dijeda",
+            }
+          : prev,
+      );
+      setPauseCountdown(paused?.sisa_jeda_detik ?? 0);
+      setShowInterruptModal(true);
+    } catch (err) {
+      setSessionError(
+        extractErrorMessage(err, "Sesi belum dapat dijeda. Modal tetap dapat dibuka."),
+      );
+      setPauseCountdown(0);
+      setShowInterruptModal(true);
+    } finally {
+      setPausingSession(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showInterruptModal) return undefined;
+    const token = localStorage.getItem("ev_token");
+    const handler = () => {
+      if (!activeSession?.id_session || !token) return;
+      try {
+        fetch(`${API_BASE_URL}/charging-sessions/${activeSession.id_session}/resume`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          keepalive: true,
+        });
+      } catch {
+        // best effort
+      }
+    };
+    window.addEventListener("pagehide", handler);
+    return () => window.removeEventListener("pagehide", handler);
+  }, [showInterruptModal, activeSession]);
+
+  useEffect(() => {
+    if (!showInterruptModal || pauseCountdown <= 0) return undefined;
+    const timer = setInterval(() => {
+      setPauseCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          (async () => {
+            try {
+              if (activeSession?.id_session) {
+                await resumeChargingSession(activeSession.id_session);
+              }
+            } catch {
+              // ignore
+            }
+            setShowInterruptModal(false);
+            setInterruptReason("");
+            setSessionNotice("Sesi dilanjutkan otomatis karena batas waktu jeda habis.");
+            if (activeSession?.id_session) {
+              try {
+                const refreshed = await getActiveChargingSession();
+                if (refreshed) setActiveSession(refreshed);
+              } catch {
+                // ignore
+              }
+            }
+          })();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showInterruptModal, pauseCountdown, activeSession]);
+
+  useEffect(() => {
+    if (!showInterruptModal) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = setTimeout(() => {
+      const textarea = interruptPanelRef.current?.querySelector("textarea");
+      textarea?.focus();
+    }, 0);
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !stoppingSession) {
+        (async () => {
+          if (activeSession?.id_session) {
+            try {
+              await resumeChargingSession(activeSession.id_session);
+            } catch {
+              // ignore
+            }
+          }
+          setShowInterruptModal(false);
+          setInterruptReason("");
+          if (activeSession?.id_session) {
+            try {
+              const refreshed = await getActiveChargingSession();
+              if (refreshed) setActiveSession(refreshed);
+            } catch {
+              // ignore
+            }
+          }
+        })();
+      }
+      if (event.key !== "Tab") return;
+      const focusable = interruptPanelRef.current?.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      clearTimeout(focusTimer);
+      document.removeEventListener("keydown", handleKeyDown);
+      interruptTriggerRef.current?.focus();
+    };
+  }, [showInterruptModal, stoppingSession]);
   const [sessionSyncError, setSessionSyncError] = useState("");
   const [sessionNotice, setSessionNotice] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -946,8 +1095,7 @@ export default function DriverDashboard({
     setActiveSession(null);
     setShowNotif(false);
     reloadStations();
-    await fetchWallet();
-    await fetchTransactionHistory();
+    await Promise.all([fetchWallet(), fetchTransactionHistory()]);
   };
 
   /** Meminta penghentian sesi normal dan memproses ringkasan transaksinya. */
@@ -973,7 +1121,7 @@ export default function DriverDashboard({
   };
 
   /** Melaporkan sesi terhenti/gagal lalu menyegarkan status sesi dan dompet. */
-  const handleInterruptSession = async () => {
+  const handleInterruptSession = async (reason = "") => {
     if (!activeSession || stoppingSession) return;
     setStoppingSession(true);
     setSessionError("");
@@ -982,10 +1130,13 @@ export default function DriverDashboard({
         activeSession.id_session,
         {
           status: "gagal",
-          alasan: "Gangguan charger dilaporkan oleh driver.",
+          alasan: reason.trim() || "Gangguan charger dilaporkan oleh driver.",
         },
       );
-      await afterSessionSettled(interruptedInvoice);
+      setShowInterruptModal(false);
+      setInterruptReason("");
+      setSessionNotice("Laporan gangguan terkirim.");
+      afterSessionSettled(interruptedInvoice).catch(() => {});
     } catch (err) {
       setSessionError(
         extractErrorMessage(err, "Gagal memproses gangguan sesi charging."),
@@ -1315,15 +1466,7 @@ export default function DriverDashboard({
                   </p>
                 </div>
                 <div className="home-header-actions">
-                  <button
-                    className="home-icon-btn"
-                    aria-label="Notifikasi"
-                    onClick={() => setShowNotif((v) => !v)}
-                  >
-                    <FiBell aria-hidden="true" />
-                    {activeSession && <span className="mapdash-badge-dot" />}
-                  </button>
-                  <NotificationsBell />
+                   <NotificationsBell />
                   <button
                     type="button"
                     className="home-icon-btn"
@@ -1482,11 +1625,16 @@ export default function DriverDashboard({
                 <span className="mapdash-sheet-title home-session-title">
                   Sesi Charging Berlangsung
                 </span>
-                <span className="dash-status-badge ok">
-                  ●{" "}
-                  {activeSession.sudah_penuh
-                    ? "Baterai Penuh"
-                    : activeSession.status}
+                <span
+                  className={`dash-status-badge ${
+                    activeSession.dijeda ? "warn" : "ok"
+                  }`}
+                >
+                  {activeSession.dijeda
+                    ? "Dijeda"
+                    : activeSession.sudah_penuh
+                      ? "Baterai Penuh"
+                      : activeSession.status}
                 </span>
               </div>
               <p className="mapdash-session-location">
@@ -1531,6 +1679,24 @@ export default function DriverDashboard({
                 Dana ditahan {formatRupiah(activeSession.saldo_hold)}. Biaya
                 akhir dihitung saat sesi selesai.
               </p>
+                {activeSession.dijeda && (
+                  <button
+                    type="button"
+                    className="dash-btn-stop"
+                    onClick={async () => {
+                      if (!activeSession?.id_session) return;
+                      try {
+                        await resumeChargingSession(activeSession.id_session);
+                        const refreshed = await getActiveChargingSession();
+                        if (refreshed) setActiveSession(refreshed);
+                      } catch (err) {
+                        setSessionError(extractErrorMessage(err, "Gagal melanjutkan sesi."));
+                      }
+                    }}
+                  >
+                    Lanjutkan
+                  </button>
+                )}
               <div className="home-session-actions">
                 <button
                   className="dash-btn-stop"
@@ -1544,11 +1710,12 @@ export default function DriverDashboard({
                       : "Hentikan Sesi"}
                 </button>
                 <button
+                  ref={interruptTriggerRef}
                   className="dash-btn-issue"
-                  onClick={handleInterruptSession}
-                  disabled={stoppingSession}
+                  onClick={openInterruptModal}
+                  disabled={stoppingSession || pausingSession}
                 >
-                  Laporkan Gangguan
+                  {pausingSession ? "Menjeda sesi..." : "Laporkan Gangguan"}
                 </button>
               </div>
               {sessionError && (
@@ -1564,13 +1731,209 @@ export default function DriverDashboard({
             </section>
           )}
 
+          {showInterruptModal &&
+            createPortal(
+              <div
+                className="interrupt-modal"
+                onMouseDown={async (event) => {
+                  if (event.target !== event.currentTarget || stoppingSession) return;
+                  if (activeSession?.id_session) {
+                    try {
+                      await resumeChargingSession(activeSession.id_session);
+                    } catch {
+                      // ignore
+                    }
+                  }
+                  setShowInterruptModal(false);
+                  setInterruptReason("");
+                  if (activeSession?.id_session) {
+                    try {
+                      const refreshed = await getActiveChargingSession();
+                      if (refreshed) setActiveSession(refreshed);
+                    } catch {
+                      // ignore
+                    }
+                  }
+                }}
+              >
+                <div className="interrupt-backdrop" aria-hidden="true" />
+                <section
+                  ref={interruptPanelRef}
+                  className="interrupt-panel"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="interrupt-title"
+                  aria-describedby="interrupt-desc"
+                  tabIndex={-1}
+                >
+                  <header className="interrupt-header">
+                    <div className="interrupt-title-wrap">
+                      <span className="interrupt-icon" aria-hidden="true">
+                        <FiAlertTriangle />
+                      </span>
+                      <div>
+                        <h3 id="interrupt-title">Laporkan Gangguan</h3>
+                        <p id="interrupt-desc">Jelaskan gangguan yang terjadi pada sesi charging.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="interrupt-close"
+                      onClick={async () => {
+                        if (stoppingSession) return;
+                        if (activeSession?.id_session) {
+                          try {
+                            await resumeChargingSession(activeSession.id_session);
+                          } catch {
+                            // ignore
+                          }
+                        }
+                        setShowInterruptModal(false);
+                        setInterruptReason("");
+                        if (activeSession?.id_session) {
+                          try {
+                            const refreshed = await getActiveChargingSession();
+                            if (refreshed) setActiveSession(refreshed);
+                          } catch {
+                            // ignore
+                          }
+                        }
+                      }}
+                      disabled={stoppingSession}
+                      aria-label="Tutup"
+                    >
+                      <FiX />
+                    </button>
+                  </header>
+                  <div className="interrupt-body">
+                    {pauseCountdown > 0 && (
+                      <div className="interrupt-warning">
+                        Sesi charging dijeda sementara. Sisa waktu: {Math.floor(pauseCountdown / 60)}:{String(pauseCountdown % 60).padStart(2, "0")}
+                      </div>
+                    )}
+                    {activeSession && (
+                      <div className="interrupt-context">
+                        <div>
+                          <span>Station</span>
+                          <strong>{activeSession.nama_lokasi}</strong>
+                        </div>
+                        <div>
+                          <span>Charger / Port</span>
+                          <strong>
+                            {activeSession.kode_charger}
+                            {activeSession.nomor_port ? ` / ${activeSession.nomor_port}` : ""}
+                          </strong>
+                        </div>
+                        <div>
+                          <span>Status sesi</span>
+                          <strong>{activeSession.status}</strong>
+                        </div>
+                      </div>
+                    )}
+                    <div className="interrupt-warning">
+                      Sesi charging akan dihentikan dan biaya dihitung dari energi yang sudah masuk.
+                    </div>
+                    <div className="interrupt-chips">
+                      {[
+                        "Charger berhenti mendadak",
+                        "Kabel/konektor bermasalah",
+                        "Layar/aplikasi error",
+                        "Lainnya",
+                      ].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          className="interrupt-chip"
+                          disabled={stoppingSession}
+                          onClick={() =>
+                            setInterruptReason((prev) =>
+                              prev ? `${prev}\\n${chip}` : chip,
+                            )
+                          }
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="interrupt-field">
+                      <span>Deskripsi gangguan</span>
+                      <textarea
+                        value={interruptReason}
+                        onChange={(e) => setInterruptReason(e.target.value)}
+                        placeholder="Contoh: charger berhenti mendadak..."
+                        maxLength={160}
+                        disabled={stoppingSession}
+                        rows={4}
+                      />
+                      <div className="interrupt-field-meta">
+                        <span>Minimal 5 karakter</span>
+                        <span>{interruptReason.length}/160</span>
+                      </div>
+                    </label>
+                    {sessionError && (
+                      <p className="interrupt-error" role="alert">
+                        {sessionError}
+                      </p>
+                    )}
+                  </div>
+                  <footer className="interrupt-footer">
+                    <button
+                      type="button"
+                      className="interrupt-btn-secondary"
+                      onClick={async () => {
+                        if (stoppingSession) return;
+                        if (activeSession?.id_session) {
+                          try {
+                            await resumeChargingSession(activeSession.id_session);
+                          } catch {
+                            // ignore
+                          }
+                        }
+                        setShowInterruptModal(false);
+                        setInterruptReason("");
+                        if (activeSession?.id_session) {
+                          try {
+                            const refreshed = await getActiveChargingSession();
+                            if (refreshed) setActiveSession(refreshed);
+                          } catch {
+                            // ignore
+                          }
+                        }
+                      }}
+                      disabled={stoppingSession}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      className="interrupt-btn-primary"
+                      onClick={() => handleInterruptSession(interruptReason)}
+                      disabled={stoppingSession || interruptReason.trim().length < 5}
+                    >
+                      {stoppingSession ? (
+                        <>
+                          <span className="interrupt-spinner" aria-hidden="true" />
+                          Mengirim...
+                        </>
+                      ) : (
+                        "Kirim Laporan"
+                      )}
+                    </button>
+                  </footer>
+                </section>
+              </div>,
+              document.body,
+            )}
+
           {invoice && (
             <section className="home-invoice-card">
               <div className="mapdash-sheet-title-row">
                 <span className="mapdash-sheet-title">
                   Invoice Digital Terakhir
                 </span>
-                <span className="dash-status-badge ok">{invoice.status}</span>
+                <span className={`dash-status-badge ${sessionStatusTone(invoice.status)}`}>
+                  {invoice.status}
+                </span>
               </div>
               <p className="mapdash-session-location">
                 <FiMapPin aria-hidden="true" /> {invoice.nama_lokasi} ·{" "}
@@ -1839,7 +2202,9 @@ export default function DriverDashboard({
                               {isIncome ? "+" : "−"}{" "}
                               {formatRupiah(trx.total)}
                             </strong>
-                            <span className="dash-status-badge ok">{trx.status}</span>
+                            <span className={`dash-status-badge ${sessionStatusTone(trx.status)}`}>
+                              {trx.status}
+                            </span>
                           </div>
                         </button>
                       );
@@ -2100,11 +2465,16 @@ export default function DriverDashboard({
                 <span className="mapdash-sheet-title">
                   Sesi Charging Berlangsung
                 </span>
-                <span className="dash-status-badge ok">
-                  ●{" "}
-                  {activeSession.sudah_penuh
-                    ? "Baterai Penuh"
-                    : activeSession.status}
+                <span
+                  className={`dash-status-badge ${
+                    activeSession.dijeda ? "warn" : "ok"
+                  }`}
+                >
+                  {activeSession.dijeda
+                    ? "Dijeda"
+                    : activeSession.sudah_penuh
+                      ? "Baterai Penuh"
+                      : activeSession.status}
                 </span>
               </div>
               <p className="mapdash-session-location">
@@ -2163,10 +2533,10 @@ export default function DriverDashboard({
                 </button>
                 <button
                   className="dash-btn-issue"
-                  onClick={handleInterruptSession}
-                  disabled={stoppingSession}
+                  onClick={openInterruptModal}
+                  disabled={stoppingSession || pausingSession}
                 >
-                  Gangguan
+                  {pausingSession ? "Menjeda..." : "Gangguan"}
                 </button>
               </div>
               {sessionError && (

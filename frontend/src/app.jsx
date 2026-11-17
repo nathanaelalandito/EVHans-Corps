@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import Welcome from './Welcome';
-import Registrasi from './Registrasi';
-import DriverDashboard from './DriverDashboard';
-import DompetDigital from './DompetDigital';
-import OperatorAdminDashboard from './OperatorAdminDashboard';
-import KelolaKendaraan from './KelolaKendaraan';
-import Bantuan from './Bantuan';
+import { lazy, Suspense, useState } from 'react';
 import { getStoredUser, getStoredToken, logout } from './api/auth';
-import OperatorDashboard from './OpsDashboard';
-import ChargerMonitor from './ChargerMonitor';
-import OpsReport from './OpsReport';
-import ProfilOps from './ProfilOps';
-import ChargerDetail from './ChargerDetail';
+
+const Welcome = lazy(() => import('./Welcome'));
+const Registrasi = lazy(() => import('./Registrasi'));
+const DriverDashboard = lazy(() => import('./DriverDashboard'));
+const DompetDigital = lazy(() => import('./DompetDigital'));
+const OperatorAdminDashboard = lazy(() => import('./OperatorAdminDashboard'));
+const KelolaKendaraan = lazy(() => import('./KelolaKendaraan'));
+const Bantuan = lazy(() => import('./Bantuan'));
+const OperatorDashboard = lazy(() => import('./OpsDashboard'));
+const ChargerMonitor = lazy(() => import('./ChargerMonitor'));
+const OpsReport = lazy(() => import('./OpsReport'));
+const ProfilOps = lazy(() => import('./ProfilOps'));
+const ChargerDetail = lazy(() => import('./ChargerDetail'));
 
 /** Menentukan layar aktif serta membagikan status autentikasi antar halaman. */
 export default function App() {
@@ -75,6 +76,7 @@ export default function App() {
     };
 
     return (
+        <Suspense fallback={<div style={{ padding: 24, textAlign: 'center' }}>Memuat halaman...</div>}>
         <div>
             {currentPage === 'welcome' && (
                 <Welcome
@@ -183,5 +185,6 @@ export default function App() {
                 <OperatorAdminDashboard user={user} onLogout={handleLogout} />
             )}
         </div>
+        </Suspense>
     );
 }

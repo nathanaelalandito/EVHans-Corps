@@ -212,6 +212,7 @@ class OperatorController extends Controller
                 'charging_session.id_session',
                 'charging_session.waktu_mulai',
                 'charging_session.total_energi_kwh',
+                'charging_session.dijeda_pada',
                 'vehicle.model as vehicle_model',
                 'vehicle.nomor_polisi'
             )
@@ -232,6 +233,7 @@ class OperatorController extends Controller
                 'vehicle' => trim(($cp->vehicle_model ?? '').' '.($cp->nomor_polisi ?? '')) ?: 'Sesi aktif',
                 'power' => $power.' kW',
                 'startedAt' => $cp->waktu_mulai,
+                'status' => $cp->dijeda_pada ? 'Dijeda' : 'Charging',
                 'energy' => $cp->total_energi_kwh !== null ? number_format($cp->total_energi_kwh, 2, ',', '.').' kWh' : 'Belum tersedia',
             ];
         }

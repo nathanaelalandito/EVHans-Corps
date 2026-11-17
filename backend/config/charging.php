@@ -13,6 +13,9 @@ return [
     // kolom `kapasitas_baterai_kwh`. Dipakai untuk membatasi pengisian maks. 100%.
     'default_battery_kwh' => (float) env('CHARGING_DEFAULT_BATTERY_KWH', 50),
 
+    // Batas maksimum jeda sesi charging (detik). Setelah lewat, sesi otomatis dilanjutkan.
+    'pause_max_seconds' => (int) env('CHARGING_PAUSE_MAX_SECONDS', 300),
+
     // SIMULASI pengisian (sementara, sampai data asli dari Perangkat Charger ada).
     // Energi dihitung dari lama sesi berjalan: daya port (kW) x waktu x kecepatan.
     // 60 = 1 menit nyata dianggap 1 jam charging. Set 1 untuk waktu nyata.
