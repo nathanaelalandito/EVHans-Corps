@@ -67,7 +67,11 @@ Contoh catatan untuk direktori Operator: `11 Nov 2026 | Fix | Tampilkan notifika
 
 Contoh catatan untuk modul Driver (validasi nomor telepon): `14 Nov 2026 | Fix | Nomor telepon dibatasi hanya angka dengan panjang maksimal 15 digit pada form Registrasi, Edit Profil Driver, Pengaturan Operator, dan form Operator Admin; aturan yang sama diterapkan di API dan kolom user_profile.nomor_telepon diperluas dari CHAR(13) menjadi VARCHAR(15) | Batas sebelumnya tidak konsisten (registrasi 15, profil dan Operator 13, kolom DB 13) sehingga nomor 14–15 digit dapat ditolak atau gagal tersimpan | Tambah util frontend utils/phone.js, validasi regex ^[0-9]{1,15}$ pada AuthController, UpdateProfileDriverRequest, OperatorController, dan OperationsController, serta migration 2026_11_14_000001_extend_nomor_telepon_on_user_profile_table; rollback migration gagal bila sudah ada nomor lebih dari 13 digit | Tim EVChargeHub | Done`.
 
+Contoh catatan untuk modul Charging (station tutup): `18 Nov 2026 | Fix | Mulai Charging dinonaktifkan untuk station yang sedang tutup; kartu rute menampilkan pesan Station sedang tutup dan jam buka berikutnya, sementara Tampilkan Rute, Google Maps, dan Detail tetap tersedia | Driver sebelumnya masih dapat membuka alur charging ke station tutup dan baru ditolak server di tengah langkah | Tambah helper isStationClosed pada DriverDashboard.jsx (is_open false atau status Tutup Sementara) yang dipakai pada tombol kartu rute, pilihan port, openStartCharging, dan alur lanjut setelah Top Up, serta kelas route-card-closed pada startCharging.css; tanpa perubahan API atau skema karena validasi server sudah ada | Tim EVChargeHub | Done`.
+
 Contoh catatan untuk modul Wallet (PIN Keamanan): `14 Nov 2026 | Create | Menu PIN Keamanan ditambahkan pada panel Pengaturan Driver untuk membuat PIN, mengubah PIN, dan mengatur ulang PIN dengan password akun, termasuk status PIN dan status dompet terkunci | PIN wajib dimiliki sebelum memulai charging, tetapi sebelumnya tidak ada antarmuka pengaturannya di menu Pengaturan | Tambah komponen PinSecuritySettings.jsx dan item menu dengan badge Belum dibuat; memakai endpoint /api/wallet/pin yang sudah ada tanpa perubahan API atau skema; fitur nonaktifkan PIN sengaja tidak ditampilkan | Tim EVChargeHub | Done`.
+
+Contoh catatan untuk modul Charging (notifikasi sesi Driver): `18 Nov 2026 | Fix | Kotak pemberitahuan sesi (mis. Laporan gangguan terkirim) dibuat selebar kartu Invoice dan diberi tombol silang untuk menutupnya | Kotak sebelumnya lebih sempit dari kartu di bawahnya dan tidak dapat ditutup | Tambah tombol tutup (aria-label Tutup pemberitahuan) yang mengosongkan sessionNotice dan gaya home-session-notice pada driverDashboard.css; tanpa perubahan API atau skema | Tim EVChargeHub | Done`.
 
 ## 7. File Terkait
 
@@ -126,6 +130,10 @@ Contoh aturan untuk EVChargeHub:
 - Perubahan status station tidak menghentikan sesi aktif, tetapi station Nonaktif/Maintenance menolak sesi baru.
 - Tindakan penghentian sesi, perubahan data teknis, dan perubahan status mencatat aktor, station, waktu, alasan, dan nilai sebelum/sesudah.
 - Admin dapat mengubah konfigurasi operasional serta simulasi; laporan Admin mendukung filter periode, station, dan charger.
+- Laporan gangguan memiliki status penanganan Menunggu, Sedang Ditangani, dan Selesai. Laporan baru berstatus Menunggu.
+- Operator menindaklanjuti laporan gangguan dari modal Detail Laporan Gangguan: Mulai penanganan hanya tersedia saat Menunggu, Tandai selesai tersedia sampai laporan Selesai.
+- Setiap perubahan status laporan gangguan wajib disertai alasan 5–500 karakter. Tombol aksi tidak aktif selama alasan belum valid atau penyimpanan berlangsung, dan kegagalan simpan menampilkan pesan tanpa mengubah status.
+- Laporan berstatus Selesai tidak menampilkan panel tindak lanjut lagi.
 - Halaman awal Admin menampilkan ringkasan lintas station dan daftar perhatian dengan akses cepat ke modul terkait.
 - Perubahan penugasan Operator menggunakan pilihan yang dapat ditinjau sebelum disimpan; perubahan status meminta alasan melalui konfirmasi.
 - Penugasan dikelola dari detail station dalam satu perubahan batch dengan pencarian Operator aktif, pratinjau jumlah penambahan/pelepasan, dan umpan balik setelah simpan. Direktori Operator menjadi tampilan informasi/jalan pintas ke station.
@@ -147,6 +155,8 @@ Aturan UX dan fungsi Driver:
 - Riwayat membedakan arus dana secara konsisten: Top Up memakai panah naik hijau dan nominal positif; pembayaran memakai panah turun merah dan nominal negatif. Status pembayaran ditampilkan terpisah dari arah dana.
 - Header Driver menata card sapaan/kendaraan aktif, saldo, dan Cari Charging Station dalam satu baris pada desktop lebar. Pada tablet, pencarian turun ke baris berikutnya; pada layar ponsel card ditumpuk. Tombol Tambah Kendaraan berada di samping label Kendaraan Aktif; Notifikasi dan Pengaturan berada di sisi sapaan.
 - Sesi aktif ditampilkan sekali pada beranda, tanpa notifikasi duplikat.
+- Pemberitahuan hasil tindakan sesi (mis. Laporan gangguan terkirim, sesi berakhir, atau sesi dilanjutkan otomatis) tampil sebagai kotak status selebar kartu Invoice di beranda, dengan tombol silang (✕) untuk menutupnya. Kotak memakai warna sukses dan tidak muncul bila sesi aktif masih ditampilkan.
+- Station yang sedang tutup (di luar jam operasional WIB atau berstatus Tutup Sementara) tidak dapat dipakai memulai charging: tombol Mulai Charging dan pilihan port dinonaktifkan, dan kartu rute menampilkan pesan Station sedang tutup beserta jam buka berikutnya. Driver tetap dapat Tampilkan Rute, membuka Google Maps, dan melihat Detail. Server tetap menolak permintaan mulai charging ke station tutup.
 - Layout desktop memakai dua kolom konten yang proporsional; layar kecil menjadi satu kolom dengan urutan informasi yang sama.
 - Saat GPS tidak tersedia, satu pesan lokasi ditampilkan dan jarak di kartu disembunyikan agar tidak berulang.
 - Ikon memakai sistem ikon aplikasi; emoji tidak digunakan sebagai ikon kontrol atau status.
@@ -162,6 +172,15 @@ Aturan UX dashboard Operator:
 - Sidebar menampilkan label pada desktop/tablet dan menjadi navigasi bawah pada layar kecil.
 - Metrik memakai placeholder saat pemuatan awal; station kosong dibedakan dari kegagalan jaringan. Badge notifikasi hanya menghitung alert dari endpoint.
 - Sesi aktif berubah menjadi kartu responsif pada layar kecil agar informasi dan tombol Akhiri Sesi mudah digunakan.
+
+Aturan UX Laporan Gangguan:
+
+- Modal Detail Laporan Gangguan menampilkan nomor laporan `LPG-######`, status, jenis gangguan, rincian charger/station/sesi/pelapor/waktu, dan deskripsi. Pelapor kosong ditampilkan sebagai Sistem / Sensor.
+- Panel Tindak lanjut Operator berada di dalam isi modal, memakai kartu bergaya sama dengan bagian lain, dan hanya tampil bila status belum Selesai.
+- Kolom Alasan perubahan status memiliki label terlihat, placeholder contoh, penghitung karakter (maks. 500), dan petunjuk minimal 5 karakter yang berubah menjadi peringatan bila belum terpenuhi.
+- Mulai penanganan memakai varian peringatan lembut yang senada dengan badge Sedang Ditangani; Tandai selesai memakai varian primer hijau. Keduanya memakai ikon dan label teks, serta menempati lebar penuh di layar kecil.
+- Saat menyimpan, label Tandai selesai berubah menjadi Menyimpan…; kesalahan tampil sebagai pesan status di modal.
+- Cetak / Simpan PDF tidak menyertakan panel tindak lanjut; Bagikan PDF mengunduh file sebagai fallback bila berbagi file tidak didukung.
 
 Aturan UX modul Station & Charger:
 

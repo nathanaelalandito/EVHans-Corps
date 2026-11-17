@@ -52,6 +52,7 @@ Pertumbuhan kendaraan listrik membuat kebutuhan platform digital charging semaki
 - Penyelesaian transaksi berdasarkan biaya aktual.
 - Struk/invoice digital dan riwayat transaksi.
 - Monitoring operator terhadap station, konektor, unit charger, dan laporan.
+- Laporan gangguan perangkat beserta tindak lanjut Operator (Menunggu, Sedang Ditangani, Selesai) dengan alasan wajib.
 - Manajemen admin untuk operator, hak akses, station, audit, dan konfigurasi.
 
 ### Tidak Termasuk
@@ -186,7 +187,19 @@ Pertumbuhan kendaraan listrik membuat kebutuhan platform digital charging semaki
 6. Form tarif menampilkan tarif berjalan, tarif yang akan disimpan, waktu berlaku, dan penjelasan bahwa sesi aktif mempertahankan tarif saat sesi dimulai.
 7. Konfirmasi perubahan status menjelaskan dampak dan prasyarat sesuai aturan perubahan status pada bagian 7.7 dan 7.8.
 
-### 7.11 Penambahan Station oleh Admin
+### 7.11 Tindak Lanjut Laporan Gangguan
+
+1. Operator atau Admin membuka Laporan Gangguan Perangkat dan memilih satu laporan untuk melihat modal Detail Laporan Gangguan.
+2. Modal menampilkan nomor laporan (`LPG-######`), status penanganan, jenis gangguan, charger, station, alamat, sesi terkait, pelapor, waktu kejadian, waktu dibuat, waktu diperbarui, dan deskripsi.
+3. Laporan baru berstatus Menunggu. Jika pelapor tidak tercatat, pelapor ditampilkan sebagai Sistem / Sensor.
+4. Panel Tindak lanjut Operator tampil di dalam isi modal selama status belum Selesai dan hanya untuk peran yang diberi wewenang menindaklanjuti.
+5. Operator mengisi Alasan perubahan status (minimal 5 dan maksimal 500 karakter). Penghitung karakter berubah menjadi peringatan jika alasan masih kurang dari 5 karakter, dan kedua tombol aksi nonaktif sampai alasan valid.
+6. Dari status Menunggu, Operator dapat memilih Mulai penanganan sehingga status menjadi Sedang Ditangani. Dari Menunggu atau Sedang Ditangani, Operator dapat memilih Tandai selesai sehingga status menjadi Selesai.
+7. Tombol dinonaktifkan saat penyimpanan berlangsung untuk mencegah klik ganda. Jika penyimpanan gagal, pesan kesalahan tampil di modal dan status tidak berubah.
+8. Laporan berstatus Selesai tidak lagi menampilkan panel tindak lanjut.
+9. Pengguna dapat mencetak laporan (Cetak / Simpan PDF) atau membagikannya sebagai PDF; unduh PDF menjadi fallback bila berbagi file tidak didukung. Panel tindak lanjut tidak ikut dicetak.
+
+### 7.12 Penambahan Station oleh Admin
 
 1. Admin membuka halaman khusus Tambah Station dengan tahapan Informasi, Operator, Tarif awal, dan Tinjau & simpan.
 2. Station baru selalu dibuat dengan status Nonaktif.
@@ -229,7 +242,7 @@ Aturan tarif minimum:
 | FR18 | Monitoring Status Charger             | Operator, Admin                    | MUST   | Status operasional diubah manual oleh Operator; Admin memantau seluruh station. |
 | FR19 | Monitoring Data Charging              | Sistem                             | MUST   | Progres dan status berasal dari sesi aktif di server; dashboard menyinkronkan ulang dan tidak mempertahankan sesi yang sudah tidak aktif. |
 | FR20 | Validasi Pemilihan Charger            | Pengemudi, Sistem                  | MUST   | Mencegah dua pengguna memakai port yang sama.               |
-| FR21 | Memulai Sesi Charging                 | Pengemudi, Sistem                  | MUST   | Proses inti tanpa aktor perangkat charger. Arrival Check harus mengikuti konfigurasi Admin dan radius aktual backend; jika nonaktif, Driver dapat memulai simulasi jarak jauh. |
+| FR21 | Memulai Sesi Charging                 | Pengemudi, Sistem                  | MUST   | Proses inti tanpa aktor perangkat charger. Arrival Check harus mengikuti konfigurasi Admin dan radius aktual backend; jika nonaktif, Driver dapat memulai simulasi jarak jauh. Station yang sedang tutup tidak dapat dipakai memulai sesi; Driver hanya dapat melihat rute, Google Maps, dan detail. |
 | FR22 | Monitoring Sesi Charging              | Pengemudi, Sistem                  | MUST   | Progres, estimasi biaya, dan status sinkron dengan server; kegagalan sinkronisasi ditampilkan kepada pengemudi. |
 | FR23 | Menghentikan Sesi Charging            | Pengemudi, Operator, Sistem        | MUST   | Operator wajib memberi alasan; biaya aktual dihitung dan sisa hold dikembalikan. |
 | FR24 | Mencatat Data Sesi Charging           | Sistem                             | MUST   | Waktu, energi simulasi, durasi, biaya, dan status.         |
@@ -249,7 +262,7 @@ Aturan tarif minimum:
 | FR38 | Melihat Riwayat Transaksi             | Pengemudi                          | MUST   | Riwayat charging dan top up, difilter menurut periode/kata kunci; ditampilkan dalam dua tabel, maksimal lima transaksi per tabel. Top Up memakai panah ke atas dan warna hijau dengan nominal positif; pembayaran memakai panah ke bawah dan warna merah dengan nominal negatif. Status tetap ditampilkan terpisah.
 | FR39 | Melihat Laporan Pendapatan            | Operator, Admin                    | SHOULD | Admin melihat lintas station dengan filter periode, station, dan charger; Operator hanya station tugas. |
 | FR40 | Melihat Laporan Utilisasi Charger     | Operator, Admin                    | SHOULD | Filter periode, station, dan charger; cakupan data mengikuti hak akses. |
-| FR41 | Melihat Laporan Gangguan Perangkat    | Operator, Admin                    | SHOULD | Gangguan tercatat; cakupan data mengikuti hak akses.       |
+| FR41 | Melihat Laporan Gangguan Perangkat    | Operator, Admin                    | SHOULD | Gangguan tercatat; cakupan data mengikuti hak akses. Detail laporan dapat dibuka dalam modal, dicetak, dan dibagikan sebagai PDF. |
 | FR42 | Notifikasi Status Charging            | Pengemudi                          | SHOULD | Selesai atau terganggu.                                    |
 | FR43 | Notifikasi Pembayaran Gagal           | Pengemudi                          | SHOULD | Info kegagalan transaksi.                                  |
 | FR44 | Notifikasi Gangguan Charger           | Operator, Admin, Pengemudi         | SHOULD | Info gangguan perangkat.                                   |
@@ -265,6 +278,7 @@ Aturan tarif minimum:
 | FR54 | Pencarian Lokasi Station              | Admin                              | SHOULD | Cari alamat secara eksplisit, pilih hasil untuk mengisi koordinat, atau tentukan titik manual pada peta. |
 | FR55 | Email Akun Operator                   | Admin                              | MUST   | Admin mengisi nama email saja; sistem melengkapi domain tetap `@ops.ac.id`, mencegah autofill email akun Admin pada kolom nama email, dan memvalidasi keunikan alamat lengkap. Nomor telepon Operator hanya menerima angka, 1–15 digit. |
 | FR56 | Kelola Charger dan Port               | Admin, Operator                    | MUST   | Admin dapat mengelola semua station; Operator hanya station yang ditugaskan. Keduanya dapat membuat dan mengubah data teknis serta status charger/port. Alasan perubahan dicatat dalam audit; status Sedang Mengisi mengikuti sesi sistem dan tidak dapat diatur manual. Jika status perangkat diubah saat sesi aktif, sistem menyelesaikan sesi berdasarkan energi aktual dan merekonsiliasi hold sebelum menerapkan status baru. |
+| FR57 | Tindak Lanjut Laporan Gangguan        | Operator                           | SHOULD | Operator mengubah status penanganan laporan (Menunggu, Sedang Ditangani, Selesai) dari modal detail dengan alasan wajib 5–500 karakter; laporan Selesai tidak menampilkan panel tindak lanjut lagi. |
 
 ## 9. Kebutuhan Nonfungsional
 
@@ -293,6 +307,7 @@ Aturan tarif minimum:
 | Payment          | `id_payment`, `id_session`, `metode`, `jumlah`, `status`, `waktu_pembayaran`, `referensi_gateway` | Pembayaran dan status transaksi.                     |
 | Wallet           | `[id_wallet]`, `id_user`, `[saldo]`, `[status]`                                                   | Perlu ditambahkan karena requirement Dompet Digital. |
 | Wallet Hold      | `[id_hold]`, `[id_wallet]`, `[id_session]`, `[jumlah_hold]`, `[status_hold]`                      | Perlu ditambahkan untuk mekanisme hold saldo.        |
+| Malfunction Log  | `id_log`, `id_session`, `jenis_error`, `deskripsi`, `waktu_terjadi`, `status_tanganan`, `created_at`, `updated_at` | Laporan gangguan; `status_tanganan`: Menunggu, Sedang Ditangani, Selesai. |
 | Audit Log        | `[id_audit]`, `[aktor]`, `[aksi]`, `[data_sebelum]`, `[data_sesudah]`, `[timestamp]`              | Mendukung audit operasional.                         |
 
 ## 11. Use Case Utama
@@ -313,6 +328,7 @@ Aturan tarif minimum:
 | Risiko/Pertanyaan                      | Keputusan Sementara                                                                                        | Tindak Lanjut                                         |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | Operator menandai unit yang sedang dipakai sebagai gangguan | Sistem menyelesaikan sesi dan saldo dari energi aktual, lalu menerapkan status gangguan/perawatan dalam satu transaksi. | Gagal settlement membatalkan perubahan status. |
+| Laporan gangguan tidak ditindaklanjuti | Laporan baru berstatus Menunggu; Operator memindahkannya ke Sedang Ditangani lalu Selesai dengan alasan wajib. | Pastikan setiap perubahan status laporan menyimpan alasan dan waktu pembaruan. |
 | Dua pengguna memilih charger yang sama | Sistem melakukan validasi ketersediaan saat pemilihan dan sebelum sesi dimulai.                            | Definisikan locking/atomic update di SDD.             |
 | Selisih hold saldo dan biaya aktual    | Pembayaran akhir menggunakan biaya aktual; sisa hold dikembalikan otomatis.                                 | Nilai tercatat pada transaksi dan audit tindakan Operator. |
 | Perubahan tarif saat charger digunakan | Tarif langsung berlaku untuk sesi baru atau terjadwal berlaku pada waktu pilihan; sesi aktif tetap memakai tarif awal. | Jadwal bertabrakan ditolak; jadwal mendatang dapat diubah/dibatalkan oleh staf berwenang. |
@@ -353,6 +369,16 @@ Aturan tarif minimum:
 - Menonaktifkan PIN tidak ditampilkan di antarmuka karena PIN wajib untuk memulai charging.
 - Input nomor telepon pada Registrasi dan Edit Profil hanya menerima angka maksimal 15 digit; karakter lain dibuang otomatis dan API menolak nilai di luar aturan tersebut.
 
+### 12.4 Aturan UX Laporan Gangguan
+
+- Modal Detail Laporan Gangguan menyusun informasi berurutan: judul dan nomor laporan, status dan jenis gangguan, rincian data, deskripsi, lalu panel Tindak lanjut Operator dan tindakan umum.
+- Panel Tindak lanjut Operator berada di dalam isi modal dengan jarak dan gaya kartu yang sama dengan bagian lain, serta hanya tampil bila status belum Selesai.
+- Kolom Alasan perubahan status memiliki label yang selalu terlihat, placeholder contoh, penghitung karakter (maks. 500), dan petunjuk minimal 5 karakter yang berubah menjadi peringatan bila belum terpenuhi.
+- Mulai penanganan memakai varian peringatan lembut yang senada dengan badge Sedang Ditangani dan hanya muncul saat status Menunggu. Tandai selesai memakai varian primer hijau. Tombol memakai ikon bermakna dan tidak aktif selama alasan belum valid atau penyimpanan berlangsung.
+- Saat penyimpanan, label Tandai selesai berubah menjadi Menyimpan…; kesalahan ditampilkan sebagai pesan status di modal.
+- Panel tindak lanjut tidak ikut tercetak; Cetak / Simpan PDF hanya memuat detail laporan.
+- Di layar kecil, tombol tindak lanjut menempati lebar penuh agar mudah dijangkau.
+
 ## 13. Backlog Dokumen
 
 | Kode  | Dokumen                                               | MoSCoW | Catatan                                                |
@@ -383,6 +409,8 @@ Aturan tarif minimum:
 - `[ ]` Operator dapat memantau status charger sesuai cabang/station yang ditugaskan.
 - `[ ]` Admin dapat mengelola operator, hak akses, station, konfigurasi, dan audit.
 - `[ ]` Admin langsung melihat ringkasan lintas station dan daftar kondisi yang perlu ditindaklanjuti.
+- `[ ]` Operator dapat mengubah status laporan gangguan dari Menunggu ke Sedang Ditangani dan Selesai hanya jika alasan minimal 5 karakter diisi; alasan di bawah 5 karakter ditolak pada form.
+- `[ ]` Laporan berstatus Selesai tidak menampilkan panel Tindak lanjut Operator, dan panel tidak ikut tercetak.
 
 ## 15. Timeline Proyek
 

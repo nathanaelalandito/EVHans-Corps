@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { FaChargingStation, FaPrint, FaShareAlt, FaTimes, FaWrench } from 'react-icons/fa';
+import {
+    FaCheckCircle,
+    FaChargingStation,
+    FaClipboardCheck,
+    FaPlay,
+    FaPrint,
+    FaShareAlt,
+    FaTimes,
+    FaWrench,
+} from 'react-icons/fa';
 import { createMalfunctionPdf, malfunctionPdfName } from './utils/malfunctionPdf';
 import './malfunctionReportModal.css';
 
@@ -129,14 +138,42 @@ export default function MalfunctionReportModal({ log, onClose, onSetHandling }) 
                 </div>
 
                 {onSetHandling && status !== 'Selesai' && (
-                    <section className="malfunction-modal-description" aria-label="Tindak lanjut Operator">
-                        <h3>Tindak lanjut Operator</h3>
-                        <label>Alasan perubahan status
-                            <textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength={5} maxLength={500} />
+                    <section className="malfunction-modal-handling" aria-label="Tindak lanjut Operator">
+                        <h3><FaClipboardCheck aria-hidden="true" /> Tindak lanjut Operator</h3>
+                        <label className="malfunction-modal-field" htmlFor="malfunction-handling-reason">
+                            <span>Alasan perubahan status</span>
+                            <textarea
+                                id="malfunction-handling-reason"
+                                value={reason}
+                                onChange={(event) => setReason(event.target.value)}
+                                minLength={5}
+                                maxLength={500}
+                                rows={3}
+                                placeholder="Contoh: Teknisi sudah dijadwalkan ke lokasi."
+                            />
+                            <small className={reason.trim().length > 0 && reason.trim().length < 5 ? 'is-invalid' : ''}>
+                                {reason.trim().length}/500 karakter · minimal 5
+                            </small>
                         </label>
                         <div className="malfunction-modal-handling-actions">
-                            {status === 'Menunggu' && <button type="button" disabled={savingStatus || reason.trim().length < 5} onClick={() => updateHandling('Sedang Ditangani')}>Mulai penanganan</button>}
-                            <button type="button" disabled={savingStatus || reason.trim().length < 5} onClick={() => updateHandling('Selesai')}>{savingStatus ? 'Menyimpan…' : 'Tandai selesai'}</button>
+                            {status === 'Menunggu' && (
+                                <button
+                                    type="button"
+                                    className="malfunction-modal-button is-warning"
+                                    disabled={savingStatus || reason.trim().length < 5}
+                                    onClick={() => updateHandling('Sedang Ditangani')}
+                                >
+                                    <FaPlay aria-hidden="true" /> Mulai penanganan
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                className="malfunction-modal-button is-primary"
+                                disabled={savingStatus || reason.trim().length < 5}
+                                onClick={() => updateHandling('Selesai')}
+                            >
+                                <FaCheckCircle aria-hidden="true" /> {savingStatus ? 'Menyimpan…' : 'Tandai selesai'}
+                            </button>
                         </div>
                     </section>
                 )}

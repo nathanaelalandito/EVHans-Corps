@@ -42,6 +42,8 @@ Template ini disesuaikan untuk EVChargeHub, yaitu sistem manajemen charging EV d
 | Charger tidak tersedia | `Charger sudah digunakan. Pilih charger lain yang tersedia.`               | `Not available.`       |
 | Invoice                | `Invoice digital telah diterbitkan dan tersimpan di riwayat transaksi.`    | `Receipt done.`        |
 | Operator alert         | `Unit Charger CHG-02 offline sejak 10:24.`                                 | `Device issue.`        |
+| Alasan tindak lanjut   | `Alasan tindak lanjut minimal 5 karakter.`                                 | `Invalid.`             |
+| Status laporan gagal   | `Status laporan tidak dapat diperbarui. Coba lagi.`                        | `Error.`               |
 
 ## 4. Terminologi UI
 
@@ -55,6 +57,8 @@ Template ini disesuaikan untuk EVChargeHub, yaitu sistem manajemen charging EV d
 | Biaya Aktual     | Biaya berdasarkan daya aktual dan parkir           | Digunakan saat settlement.                                        |
 | Sesi Charging    | Proses charging dari mulai sampai selesai/terhenti | Memiliki status sendiri.                                          |
 | Invoice Digital  | Bukti transaksi akhir                              | Tersimpan di riwayat.                                             |
+| Laporan Gangguan | Catatan gangguan perangkat dengan nomor `LPG-######` | Memiliki status penanganan sendiri.                              |
+| Tindak Lanjut    | Aksi Operator mengubah status penanganan laporan   | Selalu disertai alasan perubahan status.                          |
 
 ## 5. Warna
 
@@ -120,6 +124,14 @@ Isi nilai hex final sesuai keputusan tim. Gunakan token berikut sebagai struktur
 | Offline            | Perangkat tidak tersambung | Operator perlu memantau.               |
 | Rusak              | Charger bermasalah         | Tidak dapat dipilih.                   |
 | Maintenance        | Charger sedang perawatan   | Tidak dapat dipilih.                   |
+
+### Status Laporan Gangguan
+
+| Status           | Arti                                       | Aksi Operator                                          | Warna badge |
+| ---------------- | ------------------------------------------ | ------------------------------------------------------ | ----------- |
+| Menunggu         | Laporan baru, belum ditangani              | `Mulai penanganan` atau `Tandai selesai` dengan alasan | Danger lembut |
+| Sedang Ditangani | Operator sedang menangani gangguan         | `Tandai selesai` dengan alasan                         | Warning lembut |
+| Selesai          | Gangguan sudah ditangani                   | Tidak ada; panel tindak lanjut disembunyikan           | Success lembut |
 
 ### Status Transaksi
 
@@ -191,7 +203,7 @@ Elemen minimal:
 - Alert offline/rusak/maintenance.
 - Utilisasi charger.
 - Laporan pendapatan.
-- Laporan gangguan perangkat.
+- Laporan gangguan perangkat dan tindak lanjutnya (Menunggu, Sedang Ditangani, Selesai).
 
 ### Dashboard Admin
 
@@ -215,6 +227,10 @@ Elemen minimal:
 | Lihat Invoice         | Secondary         | Setelah transaksi selesai.             |
 | Ubah Tarif            | Secondary         | Untuk operator/admin sesuai hak akses. |
 | Nonaktifkan Charger   | Danger            | Untuk operator/admin sesuai hak akses. |
+| Mulai Penanganan      | Warning           | Hanya saat laporan Menunggu; warna senada badge Sedang Ditangani; alasan wajib. |
+| Tandai Selesai        | Primary           | Menutup laporan gangguan; alasan wajib; label berubah menjadi `Menyimpan…` saat proses. |
+| Cetak / Simpan PDF    | Primary/Secondary | Laporan gangguan; panel tindak lanjut tidak ikut tercetak. |
+| Bagikan PDF           | Primary/Secondary | Mengunduh file sebagai fallback bila berbagi file tidak didukung. |
 
 ## 10. Form dan Validasi
 
@@ -225,6 +241,7 @@ Elemen minimal:
 - Field daya menggunakan satuan `kWh` atau `kW` sesuai konteks.
 - Field koordinat harus divalidasi sebagai latitude/longitude.
 - PIN tidak ditampilkan sebagai teks biasa.
+- Kolom `Alasan perubahan status` pada tindak lanjut laporan gangguan: minimal 5 dan maksimal 500 karakter, label tetap terlihat, ada penghitung karakter, dan tombol aksi tetap nonaktif sampai alasan valid.
 
 ## 11. Empty, Loading, dan Error State
 
@@ -270,5 +287,6 @@ Elemen minimal:
 - Wireframe sesi charging berjalan.
 - Wireframe invoice/riwayat transaksi.
 - Wireframe dashboard operator.
+- Wireframe modal detail laporan gangguan beserta panel Tindak lanjut Operator.
 - Wireframe dashboard admin.
 - Permission matrix admin/operator.

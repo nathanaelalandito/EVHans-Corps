@@ -115,6 +115,10 @@ Aturan bisnis Admin/Operator EVChargeHub:
 - Perubahan penting dicatat dengan aktor, waktu, dan nilai sebelum/sesudah.
 - Admin dapat mengubah konfigurasi operasional dan simulasi proyek; perubahan konfigurasi masuk audit.
 - Laporan Admin dapat difilter berdasarkan periode, station, dan charger; Operator hanya melihat data station tugas.
+- Laporan gangguan memiliki status penanganan Menunggu, Sedang Ditangani, dan Selesai. Laporan baru berstatus Menunggu.
+- Operator menindaklanjuti laporan gangguan dari modal Detail Laporan Gangguan: Mulai penanganan hanya tersedia saat Menunggu, Tandai selesai tersedia sampai laporan Selesai.
+- Setiap perubahan status laporan gangguan wajib disertai alasan 5–500 karakter. Tombol aksi tidak aktif selama alasan belum valid atau penyimpanan berlangsung, dan kegagalan simpan menampilkan pesan tanpa mengubah status.
+- Laporan berstatus Selesai tidak menampilkan panel tindak lanjut lagi.
 - Halaman awal Admin merangkum station aktif, unit charger, sesi berjalan, pendapatan, serta station yang perlu perhatian.
 - Navigasi Admin desktop memakai sidebar ringkas; pada layar kecil navigasi tetap mudah dijangkau tanpa menumpuk statistik menjadi satu kolom panjang.
 
@@ -134,8 +138,10 @@ Aturan UX Dashboard Driver:
 - Nota memiliki tindakan Cetak dan Bagikan PDF. Cetak memakai tata letak nota pada kertas; jika browser/perangkat tidak mendukung berbagi file, Bagikan PDF mengunduh file sebagai fallback.
 - Invoice mengambil nilai dari transaksi tersimpan dan tidak menghitung ulang biaya memakai tarif station terbaru. Akses detail invoice dibatasi pada transaksi milik pengemudi yang sedang login.
 - Jangan menampilkan notifikasi sesi aktif yang mengulang isi kartu sesi. Desktop menggunakan dua kolom konten yang seimbang; mobile menggunakan satu kolom dengan urutan yang sama.
+- Pemberitahuan hasil tindakan sesi (mis. Laporan gangguan terkirim, sesi berakhir, atau sesi dilanjutkan otomatis) tampil sebagai kotak status selebar kartu Invoice di beranda, dengan tombol silang (✕) untuk menutupnya. Kotak memakai warna sukses dan tidak muncul bila sesi aktif masih ditampilkan.
 - Saat GPS tidak tersedia, tampilkan satu pesan lokasi dan sembunyikan jarak pada kartu station.
 - Tombol Mulai Charging mengikuti status Arrival Check dan radius yang dikirim backend. Saat Arrival Check nonaktif, Driver dapat membuka alur charging dari jarak jauh untuk simulasi; saat aktif, Driver harus mengaktifkan lokasi dan berada dalam radius yang dikonfigurasi. Server tetap menjadi pemeriksa akhir.
+- Station yang sedang tutup (di luar jam operasional WIB atau berstatus Tutup Sementara) tidak dapat dipakai memulai charging: tombol Mulai Charging dan pilihan port dinonaktifkan, dan kartu rute menampilkan pesan Station sedang tutup beserta jam buka berikutnya. Driver tetap dapat Tampilkan Rute, membuka Google Maps, dan melihat Detail. Server tetap menolak permintaan mulai charging ke station tutup.
 
 Aturan UX dashboard Operator:
 
@@ -147,6 +153,15 @@ Aturan UX dashboard Operator:
 - Sidebar tetap menampilkan ikon dan label pada desktop/tablet; pada ponsel berubah menjadi navigasi bawah dengan status aktif yang jelas.
 - Metrik menampilkan placeholder selama pemuatan awal, bukan angka nol yang dapat disalahartikan sebagai nilai aktual. Station tanpa penugasan, kegagalan memuat, dan pemuatan awal memiliki status yang berbeda.
 - Badge Pusat Notifikasi menghitung alert yang benar-benar disediakan endpoint dashboard. Daftar sesi aktif beralih ke kartu ringkas pada layar kecil agar aksi Akhiri Sesi mudah dijangkau.
+
+Aturan UX Laporan Gangguan:
+
+- Modal Detail Laporan Gangguan menampilkan nomor laporan `LPG-######`, status, jenis gangguan, rincian charger/station/sesi/pelapor/waktu, dan deskripsi. Pelapor kosong ditampilkan sebagai Sistem / Sensor.
+- Panel Tindak lanjut Operator berada di dalam isi modal, memakai kartu bergaya sama dengan bagian lain, dan hanya tampil bila status belum Selesai.
+- Kolom Alasan perubahan status memiliki label terlihat, placeholder contoh, penghitung karakter (maks. 500), dan petunjuk minimal 5 karakter yang berubah menjadi peringatan bila belum terpenuhi.
+- Mulai penanganan memakai varian peringatan lembut yang senada dengan badge Sedang Ditangani; Tandai selesai memakai varian primer hijau. Keduanya memakai ikon dan label teks, serta menempati lebar penuh di layar kecil.
+- Saat menyimpan, label Tandai selesai berubah menjadi Menyimpan…; kesalahan tampil sebagai pesan status di modal.
+- Cetak / Simpan PDF tidak menyertakan panel tindak lanjut; Bagikan PDF mengunduh file sebagai fallback bila berbagi file tidak didukung.
 
 Aturan UX Station & Charger:
 
@@ -211,6 +226,14 @@ Aturan proses Tambah Station:
 
 Operator mengubah status operasional secara manual pada station yang ditugaskan. Status Sedang Mengisi Daya hanya berubah mengikuti sesi charging oleh sistem.
 
+### Status Laporan Gangguan
+
+- Menunggu
+- Sedang Ditangani
+- Selesai
+
+Status laporan gangguan diubah Operator melalui panel Tindak lanjut Operator dengan alasan wajib.
+
 ### Status Sesi/Transaksi
 
 - Estimasi
@@ -226,6 +249,8 @@ Operator mengubah status operasional secara manual pada station yang ditugaskan.
 | --- | --- |
 | Saldo Dompet Digital tidak cukup | Sistem meminta pengemudi melakukan top up. |
 | Charger berubah menjadi tidak tersedia | Sistem membatalkan pemilihan dan meminta pengguna memilih charger lain. |
+| Alasan tindak lanjut kurang dari 5 karakter | Tombol Mulai penanganan dan Tandai selesai tetap nonaktif; penghitung karakter menampilkan peringatan. |
+| Penyimpanan status laporan gangguan gagal | Modal menampilkan pesan kesalahan dan status laporan tidak berubah. |
 | Charging gagal sebelum selesai | Sistem menghitung biaya berdasarkan daya aktual dan memperbarui status transaksi. |
 | Payment gateway gagal saat top up | Sistem mencatat status gagal dan menampilkan pesan kepada pengemudi. |
 | Operator tidak berwenang atas station | Sistem menolak akses dan mencatat audit jika diperlukan. |

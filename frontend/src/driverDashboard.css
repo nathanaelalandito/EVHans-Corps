@@ -5599,3 +5599,39 @@
     animation: none;
   }
 }
+/* Notifikasi sesi (mis. "Laporan gangguan terkirim") selebar kartu invoice. */
+.home-content > .home-session-notice {
+    grid-column: 1 / -1;
+    box-sizing: border-box;
+    width: 100%;
+    margin-bottom: 0;
+    padding: 14px 16px;
+    border: 1px solid #c7e8bb;
+    border-radius: 8px;
+    background: #eaf7e5;
+    color: #235a2f;
+    font-weight: 600;
+}
+
+.home-session-notice-close {
+    display: inline-grid;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.home-session-notice-close:hover {
+    background: rgb(35 90 47 / 12%);
+}
+
+.home-session-notice-close:focus-visible {
+    outline: 3px solid rgba(46, 125, 50, 0.35);
+    outline-offset: 2px;
+}

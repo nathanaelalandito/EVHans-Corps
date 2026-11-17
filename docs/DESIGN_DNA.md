@@ -75,23 +75,28 @@ status—selalu sertakan label atau ikon yang bermakna.
 - Putih, radius `--ev-radius-lg`, border tipis `--ev-border`, bayangan halus.
 - Padding minimum 16px pada mobile dan 24px pada desktop.
 - Hindari kartu di dalam kartu kecuali ada perbedaan konteks yang jelas.
+- Panel aksi di dalam modal (misalnya Tindak lanjut Operator) diletakkan di dalam isi modal dengan padding dan jarak yang sama seperti panel lain, bukan di luar isi modal.
 
 ### Tombol
 
 - Satu CTA primer per kelompok aksi; sisanya gunakan secondary atau text button.
 - Tinggi minimum `--ev-touch-target` (44px).
 - Tombol primer memakai hijau EV dan teks putih; jangan memakai shadow berat.
+- Aksi yang memindahkan item ke status "sedang berjalan" (misalnya Mulai penanganan) memakai varian peringatan lembut yang senada dengan badge statusnya; aksi yang menyelesaikan memakai primer.
+- Tombol yang belum dapat dipakai tampil nonaktif dengan jelas (opacity turun, kursor `not-allowed`) dan disertai petunjuk syarat yang belum terpenuhi.
 
 ### Input dan filter
 
 - Border netral, fokus hijau dengan focus ring yang jelas.
 - Label tetap terlihat; placeholder bukan pengganti label.
+- Input teks panjang yang wajib (misalnya alasan perubahan status) menampilkan penghitung karakter dan batas minimum/maksimum di dekat field.
 
 ### Status
 
 - Gunakan pill/badge kecil dengan teks: `Tersedia`, `Mengisi daya`,
   `Terisi penuh`, `Gangguan`, dan seterusnya.
 - Ikon dan warna mendukung label; teks tetap menjadi sumber makna utama.
+- Status penanganan laporan gangguan: `Menunggu`, `Sedang Ditangani`, `Selesai`.
 
 ## 7. Spacing, radius, dan elevasi
 

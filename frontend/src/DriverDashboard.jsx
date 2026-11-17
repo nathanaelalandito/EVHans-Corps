@@ -124,6 +124,11 @@ function getGreeting() {
   return "Selamat malam";
 }
 
+/** Station tutup (di luar jam operasional atau Tutup Sementara) tidak boleh memulai charging. */
+function isStationClosed(station) {
+  return station?.is_open === false || station?.status === "Tutup Sementara";
+}
+
 /** Membentuk label ketersediaan station dari status dan jumlah port bebas. */
 function stationStatusLabel(station) {
   const text = stationAvailabilityLabel(station);
@@ -738,7 +743,7 @@ export default function DriverDashboard({
       (item) =>
         String(item.id_location) === String(resumeChargingContext.stationId),
     );
-    if (station) {
+    if (station && !isStationClosed(station)) {
       setSelectedStationId(station.id_location);
       setStartPortId(resumeChargingContext.portId ?? null);
       setShowStartCharging(true);
@@ -1211,6 +1216,12 @@ export default function DriverDashboard({
   // Mulai charging langsung dari port yang dipilih di daftar station.
   /** Membuka alur persiapan charging untuk station dan port terpilih. */
   const openStartCharging = (station, port) => {
+    if (isStationClosed(station)) {
+      setSessionError(
+        "Station sedang tutup. Anda hanya dapat melihat rute, membuka Google Maps, atau melihat detail station.",
+      );
+      return;
+    }
     if (
       chargingSettings.require_arrival &&
       (locationStatus !== "live" || !driverPosition)
@@ -1687,8 +1698,16 @@ export default function DriverDashboard({
 
         <main className="home-content">
           {sessionNotice && !activeSession && (
-            <div className="home-inline-error" role="status">
-              {sessionNotice}
+            <div className="home-inline-error home-session-notice" role="status">
+              <span>{sessionNotice}</span>
+              <button
+                type="button"
+                className="home-session-notice-close"
+                onClick={() => setSessionNotice("")}
+                aria-label="Tutup pemberitahuan"
+              >
+                <FiX aria-hidden="true" />
+              </button>
             </div>
           )}
           {sessionSyncError && !activeSession && (
@@ -2447,7 +2466,16 @@ export default function DriverDashboard({
             )}
 
             <div className="route-card-start-block">
-              {!chargingSettings.require_arrival ? (
+              {isStationClosed(selectedStation) ? (
+                <p className="route-card-closed" role="status">
+                  Station sedang tutup
+                  {selectedStation.buka_berikutnya
+                    ? `, buka pukul ${selectedStation.buka_berikutnya} WIB`
+                    : ""}
+                  . Mulai charging tidak tersedia; Anda masih dapat melihat
+                  rute, membuka Google Maps, atau melihat detail.
+                </p>
+              ) : !chargingSettings.require_arrival ? (
                 <p className="route-card-arrived">
                   Mode uji coba jarak jauh aktif.
                 </p>
@@ -2465,7 +2493,10 @@ export default function DriverDashboard({
               <button
                 className="route-card-start"
                 onClick={() => openStartCharging(selectedStation, null)}
-                disabled={chargingSettings.require_arrival && !hasArrived}
+                disabled={
+                  isStationClosed(selectedStation) ||
+                  (chargingSettings.require_arrival && !hasArrived)
+                }
               >
                 <FiZap aria-hidden="true" /> Mulai Charging
               </button>
@@ -2746,7 +2777,7 @@ export default function DriverDashboard({
                                 <button
                                   key={charger.id_port}
                                   className="charger-option"
-                                  disabled={!s.can_start || chargerBadge.tone !== "ok"}
+                                  disabled={isStationClosed(s) || !s.can_start || chargerBadge.tone !== "ok"}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     openStartCharging(s, charger);
