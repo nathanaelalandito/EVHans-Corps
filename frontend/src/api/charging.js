@@ -18,6 +18,7 @@ export function toDashboardSession(s) {
         nama_lokasi: s.nama_lokasi,
         kode_charger: s.kode_charger,
         nomor_port: s.nomor_port ?? null,
+        status_port: s.status_port ?? null,
         status: s.sudah_penuh ? 'Penuh' : 'Charging',
         sudah_penuh: !!s.sudah_penuh,
         soc_sekarang: s.soc_sekarang ?? s.soc_awal ?? null,

@@ -1031,8 +1031,8 @@ export default function DriverDashboard({
             session.nama_lokasi === "UKDW" &&
             session.kode_charger === "CHG-0005B" &&
             session.nomor_port === "Port B" &&
-            Number(session.target_energi_kwh || 0) > 0 &&
-            Number(session.energi_kwh || 0) >= Number(session.target_energi_kwh || 0) / 2;
+            Number(session.target_kwh || 0) > 0 &&
+            Number(session.energi_kwh || 0) >= Number(session.target_kwh || 0) / 2;
 
           if (isSimulatedFailureTarget && simulatedFailureRef.current !== session.id_session) {
             simulatedFailureRef.current = session.id_session;
