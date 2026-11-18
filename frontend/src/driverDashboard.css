@@ -629,6 +629,17 @@
     opacity: 0.7;
 }
 
+.mapdash-session-status {
+    left: 50%;
+    right: auto;
+    width: auto;
+    max-width: min(90vw, 360px);
+    transform: translateX(-50%);
+    padding: 8px 36px 8px 14px;
+    justify-content: flex-start;
+    text-align: left;
+}
+
 /* Filter konektor mengambang */
 .mapdash-filters {
     position: absolute;

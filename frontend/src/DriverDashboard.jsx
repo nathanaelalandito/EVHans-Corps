@@ -2382,8 +2382,8 @@ export default function DriverDashboard({
         {showSessionStatus && activeSession && (
           <div className="mapdash-notif mapdash-session-status" role="status" aria-label="Status sesi charging">
               <span>
-                <FiZap aria-hidden="true" /> <strong>Sesi aktif</strong> ·{" "}
-                {activeSession.nama_lokasi}
+                <FiZap aria-hidden="true" /> <strong>Sesi aktif</strong> di{" "}
+                <strong>{activeSession.nama_lokasi}</strong> sedang berjalan.
               </span>
             <button
               className="mapdash-notif-close"
