@@ -1216,9 +1216,9 @@ export default function DriverDashboard({
   // Mulai charging langsung dari port yang dipilih di daftar station.
   /** Membuka alur persiapan charging untuk station dan port terpilih. */
   const openStartCharging = (station, port) => {
-    if (isStationClosed(station)) {
+    if (isStationClosed(station) || station?.can_start === false) {
       setSessionError(
-        "Station sedang tutup. Anda hanya dapat melihat rute, membuka Google Maps, atau melihat detail station.",
+        "Station sedang tidak tersedia untuk charging. Anda hanya dapat melihat rute, membuka Google Maps, atau melihat detail station.",
       );
       return;
     }
@@ -2505,6 +2505,7 @@ export default function DriverDashboard({
                 onClick={() => openStartCharging(selectedStation, null)}
                 disabled={
                   isStationClosed(selectedStation) ||
+                  selectedStation?.can_start === false ||
                   (chargingSettings.require_arrival && !hasArrived)
                 }
               >
