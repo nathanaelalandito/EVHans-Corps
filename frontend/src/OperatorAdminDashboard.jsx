@@ -1842,7 +1842,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                                                 <td>{item.kategori}</td>
                                                 <td><strong>{item.aktor}</strong></td>
                                                 <td>{item.stasiun}</td>
-                                                <td>{item.detail}</td>
+                                                <td style={{ whiteSpace: 'pre-line' }}>{item.detail}</td>
                                                 <td>
                                                     <span className={`ops-badge-status ops-badge-${(item.status || 'sukses').toLowerCase()}`}>
                                                         {item.status}
