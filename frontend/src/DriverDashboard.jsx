@@ -1215,8 +1215,9 @@ export default function DriverDashboard({
       );
       setShowInterruptModal(false);
       setInterruptReason("");
-      setSessionError("Laporan gangguan terkirim.");
-      afterSessionSettled(interruptedInvoice).catch(() => {});
+      afterSessionSettled(interruptedInvoice)
+        .then(() => setSessionError("Laporan gangguan terkirim."))
+        .catch(() => setSessionError("Laporan gangguan terkirim."));
     } catch (err) {
       setSessionError(
         extractErrorMessage(err, "Gagal memproses gangguan sesi charging."),
