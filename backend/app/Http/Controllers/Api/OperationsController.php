@@ -953,9 +953,9 @@ class OperationsController extends Controller
                     'kategori' => 'Perubahan Tarif',
                     'aktor' => $log->user?->profile?->nama_lengkap ?? $log->user?->email ?? 'Akun dihapus',
                     'stasiun' => $log->location?->nama_lokasi ?? 'Station dihapus',
-                    'detail' => $log->aksi.' · sebelum: '.json_encode($log->data_sebelum, JSON_UNESCAPED_UNICODE).' · sesudah: '.json_encode($log->data_sesudah, JSON_UNESCAPED_UNICODE),
+                    'detail' => ucwords(str_replace('_', ' ', $log->aksi)).' · Sebelum: '.$this->formatAuditData($log->data_sebelum).' · Sesudah: '.$this->formatAuditData($log->data_sesudah).($log->alasan ? ' · Alasan: '.$log->alasan : ''),
                     'nominal' => ($log->data_sesudah ?? [])['harga_per_kwh'] ?? 0,
-                    'status' => str_replace('_', ' ', $log->aksi),
+                    'status' => ucwords(str_replace('_', ' ', $log->aksi)),
                     'timestamp' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
                 ];
             });
@@ -985,7 +985,7 @@ class OperationsController extends Controller
                 'kategori' => str_replace('_', ' ', $log->aksi),
                 'aktor' => $log->user?->profile?->nama_lengkap ?? $log->user?->email ?? 'Akun dihapus',
                 'stasiun' => $log->location?->nama_lokasi ?? '—',
-                'detail' => 'Sebelum: '.json_encode($log->data_sebelum, JSON_UNESCAPED_UNICODE).' · Sesudah: '.json_encode($log->data_sesudah, JSON_UNESCAPED_UNICODE).($log->alasan ? ' · Alasan: '.$log->alasan : ''),
+                'detail' => 'Sebelum: '.$this->formatAuditData($log->data_sebelum).' · Sesudah: '.$this->formatAuditData($log->data_sesudah).($log->alasan ? ' · Alasan: '.$log->alasan : ''),
                 'nominal' => 0,
                 'status' => 'Tercatat',
                 'timestamp' => $log->created_at?->format('Y-m-d H:i:s') ?? '-',
@@ -1462,6 +1462,33 @@ class OperationsController extends Controller
         if ($request->user()->peran !== 'admin') {
             abort(403, 'Hanya admin yang dapat mengelola akun operator.');
         }
+    }
+
+    /** Mengubah data audit menjadi teks yang mudah dibaca pada dashboard admin. */
+    private function formatAuditData(?array $data): string
+    {
+        if (empty($data)) {
+            return '-';
+        }
+
+        $parts = [];
+        foreach ($data as $key => $value) {
+            $label = ucwords(str_replace('_', ' ', (string) $key));
+            if (is_numeric($value) && (str_contains(strtolower((string) $key), 'harga') || str_contains(strtolower((string) $key), 'biaya'))) {
+                $value = 'Rp'.number_format((float) $value, 0, ',', '.');
+            }
+            if (is_array($value)) {
+                $value = implode(', ', $value);
+            } elseif (is_bool($value)) {
+                $value = $value ? 'Ya' : 'Tidak';
+            } elseif ($value === null) {
+                $value = '-';
+            }
+
+            $parts[] = "{$label}: {$value}";
+        }
+
+        return implode(' · ', $parts);
     }
 
     /** Mengubah model lokasi beserta charger menjadi format dashboard. */
