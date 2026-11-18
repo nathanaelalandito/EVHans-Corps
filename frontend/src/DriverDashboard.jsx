@@ -1004,6 +1004,7 @@ export default function DriverDashboard({
   }, [view]);
 
   const activeSessionId = activeSession?.id_session;
+  const simulatedFailureRef = useRef(null);
   useEffect(() => {
     if (!activeSessionId) return;
     let cancelled = false;
@@ -1014,6 +1015,7 @@ export default function DriverDashboard({
           if (cancelled) return;
           setSessionSyncError("");
           if (!session) {
+            simulatedFailureRef.current = null;
             setActiveSession(null);
             setShowSessionStatus(false);
             reloadStations();
@@ -1024,6 +1026,37 @@ export default function DriverDashboard({
             );
             return;
           }
+
+          const isSimulatedFailureTarget =
+            session.nama_lokasi === "UKDW" &&
+            session.kode_charger === "CHG-0005B" &&
+            session.nomor_port === "Port B" &&
+            Number(session.target_energi_kwh || 0) > 0 &&
+            Number(session.energi_kwh || 0) >= Number(session.target_energi_kwh || 0) / 2;
+
+          if (isSimulatedFailureTarget && simulatedFailureRef.current !== session.id_session) {
+            simulatedFailureRef.current = session.id_session;
+            interruptChargingSession(session.id_session, {
+              status: "gagal",
+              alasan: "Simulasi gangguan charger saat pengisian berlangsung.",
+            })
+              .then((invoice) => {
+                if (cancelled) return;
+                setInvoice(invoice);
+                setActiveSession(null);
+                setShowSessionStatus(false);
+                reloadStations();
+                fetchWallet();
+                fetchTransactionHistory();
+                setSessionNotice("Sesi charging terhenti karena simulasi gangguan charger.");
+              })
+              .catch(() => {
+                if (cancelled) return;
+                setSessionError("Simulasi gangguan charger gagal diproses.");
+              });
+            return;
+          }
+
           setActiveSession(session);
           setShowSessionStatus(true);
         })
