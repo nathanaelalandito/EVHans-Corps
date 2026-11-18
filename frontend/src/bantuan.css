@@ -22,10 +22,19 @@
 
 /* ---------------- Header hijau melengkung ---------------- */
 .bt-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     background: linear-gradient(150deg, #0b4e35, #167a55 45%, #167a55 110%);
     padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
     border-radius: 0 0 28px 28px;
     animation: btFadeUp 0.4s ease both;
+    border-bottom: 1px solid transparent;
+}
+
+.bt-header-scrolled {
+    border-bottom-color: #cbd7d0;
+    box-shadow: 0 4px 12px rgba(24, 39, 33, 0.08);
 }
 
 .bt-header-top {
@@ -132,9 +141,9 @@
 /* ---------------- Konten ---------------- */
 .bt-content {
     width: 100%;
-    max-width: 640px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 18px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+    padding: 18px 16px calc(56px + env(safe-area-inset-bottom, 0px));
     animation: btFadeUp 0.4s ease 0.1s both;
 }
 
@@ -174,12 +183,29 @@
     color: #ffffff;
 }
 
+.bt-chip-count {
+    margin-left: 6px;
+    font-size: 11px;
+    opacity: 0.85;
+}
+
 .bt-section-title {
     font-family: 'Outfit', sans-serif;
     font-size: 16px;
     font-weight: 700;
     color: #167a55;
     margin: 22px 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.bt-section-count {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6d7c75;
 }
 
 /* ---------------- FAQ (accordion) ---------------- */
@@ -242,12 +268,25 @@
     transform: rotate(90deg);
 }
 
-.bt-faq-a {
-    padding: 0 16px 16px;
-    animation: btFadeUp 0.2s ease both;
+.bt-faq-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s ease;
 }
 
-.bt-faq-a p {
+.bt-faq-open .bt-faq-panel {
+    grid-template-rows: 1fr;
+}
+
+.bt-faq-panel > div {
+    overflow: hidden;
+}
+
+.bt-faq-panel-inner {
+    padding: 0 16px 16px;
+}
+
+.bt-faq-panel-inner p {
     margin: 8px 0 0;
     font-size: 13.5px;
     line-height: 1.6;
@@ -290,6 +329,20 @@
     font-size: 13px;
     color: #6d7c75;
     line-height: 1.5;
+}
+
+.bt-empty-clear {
+    margin-top: 12px;
+    min-height: 40px;
+    padding: 0 16px;
+    border: 1px solid #167a55;
+    border-radius: 999px;
+    background: #167a55;
+    color: #ffffff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 /* ---------------- Kontak ---------------- */
@@ -358,8 +411,9 @@
     .bt-header,
     .bt-search,
     .bt-content,
-    .bt-faq-a {
+    .bt-faq-panel {
         animation: none;
+        transition: none;
     }
     .bt-faq-caret,
     .bt-contact-card {
