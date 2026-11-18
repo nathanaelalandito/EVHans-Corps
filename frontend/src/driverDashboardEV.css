@@ -724,6 +724,12 @@
   font-size: 13px;
 }
 
+.mapdash-location-notice.is-error {
+  border-color: var(--ev-danger);
+  background: var(--ev-danger-soft);
+  color: var(--ev-danger);
+}
+
 .mapdash-location-notice button {
   min-height: 40px;
   border: 0;

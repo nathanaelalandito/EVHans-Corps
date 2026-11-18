@@ -1048,7 +1048,7 @@ export default function DriverDashboard({
                 reloadStations();
                 fetchWallet();
                 fetchTransactionHistory();
-                setSessionNotice("Sesi charging terhenti karena simulasi gangguan charger.");
+                setSessionError("Sesi charging terhenti karena simulasi gangguan charger.");
               })
               .catch(() => {
                 if (cancelled) return;
@@ -2432,7 +2432,7 @@ export default function DriverDashboard({
           (sessionSyncError && !activeSession) ||
           (sessionNotice && !activeSession)) && (
           <div
-            className="mapdash-location-notice"
+            className={`mapdash-location-notice${sessionError || sessionSyncError ? ' is-error' : ''}`}
             role={sessionError || sessionSyncError ? "alert" : "status"}
           >
             {(sessionError || sessionSyncError || sessionNotice) && (
