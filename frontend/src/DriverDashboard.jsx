@@ -1215,7 +1215,7 @@ export default function DriverDashboard({
       );
       setShowInterruptModal(false);
       setInterruptReason("");
-      setSessionNotice("Laporan gangguan terkirim.");
+      setSessionError("Laporan gangguan terkirim.");
       afterSessionSettled(interruptedInvoice).catch(() => {});
     } catch (err) {
       setSessionError(
