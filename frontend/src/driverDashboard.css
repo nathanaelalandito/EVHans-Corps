@@ -630,11 +630,11 @@
 }
 
 .mapdash-session-status {
-    left: 50%;
-    right: auto;
+    left: 50% !important;
+    right: auto !important;
     width: auto;
     max-width: min(90vw, 360px);
-    transform: translateX(-50%);
+    transform: translateX(-50%) !important;
     padding: 8px 36px 8px 14px;
     justify-content: flex-start;
     text-align: left;
