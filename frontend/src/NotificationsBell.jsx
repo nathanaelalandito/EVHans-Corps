@@ -9,6 +9,8 @@ import {
     FiCreditCard,
     FiInbox,
     FiInfo,
+    FiMapPin,
+    FiUser,
     FiX,
     FiZap,
 } from 'react-icons/fi';
@@ -18,6 +20,8 @@ import './notificationsBell.css';
 
 const TYPE_META = {
     charging_selesai: { icon: FiCheckCircle, tone: 'success', label: 'Charging', group: 'charging' },
+    operator_baru: { icon: FiUser, tone: 'info', label: 'Operator', group: 'other' },
+    station_baru: { icon: FiMapPin, tone: 'info', label: 'Station', group: 'other' },
     charging_gagal: { icon: FiAlertTriangle, tone: 'danger', label: 'Charging', group: 'charging' },
     topup_gagal: { icon: FiCreditCard, tone: 'danger', label: 'Pembayaran', group: 'payment' },
     charger_gangguan: { icon: FiZap, tone: 'warning', label: 'Gangguan', group: 'issue' },

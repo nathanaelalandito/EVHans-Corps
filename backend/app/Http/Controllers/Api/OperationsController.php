@@ -322,7 +322,7 @@ class OperationsController extends Controller
             'fasilitas' => ['sometimes', 'nullable', 'string', 'max:1000'],
         ]);
 
-        return DB::transaction(function () use ($data, $request): JsonResponse {
+        $station = DB::transaction(function () use ($data, $request): Location {
             $lastCodeNumber = (int) Location::query()
                 ->whereNotNull('kode_station')
                 ->selectRaw('MAX(CAST(SUBSTRING(kode_station, 7) AS UNSIGNED)) as last_code_number')
@@ -341,11 +341,15 @@ class OperationsController extends Controller
                 'data_sesudah' => $station->only(['kode_station', 'nama_lokasi', 'alamat', 'latitude', 'longitude', 'jam_buka', 'jam_tutup', 'status_loc']),
             ]);
 
-            return response()->json([
-                'message' => 'Station baru berhasil ditambahkan.',
-                'data' => $this->presentStation($station->fresh(['chargers.ports', 'tarifs'])),
-            ], 201);
+            return $station;
         });
+
+        app(NotificationService::class)->notifyStationCreated($station->fresh());
+
+        return response()->json([
+            'message' => 'Station baru berhasil ditambahkan.',
+            'data' => $this->presentStation($station->fresh(['chargers.ports', 'tarifs'])),
+        ], 201);
     }
 
     /** Mencari alamat secara eksplisit melalui proxy geocoding yang dibatasi dan menyimpan hasil di cache. */
@@ -672,6 +676,8 @@ class OperationsController extends Controller
 
             return $user->load('profile');
         });
+
+        app(NotificationService::class)->notifyOperatorCreated($operator);
 
         return response()->json([
             'message' => 'Akun operator berhasil dibuat.',

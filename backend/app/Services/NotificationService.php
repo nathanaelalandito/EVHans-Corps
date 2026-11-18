@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Charger;
+use App\Models\Location;
 use App\Models\Notifikasi;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,40 @@ class NotificationService
     public function notifyTopupFailed(string $userId, $topup, string $reason): void
     {
         $this->safeCreate($userId, 'topup_gagal', 'Top up gagal', "Top up {$topup->referensi} gagal: {$reason}.", $topup->id_topup ?? null, 'topup', "topup_failed:{$topup->id_topup}:{$reason}");
+    }
+
+    public function notifyOperatorCreated(User $operator): void
+    {
+        $admins = User::where('peran', 'admin')->where('status_akun', 'Aktif')->pluck('id_user');
+
+        foreach ($admins as $adminId) {
+            $this->safeCreate(
+                $adminId,
+                'operator_baru',
+                'Operator baru',
+                "Operator {$operator->profile?->nama_lengkap} ({$operator->email}) ditambahkan.",
+                $operator->id_user,
+                'user',
+                "operator_created:{$operator->id_user}:{$adminId}"
+            );
+        }
+    }
+
+    public function notifyStationCreated(Location $station): void
+    {
+        $admins = User::where('peran', 'admin')->where('status_akun', 'Aktif')->pluck('id_user');
+
+        foreach ($admins as $adminId) {
+            $this->safeCreate(
+                $adminId,
+                'station_baru',
+                'Station baru',
+                "Station {$station->kode_station} - {$station->nama_lokasi} ditambahkan.",
+                $station->id_location,
+                'location',
+                "station_created:{$station->id_location}:{$adminId}"
+            );
+        }
     }
 
     public function notifyChargerIssue(Charger $charger, string $status, ?string $reason = null, array $driverIds = []): void
