@@ -2058,6 +2058,16 @@ export default function DriverDashboard({
                   </strong>
                 </div>
               </div>
+              <div className="invoice-grid-actions">
+                <button
+                  type="button"
+                  className="invoice-print-button"
+                  disabled={!invoice.id_payment}
+                  onClick={() => handleOpenInvoice({ id_payment: invoice.id_payment })}
+                >
+                  <FiPrinter aria-hidden="true" /> Lihat & Cetak Nota
+                </button>
+              </div>
             </section>
           )}
 

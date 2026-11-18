@@ -1798,6 +1798,33 @@
   text-align: center;
 }
 
+.invoice-grid-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.invoice-grid-actions button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--ev-border-strong);
+  border-radius: var(--ev-radius-md);
+  background: var(--ev-surface);
+  color: var(--ev-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invoice-grid-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .invoice-copy-button {
   display: inline-flex;
   align-items: center;
