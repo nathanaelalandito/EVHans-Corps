@@ -225,6 +225,26 @@ class StationSeeder extends Seeder
             $this->syncCurrentTariff($locationId, $tariff, $now);
             $this->syncChargersAndPorts($locationId, $chargers, $now);
         }
+
+        $adminId = DB::table('users')->where('email', 'admin.utama@admin.ac.id')->value('id_user');
+        $firstLocationId = DB::table('location')->orderBy('id_location')->value('id_location');
+        $tariffId = DB::table('tarif')->where('id_location', $firstLocationId)->orderByDesc('periode_mulai')->value('id_tarif');
+
+        if ($adminId && $firstLocationId && $tariffId && ! DB::table('audit_logs')->where('aksi', 'ubah_tarif')->where('id_user', $adminId)->exists()) {
+            DB::table('audit_logs')->insert([
+                'id_user' => $adminId,
+                'id_location' => $firstLocationId,
+                'aksi' => 'ubah_tarif',
+                'entitas' => 'tarif',
+                'id_entitas' => (string) $tariffId,
+                'data_sebelum' => json_encode(['harga_per_kwh' => 2500]),
+                'data_sesudah' => json_encode(['harga_per_kwh' => 2466]),
+                'alasan' => 'Penyesuaian tarif demo oleh admin.',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
     }
 
     /** Menyegarkan tarif berjalan tanpa mengganti jadwal tarif mendatang. */
