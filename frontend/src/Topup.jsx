@@ -90,7 +90,7 @@ export default function TopUp({ phoneNumber, onBack, onDone, wallet, skipPinConf
   useEffect(() => {
     getTopupMethods()
       .then((d) => {
-        setMethods(d.methods);
+        setMethods((d.methods || []).filter((m) => !/dompet\s*digital/i.test(String(m.method_name || m.nama_metode || m.name || ''))));
         setLimits({ min: d.min_amount, max: d.max_amount });
       })
       .catch((e) => setError(errMessage(e)));
