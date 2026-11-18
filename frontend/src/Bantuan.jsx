@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { FiArrowLeft, FiSearch, FiX } from 'react-icons/fi';
 import './bantuan.css';
 
 // ---------------------------------------------------------------------------
@@ -11,8 +12,6 @@ const KONTAK_BANTUAN = {
     jamLayanan: 'Setiap hari, 08.00–21.00 WIB',
 };
 
-// Isi FAQ. Jawaban sengaja mengikuti perilaku aplikasi yang sebenarnya
-// (aturan PIN, konektor, dll.) — ubah di sini kalau fiturnya berubah.
 const KATEGORI = ['Semua', 'Akun', 'Kendaraan', 'Dompet & PIN', 'Mengisi Daya'];
 
 const FAQ = [
@@ -101,7 +100,6 @@ const normalisasi = (s) => String(s || '').toLowerCase();
 export default function Bantuan({ onBack }) {
     const [query, setQuery] = useState('');
     const [kategori, setKategori] = useState('Semua');
-    const [openId, setOpenId] = useState(null);
 
     const hasil = useMemo(() => {
         const kata = normalisasi(query).trim();
@@ -111,8 +109,6 @@ export default function Bantuan({ onBack }) {
             return normalisasi(item.q).includes(kata) || normalisasi(item.a).includes(kata);
         });
     }, [query, kategori]);
-
-    const toggle = (id) => setOpenId((cur) => (cur === id ? null : id));
 
     const { whatsapp, email, telepon, jamLayanan } = KONTAK_BANTUAN;
     const kanal = [
@@ -141,123 +137,114 @@ export default function Bantuan({ onBack }) {
     ].filter(Boolean);
 
     return (
-        <div className="bt-page">
-            <header className="bt-header">
-                <div className="bt-header-top">
-                    <button className="bt-back-btn" onClick={onBack} aria-label="Kembali">←</button>
-                    <h1 className="bt-title">Bantuan</h1>
-                    <span className="bt-header-spacer" />
+        <div className="bantuan-page">
+            <header className="bantuan-header">
+                <div className="bantuan-header-inner">
+                    <button className="bantuan-back-btn" onClick={onBack} aria-label="Kembali">
+                        <FiArrowLeft aria-hidden="true" />
+                    </button>
+                    <div className="bantuan-header-text">
+                        <h1 className="bantuan-title">Bantuan</h1>
+                        <p className="bantuan-subtitle">Ada yang bisa kami bantu?</p>
+                    </div>
                 </div>
-                <p className="bt-header-sub">Ada yang bisa kami bantu?</p>
             </header>
 
-            {/* Kolom pencarian, "mengintip" di atas lengkungan header */}
-            <div className="bt-search">
-                <span className="bt-search-icon" aria-hidden="true">🔍</span>
-                <input
-                    type="search"
-                    className="bt-search-input"
-                    placeholder="Cari pertanyaan, mis. PIN, konektor…"
-                    value={query}
-                    onChange={(e) => {
-                        setQuery(e.target.value);
-                        setOpenId(null);
-                    }}
-                    aria-label="Cari bantuan"
-                />
-                {query && (
-                    <button
-                        className="bt-search-clear"
-                        onClick={() => setQuery('')}
-                        aria-label="Hapus pencarian"
-                    >
-                        ✕
-                    </button>
-                )}
-            </div>
+            <main className="bantuan-content">
+                <div className="bantuan-search">
+                    <span className="bantuan-search-icon" aria-hidden="true">
+                        <FiSearch />
+                    </span>
+                    <input
+                        type="search"
+                        className="bantuan-search-input"
+                        placeholder="Cari pertanyaan, mis. PIN, konektor..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        aria-label="Cari bantuan"
+                    />
+                    {query && (
+                        <button
+                            className="bantuan-search-clear"
+                            onClick={() => setQuery('')}
+                            aria-label="Hapus pencarian"
+                        >
+                            <FiX aria-hidden="true" />
+                        </button>
+                    )}
+                </div>
 
-            <main className="bt-content">
-                <div className="bt-chips" role="tablist" aria-label="Kategori bantuan">
+                <div className="bantuan-chips" role="tablist" aria-label="Kategori bantuan">
                     {KATEGORI.map((k) => (
                         <button
                             key={k}
                             role="tab"
                             aria-selected={kategori === k}
-                            className={`bt-chip${kategori === k ? ' bt-chip-active' : ''}`}
-                            onClick={() => {
-                                setKategori(k);
-                                setOpenId(null);
-                            }}
+                            className={`bantuan-chip${kategori === k ? ' bantuan-chip-active' : ''}`}
+                            onClick={() => setKategori(k)}
                         >
                             {k}
                         </button>
                     ))}
                 </div>
 
-                <section aria-label="Pertanyaan yang sering diajukan">
-                    <h2 className="bt-section-title">Pertanyaan Umum</h2>
+                <section className="bantuan-faq-section" aria-label="Pertanyaan yang sering diajukan">
+                    <h2 className="bantuan-section-title">Pertanyaan Umum</h2>
 
                     {hasil.length === 0 ? (
-                        <div className="bt-empty">
-                            <span className="bt-empty-icon" aria-hidden="true">🤔</span>
-                            <p className="bt-empty-title">Tidak ada hasil untuk "{query}"</p>
-                            <p className="bt-empty-text">
-                                Coba kata kunci lain, atau hubungi tim dukungan di bawah.
-                            </p>
+                        <div className="bantuan-empty">
+                            <p className="bantuan-empty-title">Pertanyaan tidak ditemukan</p>
+                            <p className="bantuan-empty-text">Coba kata kunci lain.</p>
+                            <button
+                                type="button"
+                                className="bantuan-empty-clear"
+                                onClick={() => {
+                                    setQuery('');
+                                    setKategori('Semua');
+                                }}
+                            >
+                                Hapus pencarian
+                            </button>
                         </div>
                     ) : (
-                        <ul className="bt-faq-list">
-                            {hasil.map((item) => {
-                                const open = openId === item.id;
-                                return (
-                                    <li key={item.id} className={`bt-faq${open ? ' bt-faq-open' : ''}`}>
-                                        <button
-                                            className="bt-faq-q"
-                                            onClick={() => toggle(item.id)}
-                                            aria-expanded={open}
-                                            aria-controls={`bt-a-${item.id}`}
-                                        >
-                                            <span className="bt-faq-q-text">{item.q}</span>
-                                            <span className="bt-faq-caret" aria-hidden="true">›</span>
-                                        </button>
-                                        {open && (
-                                            <div className="bt-faq-a" id={`bt-a-${item.id}`} role="region">
-                                                <span className="bt-faq-tag">{item.kategori}</span>
-                                                <p>{item.a}</p>
-                                            </div>
-                                        )}
-                                    </li>
-                                );
-                            })}
+                        <ul className="bantuan-faq-list">
+                            {hasil.map((item) => (
+                                <li key={item.id} className="bantuan-faq-item">
+                                    <div className="bantuan-faq-question">
+                                        <span>{item.q}</span>
+                                        <span className="bantuan-faq-caret" aria-hidden="true">›</span>
+                                    </div>
+                                </li>
+                            ))}
                         </ul>
                     )}
                 </section>
 
-                <section className="bt-contact" aria-label="Hubungi kami">
-                    <h2 className="bt-section-title">Masih butuh bantuan?</h2>
+                <section className="bantuan-contact" aria-label="Hubungi kami">
+                    <h2 className="bantuan-section-title">Masih butuh bantuan?</h2>
                     {kanal.length > 0 ? (
                         <>
-                            <div className="bt-contact-list">
+                            <div className="bantuan-contact-list">
                                 {kanal.map((c) => (
                                     <a
                                         key={c.key}
-                                        className="bt-contact-card"
+                                        className="bantuan-contact-card"
                                         href={c.href}
                                         {...(c.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                     >
-                                        <span className="bt-contact-icon" aria-hidden="true">{c.icon}</span>
-                                        <span className="bt-contact-info">
-                                            <span className="bt-contact-label">{c.label}</span>
-                                            <span className="bt-contact-value">{c.value}</span>
+                                        <span className="bantuan-contact-icon" aria-hidden="true">{c.icon}</span>
+                                        <span className="bantuan-contact-info">
+                                            <span className="bantuan-contact-label">{c.label}</span>
+                                            <span className="bantuan-contact-value">{c.value}</span>
                                         </span>
-                                        <span className="bt-faq-caret" aria-hidden="true">›</span>
+                                        <span className="bantuan-faq-caret" aria-hidden="true">›</span>
                                     </a>
                                 ))}
                             </div>
-                            {jamLayanan && <p className="bt-contact-hours">🕗 {jamLayanan}</p>}
+                            {jamLayanan && <p className="bantuan-contact-hours">🕐 {jamLayanan}</p>}
                         </>
                     ) : (
-                        <p className="bt-empty-text">Kontak dukungan belum tersedia.</p>
+                        <p className="bantuan-empty-text">Kontak dukungan belum tersedia.</p>
                     )}
                 </section>
             </main>

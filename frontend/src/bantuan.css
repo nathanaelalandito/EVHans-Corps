@@ -1,368 +1,340 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
-
-/* Palet mengikuti dashboard & Kelola Kendaraan: hijau #1b4d2e / #2e7d32,
-   krem #eef0df, aksen mint #eaf7e5, garis krem #eee6c9. */
-
-.bt-page {
-    position: relative;
-    width: 100%;
+/* Halaman Bantuan - gaya khusus, mengikuti design token EVChargeHub */
+.bantuan-page {
     min-height: 100vh;
     min-height: 100dvh;
-    background: #eef0df;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #f4f6f5;
+    font-family: var(--ev-font-sans);
+    color: var(--ev-ink);
+}
+
+.bantuan-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 70px;
+    background: var(--ev-surface);
+    border-bottom: 1px solid var(--ev-border);
     display: flex;
-    flex-direction: column;
-    color: #1b1f16;
+    align-items: center;
 }
 
-@keyframes btFadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* ---------------- Header hijau melengkung ---------------- */
-.bt-header {
-    background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
-    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
-    border-radius: 0 0 28px 28px;
-    animation: btFadeUp 0.4s ease both;
-}
-
-.bt-header-top {
+.bantuan-header-inner {
+    width: 100%;
+    max-width: 550px;
+    margin: 0 auto;
+    padding: 0 16px;
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.bt-back-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255, 255, 255, 0.14);
-    color: #ffffff;
-    font-size: 18px;
-    display: flex;
+.bantuan-back-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--ev-border);
+    border-radius: 8px;
+    background: var(--ev-surface);
+    color: var(--ev-ink);
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.15s ease;
 }
 
-.bt-back-btn:hover {
-    background: rgba(255, 255, 255, 0.24);
+.bantuan-back-btn:hover,
+.bantuan-back-btn:focus-visible {
+    border-color: var(--ev-primary);
+    color: var(--ev-primary);
+    outline: none;
 }
 
-.bt-title {
-    font-family: 'Outfit', sans-serif;
-    font-weight: 700;
-    font-size: 19px;
-    color: #ffffff;
+.bantuan-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bantuan-title {
     margin: 0;
-    flex: 1;
-    text-align: center;
+    font-family: var(--ev-font-display);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ev-ink);
+    line-height: 1.2;
 }
 
-.bt-header-spacer {
-    width: 38px;
-    flex-shrink: 0;
+.bantuan-subtitle {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ev-text-muted);
+    line-height: 1.3;
 }
 
-.bt-header-sub {
-    margin: 14px 0 0;
-    text-align: center;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.78);
+.bantuan-content {
+    width: 100%;
+    max-width: 550px;
+    margin: 0 auto;
+    padding: 16px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
-/* ---------------- Pencarian ---------------- */
-.bt-search {
+.bantuan-search {
+    height: 40px;
+    background: var(--ev-surface);
+    border: 1px solid var(--ev-border);
+    border-radius: 8px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 10px 24px rgba(27, 77, 46, 0.18);
-    padding: 0 14px;
-    margin: -28px 16px 0;
-    position: relative;
-    z-index: 2;
-    animation: btFadeUp 0.4s ease 0.05s both;
+    gap: 8px;
+    padding: 0 12px;
 }
 
-.bt-search:focus-within {
-    outline: 2px solid #2e7d32;
-    outline-offset: 1px;
+.bantuan-search:focus-within {
+    border-color: var(--ev-primary);
+    box-shadow: var(--ev-focus-ring);
 }
 
-.bt-search-icon {
-    font-size: 15px;
+.bantuan-search-icon {
+    color: var(--ev-text-muted);
+    display: inline-flex;
+    align-items: center;
     flex-shrink: 0;
 }
 
-.bt-search-input {
+.bantuan-search-input {
     flex: 1;
     min-width: 0;
     border: none;
     background: transparent;
     outline: none;
-    font-family: inherit;
-    font-size: 14px;
-    color: #1b1f16;
-    padding: 15px 0;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ev-ink);
+    height: 100%;
 }
 
-.bt-search-input::placeholder {
-    color: #8a8f7c;
+.bantuan-search-input::placeholder {
+    color: var(--ev-text-muted);
 }
 
-.bt-search-clear {
-    width: 26px;
-    height: 26px;
+.bantuan-search-clear {
+    width: 24px;
+    height: 24px;
     border: none;
     border-radius: 50%;
-    background: #eef0df;
-    color: #55603f;
-    font-size: 12px;
+    background: var(--ev-surface-subtle);
+    color: var(--ev-text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
 }
 
-/* ---------------- Konten ---------------- */
-.bt-content {
-    width: 100%;
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 18px 16px calc(32px + env(safe-area-inset-bottom, 0px));
-    animation: btFadeUp 0.4s ease 0.1s both;
+.bantuan-search-clear:hover {
+    color: var(--ev-primary);
 }
 
-.bt-chips {
+.bantuan-chips {
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: 2px;
     scrollbar-width: none;
 }
 
-.bt-chips::-webkit-scrollbar {
+.bantuan-chips::-webkit-scrollbar {
     display: none;
 }
 
-.bt-chip {
+.bantuan-chip {
     flex-shrink: 0;
-    border: 1px solid #eee6c9;
-    background: #ffffff;
-    color: #3b4a2c;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 14px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--ev-border);
     border-radius: 999px;
+    background: var(--ev-surface);
+    color: var(--ev-ink);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: border-color var(--ev-transition-fast), color var(--ev-transition-fast), background var(--ev-transition-fast);
 }
 
-.bt-chip:hover {
-    border-color: #2e7d32;
+.bantuan-chip:hover {
+    border-color: var(--ev-primary);
+    color: var(--ev-primary);
 }
 
-.bt-chip-active {
-    background: #1b4d2e;
-    border-color: #1b4d2e;
+.bantuan-chip-active {
+    background: #17795a;
+    border-color: #17795a;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.bantuan-chip-active:hover {
+    background: #17795a;
+    border-color: #17795a;
     color: #ffffff;
 }
 
-.bt-section-title {
-    font-family: 'Outfit', sans-serif;
-    font-size: 16px;
+.bantuan-section-title {
+    margin: 24px 0 10px;
+    font-family: var(--ev-font-display);
+    font-size: 15px;
     font-weight: 700;
-    color: #1b4d2e;
-    margin: 22px 0 10px;
+    color: var(--ev-ink);
 }
 
-/* ---------------- FAQ (accordion) ---------------- */
-.bt-faq-list {
+.bantuan-faq-list {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
-.bt-faq {
-    background: #ffffff;
-    border: 1px solid #eee6c9;
-    border-radius: 16px;
-    overflow: hidden;
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+.bantuan-faq-item {
+    background: var(--ev-surface);
+    border: 1px solid var(--ev-border);
+    border-radius: 8px;
+    min-height: 46px;
 }
 
-.bt-faq-open {
-    border-color: #2e7d32;
-    box-shadow: 0 6px 16px rgba(27, 77, 46, 0.1);
-}
-
-.bt-faq-q {
-    width: 100%;
+.bantuan-faq-question {
+    min-height: 46px;
+    padding: 0 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 15px 16px;
-    border: none;
-    background: transparent;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    color: #1b1f16;
+    font-size: 13px;
+    color: var(--ev-ink);
     text-align: left;
+}
+
+.bantuan-faq-caret {
+    color: var(--ev-text-muted);
+    flex-shrink: 0;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.bantuan-empty {
+    background: var(--ev-surface);
+    border: 1px dashed var(--ev-border-strong);
+    border-radius: 8px;
+    padding: 20px 16px;
+    text-align: center;
+}
+
+.bantuan-empty-title {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ev-ink);
+}
+
+.bantuan-empty-text {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ev-text-muted);
+}
+
+.bantuan-empty-clear {
+    margin-top: 12px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--ev-primary);
+    border-radius: 999px;
+    background: var(--ev-primary);
+    color: #ffffff;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
     cursor: pointer;
 }
 
-.bt-faq-q:focus-visible,
-.bt-contact-card:focus-visible,
-.bt-chip:focus-visible,
-.bt-back-btn:focus-visible {
-    outline: 2px solid #2e7d32;
-    outline-offset: 2px;
+.bantuan-contact {
+    margin-top: 8px;
 }
 
-.bt-faq-caret {
-    font-size: 20px;
-    line-height: 1;
-    color: #2e7d32;
-    flex-shrink: 0;
-    transition: transform 0.2s ease;
-}
-
-.bt-faq-open .bt-faq-caret {
-    transform: rotate(90deg);
-}
-
-.bt-faq-a {
-    padding: 0 16px 16px;
-    animation: btFadeUp 0.2s ease both;
-}
-
-.bt-faq-a p {
-    margin: 8px 0 0;
-    font-size: 13.5px;
-    line-height: 1.6;
-    color: #3b4a2c;
-}
-
-.bt-faq-tag {
-    display: inline-block;
-    background: #eaf7e5;
-    color: #1b4d2e;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 999px;
-}
-
-/* ---------------- Kosong ---------------- */
-.bt-empty {
-    text-align: center;
-    background: #ffffff;
-    border: 1px dashed #d9d2b0;
-    border-radius: 16px;
-    padding: 28px 20px;
-}
-
-.bt-empty-icon {
-    font-size: 30px;
-}
-
-.bt-empty-title {
-    margin: 8px 0 4px;
-    font-weight: 700;
-    font-size: 14px;
-    color: #1b1f16;
-    overflow-wrap: anywhere;
-}
-
-.bt-empty-text {
-    margin: 0;
-    font-size: 13px;
-    color: #55603f;
-    line-height: 1.5;
-}
-
-/* ---------------- Kontak ---------------- */
-.bt-contact-list {
+.bantuan-contact-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
-.bt-contact-card {
+.bantuan-contact-card {
     display: flex;
     align-items: center;
-    gap: 12px;
-    background: #ffffff;
-    border: 1px solid #eee6c9;
-    border-radius: 16px;
-    padding: 13px 16px;
+    gap: 10px;
+    background: var(--ev-surface);
+    border: 1px solid var(--ev-border);
+    border-radius: 8px;
+    padding: 10px 12px;
     text-decoration: none;
     color: inherit;
-    transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
-.bt-contact-card:hover {
-    border-color: #2e7d32;
-    transform: translateY(-1px);
+.bantuan-contact-card:hover {
+    border-color: var(--ev-primary);
 }
 
-.bt-contact-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: #eaf7e5;
+.bantuan-contact-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--ev-primary-soft);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 16px;
     flex-shrink: 0;
 }
 
-.bt-contact-info {
+.bantuan-contact-info {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
 }
 
-.bt-contact-label {
-    font-size: 12px;
-    color: #6b7259;
+.bantuan-contact-label {
+    font-size: 11px;
+    color: var(--ev-text-muted);
 }
 
-.bt-contact-value {
-    font-size: 14px;
+.bantuan-contact-value {
+    font-size: 13px;
     font-weight: 600;
-    color: #1b1f16;
+    color: var(--ev-ink);
     overflow-wrap: anywhere;
 }
 
-.bt-contact-hours {
-    margin: 12px 4px 0;
-    font-size: 12.5px;
-    color: #55603f;
+.bantuan-contact-hours {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--ev-text-muted);
+}
+
+@media (max-width: 768px) {
+    .bantuan-content {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .bt-header,
-    .bt-search,
-    .bt-content,
-    .bt-faq-a {
-        animation: none;
-    }
-    .bt-faq-caret,
-    .bt-contact-card {
+    .bantuan-back-btn,
+    .bantuan-chip,
+    .bantuan-contact-card {
         transition: none;
     }
 }
