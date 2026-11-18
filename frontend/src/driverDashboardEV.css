@@ -1804,6 +1804,30 @@
   margin-top: 12px;
 }
 
+.home-invoice-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.home-invoice-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius-pill);
+  background: var(--ev-surface);
+  color: var(--ev-text-muted);
+  cursor: pointer;
+}
+
+.home-invoice-close:hover {
+  border-color: var(--ev-primary);
+  color: var(--ev-primary);
+}
+
 .invoice-grid-actions button {
   display: inline-flex;
   min-height: 40px;

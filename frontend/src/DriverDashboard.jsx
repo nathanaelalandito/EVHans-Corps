@@ -2028,9 +2028,19 @@ export default function DriverDashboard({
                 <span className="mapdash-sheet-title">
                   Invoice Digital Terakhir
                 </span>
-                <span className={`dash-status-badge ${sessionStatusTone(invoice.status)}`}>
-                  {invoice.status}
-                </span>
+                <div className="home-invoice-card-actions">
+                  <span className={`dash-status-badge ${sessionStatusTone(invoice.status)}`}>
+                    {invoice.status}
+                  </span>
+                  <button
+                    type="button"
+                    className="home-invoice-close"
+                    aria-label="Tutup invoice"
+                    onClick={() => setInvoice(null)}
+                  >
+                    <FiX aria-hidden="true" />
+                  </button>
+                </div>
               </div>
               <p className="mapdash-session-location">
                 <FiMapPin aria-hidden="true" /> {invoice.nama_lokasi} ·{" "}
