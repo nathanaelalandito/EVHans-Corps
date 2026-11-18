@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import './bantuan.css';
 
 // ---------------------------------------------------------------------------
@@ -96,22 +96,12 @@ const FAQ = [
     },
 ];
 
-/** Menyeragamkan teks agar pencarian bantuan tidak peka huruf besar/kecil. */
 const normalisasi = (s) => String(s || '').toLowerCase();
 
-/** Menampilkan topik bantuan dan jawaban yang dapat dibuka/tutup. */
 export default function Bantuan({ onBack }) {
     const [query, setQuery] = useState('');
     const [kategori, setKategori] = useState('Semua');
     const [openId, setOpenId] = useState(null);
-    const [scrolled, setScrolled] = useState(false);
-
-    useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 4);
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
-        return () => window.removeEventListener('scroll', onScroll);
-    }, []);
 
     const hasil = useMemo(() => {
         const kata = normalisasi(query).trim();
@@ -122,15 +112,6 @@ export default function Bantuan({ onBack }) {
         });
     }, [query, kategori]);
 
-    const jumlahKategori = useMemo(() => {
-        const hitung = { Semua: FAQ.length };
-        KATEGORI.forEach((k) => {
-            if (k !== 'Semua') hitung[k] = FAQ.filter((item) => item.kategori === k).length;
-        });
-        return hitung;
-    }, []);
-
-    /** Membuka satu jawaban atau menutupnya jika sedang terbuka. */
     const toggle = (id) => setOpenId((cur) => (cur === id ? null : id));
 
     const { whatsapp, email, telepon, jamLayanan } = KONTAK_BANTUAN;
@@ -161,7 +142,7 @@ export default function Bantuan({ onBack }) {
 
     return (
         <div className="bt-page">
-            <header className={`bt-header${scrolled ? ' bt-header-scrolled' : ''}`}>
+            <header className="bt-header">
                 <div className="bt-header-top">
                     <button className="bt-back-btn" onClick={onBack} aria-label="Kembali">←</button>
                     <h1 className="bt-title">Bantuan</h1>
@@ -209,35 +190,20 @@ export default function Bantuan({ onBack }) {
                             }}
                         >
                             {k}
-                            <span className="bt-chip-count">{jumlahKategori[k]}</span>
                         </button>
                     ))}
                 </div>
 
                 <section aria-label="Pertanyaan yang sering diajukan">
-                    <h2 className="bt-section-title">
-                        {kategori === 'Semua' ? 'Semua pertanyaan' : kategori}
-                        <span className="bt-section-count">{hasil.length}</span>
-                    </h2>
+                    <h2 className="bt-section-title">Pertanyaan Umum</h2>
 
                     {hasil.length === 0 ? (
                         <div className="bt-empty">
-                            <span className="bt-empty-icon" aria-hidden="true">🔍</span>
-                            <p className="bt-empty-title">Pertanyaan tidak ditemukan</p>
+                            <span className="bt-empty-icon" aria-hidden="true">🤔</span>
+                            <p className="bt-empty-title">Tidak ada hasil untuk "{query}"</p>
                             <p className="bt-empty-text">
-                                Coba kata kunci lain.
+                                Coba kata kunci lain, atau hubungi tim dukungan di bawah.
                             </p>
-                            <button
-                                type="button"
-                                className="bt-empty-clear"
-                                onClick={() => {
-                                    setQuery('');
-                                    setKategori('Semua');
-                                    setOpenId(null);
-                                }}
-                            >
-                                Hapus pencarian
-                            </button>
                         </div>
                     ) : (
                         <ul className="bt-faq-list">
@@ -254,17 +220,12 @@ export default function Bantuan({ onBack }) {
                                             <span className="bt-faq-q-text">{item.q}</span>
                                             <span className="bt-faq-caret" aria-hidden="true">›</span>
                                         </button>
-                                        <div
-                                            className="bt-faq-panel"
-                                            id={`bt-a-${item.id}`}
-                                            role="region"
-                                            aria-hidden={!open}
-                                        >
-                                            <div className="bt-faq-panel-inner">
+                                        {open && (
+                                            <div className="bt-faq-a" id={`bt-a-${item.id}`} role="region">
                                                 <span className="bt-faq-tag">{item.kategori}</span>
                                                 <p>{item.a}</p>
                                             </div>
-                                        </div>
+                                        )}
                                     </li>
                                 );
                             })}
