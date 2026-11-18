@@ -1712,7 +1712,7 @@ export default function DriverDashboard({
               <p className="mapdash-session-location">
                 <FiMapPin aria-hidden="true" /> {activeSession.nama_lokasi} ·{" "}
                 {activeSession.kode_charger}
-                {activeSession.nomor_port && <> · {activeSession.nomor_port} · {portStatusLabel(activeSession.status_port).text}</>}
+                {activeSession.nomor_port && <> · {activeSession.nomor_port} · {portStatusLabel(activeSession.status_port || "Charging").text}</>}
                 {activeSession.soc_sekarang != null ? (
                   <>
                     <span> · </span>
@@ -2588,7 +2588,7 @@ export default function DriverDashboard({
               <p className="mapdash-session-location">
                 <FiMapPin aria-hidden="true" /> {activeSession.nama_lokasi} ·{" "}
                 {activeSession.kode_charger}
-                {activeSession.nomor_port && <> · {activeSession.nomor_port} · {portStatusLabel(activeSession.status_port).text}</>}
+                {activeSession.nomor_port && <> · {activeSession.nomor_port} · {portStatusLabel(activeSession.status_port || "Charging").text}</>}
                 {activeSession.soc_sekarang != null ? (
                   <>
                     <span> · </span>
