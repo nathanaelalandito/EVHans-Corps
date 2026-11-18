@@ -100,6 +100,7 @@ const normalisasi = (s) => String(s || '').toLowerCase();
 export default function Bantuan({ onBack }) {
     const [query, setQuery] = useState('');
     const [kategori, setKategori] = useState('Semua');
+    const [openId, setOpenId] = useState(null);
 
     const hasil = useMemo(() => {
         const kata = normalisasi(query).trim();
@@ -208,14 +209,33 @@ export default function Bantuan({ onBack }) {
                         </div>
                     ) : (
                         <ul className="bantuan-faq-list">
-                            {hasil.map((item) => (
-                                <li key={item.id} className="bantuan-faq-item">
-                                    <div className="bantuan-faq-question">
-                                        <span>{item.q}</span>
-                                        <span className="bantuan-faq-caret" aria-hidden="true">›</span>
-                                    </div>
-                                </li>
-                            ))}
+                            {hasil.map((item) => {
+                                const open = openId === item.id;
+                                return (
+                                    <li key={item.id} className={`bantuan-faq-item${open ? ' bantuan-faq-open' : ''}`}>
+                                        <button
+                                            type="button"
+                                            className="bantuan-faq-question"
+                                            onClick={() => setOpenId(open ? null : item.id)}
+                                            aria-expanded={open}
+                                            aria-controls={`bantuan-a-${item.id}`}
+                                        >
+                                            <span>{item.q}</span>
+                                            <span className="bantuan-faq-caret" aria-hidden="true">›</span>
+                                        </button>
+                                        <div
+                                            className="bantuan-faq-panel"
+                                            id={`bantuan-a-${item.id}`}
+                                            role="region"
+                                            aria-hidden={!open}
+                                        >
+                                            <div className="bantuan-faq-panel-inner">
+                                                <p>{item.a}</p>
+                                            </div>
+                                        </div>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </section>

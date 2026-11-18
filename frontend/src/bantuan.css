@@ -224,6 +224,36 @@
     flex-shrink: 0;
     font-size: 18px;
     line-height: 1;
+    transition: transform var(--ev-transition-fast);
+}
+
+.bantuan-faq-open .bantuan-faq-caret {
+    transform: rotate(90deg);
+}
+
+.bantuan-faq-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.2s ease;
+}
+
+.bantuan-faq-open .bantuan-faq-panel {
+    grid-template-rows: 1fr;
+}
+
+.bantuan-faq-panel > div {
+    overflow: hidden;
+}
+
+.bantuan-faq-panel-inner {
+    padding: 0 12px 12px;
+}
+
+.bantuan-faq-panel-inner p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ev-text-muted);
 }
 
 .bantuan-empty {
