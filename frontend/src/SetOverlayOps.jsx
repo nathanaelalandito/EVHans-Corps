@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FaTimes, FaCog, FaVolumeUp, FaSyncAlt } from 'react-icons/fa';
+import { useState } from 'react';
+import { FaTimes } from 'react-icons/fa';
 
 /** Panel pengaturan operator yang dapat ditutup melalui tombol atau backdrop. */
 export default function SettingsOverlay({ isOpen, onClose }) {

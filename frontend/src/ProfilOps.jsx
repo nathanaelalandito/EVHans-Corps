@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
-    FaBell, FaCog, FaTachometerAlt, FaChargingStation, FaPlug,
+    FaBell, FaCog, FaTachometerAlt, FaChargingStation,
     FaFileAlt, FaUser, FaSignOutAlt, FaSyncAlt, FaShieldAlt,
     FaTimes, FaExclamationTriangle, FaReceipt, FaWrench, FaCheck, FaCheckCircle
 } from 'react-icons/fa';

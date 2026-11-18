@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FiArrowLeft, FiCheck, FiEdit2, FiPlus, FiTrash2, FiTruck, FiZap } from 'react-icons/fi';
 import './kelolaKendaraan.css';
 import './kelolaKendaraanEV.css';

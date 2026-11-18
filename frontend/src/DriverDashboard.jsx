@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { sessionStatusTone } from "./utils/sessionStatus";
 import { API_BASE_URL } from "./api/client";
@@ -18,7 +18,6 @@ import {
   FiCrosshair,
   FiEye,
   FiEyeOff,
-  FiFileText,
   FiFilter,
   FiHelpCircle,
   FiLock,
@@ -210,7 +209,6 @@ export default function DriverDashboard({
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
-  const [vehiclesError, setVehiclesError] = useState("");
   const [activeVehicleId, setActiveVehicleId] = useState(() => {
     const saved = Number(localStorage.getItem(ACTIVE_VEHICLE_KEY));
     return saved || null;
@@ -574,13 +572,11 @@ export default function DriverDashboard({
   /** Memuat kendaraan pengemudi dan memilih kendaraan aktif bila perlu. */
   const fetchVehicles = async (silent = false) => {
     if (!silent) setVehiclesLoading(true);
-    setVehiclesError("");
     try {
       const data = await getVehicles();
       setVehicles(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Gagal memuat kendaraan:", err);
-      setVehiclesError(extractErrorMessage(err, "Gagal memuat kendaraan."));
     } finally {
       setVehiclesLoading(false);
     }
@@ -1458,17 +1454,6 @@ export default function DriverDashboard({
     }
   };
 
-  /** Berpindah ke kendaraan berikutnya untuk menyesuaikan hasil station. */
-  const cycleVehicle = () => {
-    if (vehicles.length === 0) {
-      onNavigateToVehicles();
-      return;
-    }
-    const idx = vehicles.findIndex((v) => v.id_vehicle === activeVehicleId);
-    const next = vehicles[(idx + 1) % vehicles.length];
-    setActiveVehicleId(next.id_vehicle);
-  };
-
   /** Membuka tampilan gabungan peta dan daftar station. */
   const openStationSearch = () => {
     setView("map");
@@ -1479,15 +1464,6 @@ export default function DriverDashboard({
     pendingFocusStationRef.current = station || null;
     setView("map");
     if (station) setSelectedStationId(station.id_location);
-  };
-
-  /** Memusatkan peta ke lokasi station tempat sesi aktif berjalan. */
-  const goToActiveSessionOnMap = () => {
-    if (!activeSession) return;
-    const station = stations.find(
-      (s) => s.id_location === activeSession.id_location,
-    );
-    goToMap(station);
   };
 
   const activeVehicleConnector = activeVehicle

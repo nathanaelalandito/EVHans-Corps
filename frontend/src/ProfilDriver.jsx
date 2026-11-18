@@ -4,18 +4,6 @@ import "./ProfilDriver.css";
 import api from "./api/axiosInstance"; 
 
 /** Menghitung umur berdasarkan tanggal lahir, atau null jika tanggal kosong. */
-function hitungUmur(tanggalLahir) {
-  if (!tanggalLahir) return null;
-  const lahir = new Date(tanggalLahir);
-  const now = new Date();
-  let umur = now.getFullYear() - lahir.getFullYear();
-  const belumUlangTahun =
-    now.getMonth() < lahir.getMonth() ||
-    (now.getMonth() === lahir.getMonth() && now.getDate() < lahir.getDate());
-  if (belumUlangTahun) umur--;
-  return umur;
-}
-
 /** Menampilkan informasi profil pengemudi dalam tampilan khusus profil. */
 export default function ProfilDriver({ onBack }) {
   const [profil, setProfil] = useState(null);
