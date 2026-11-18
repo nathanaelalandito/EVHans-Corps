@@ -1,18 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
 
-/* Palet mengikuti dashboard & Kelola Kendaraan: hijau #1b4d2e / #2e7d32,
-   krem #eef0df, aksen mint #eaf7e5, garis krem #eee6c9. */
+/* Palet mengikuti dashboard & Kelola Kendaraan: hijau #167a55 / #167a55,
+   krem #f5f7f6, aksen mint #e6f4ed, garis krem #e2e9e5. */
 
 .bt-page {
     position: relative;
     width: 100%;
     min-height: 100vh;
     min-height: 100dvh;
-    background: #eef0df;
+    background: #f5f7f6;
     font-family: 'Plus Jakarta Sans', sans-serif;
     display: flex;
     flex-direction: column;
-    color: #1b1f16;
+    color: #182721;
 }
 
 @keyframes btFadeUp {
@@ -22,7 +22,7 @@
 
 /* ---------------- Header hijau melengkung ---------------- */
 .bt-header {
-    background: linear-gradient(150deg, #163d24, #1b4d2e 45%, #2e7d32 110%);
+    background: linear-gradient(150deg, #0b4e35, #167a55 45%, #167a55 110%);
     padding: calc(16px + env(safe-area-inset-top, 0px)) 18px 56px;
     border-radius: 0 0 28px 28px;
     animation: btFadeUp 0.4s ease both;
@@ -92,7 +92,7 @@
 }
 
 .bt-search:focus-within {
-    outline: 2px solid #2e7d32;
+    outline: 2px solid #167a55;
     outline-offset: 1px;
 }
 
@@ -109,12 +109,12 @@
     outline: none;
     font-family: inherit;
     font-size: 14px;
-    color: #1b1f16;
+    color: #182721;
     padding: 15px 0;
 }
 
 .bt-search-input::placeholder {
-    color: #8a8f7c;
+    color: #9aa59f;
 }
 
 .bt-search-clear {
@@ -122,8 +122,8 @@
     height: 26px;
     border: none;
     border-radius: 50%;
-    background: #eef0df;
-    color: #55603f;
+    background: #f5f7f6;
+    color: #6d7c75;
     font-size: 12px;
     cursor: pointer;
     flex-shrink: 0;
@@ -152,9 +152,9 @@
 
 .bt-chip {
     flex-shrink: 0;
-    border: 1px solid #eee6c9;
+    border: 1px solid #e2e9e5;
     background: #ffffff;
-    color: #3b4a2c;
+    color: #182721;
     font-family: inherit;
     font-size: 13px;
     font-weight: 600;
@@ -165,12 +165,12 @@
 }
 
 .bt-chip:hover {
-    border-color: #2e7d32;
+    border-color: #167a55;
 }
 
 .bt-chip-active {
-    background: #1b4d2e;
-    border-color: #1b4d2e;
+    background: #167a55;
+    border-color: #167a55;
     color: #ffffff;
 }
 
@@ -178,7 +178,7 @@
     font-family: 'Outfit', sans-serif;
     font-size: 16px;
     font-weight: 700;
-    color: #1b4d2e;
+    color: #167a55;
     margin: 22px 0 10px;
 }
 
@@ -194,14 +194,14 @@
 
 .bt-faq {
     background: #ffffff;
-    border: 1px solid #eee6c9;
+    border: 1px solid #e2e9e5;
     border-radius: 16px;
     overflow: hidden;
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .bt-faq-open {
-    border-color: #2e7d32;
+    border-color: #167a55;
     box-shadow: 0 6px 16px rgba(27, 77, 46, 0.1);
 }
 
@@ -217,7 +217,7 @@
     font-family: inherit;
     font-size: 14px;
     font-weight: 600;
-    color: #1b1f16;
+    color: #182721;
     text-align: left;
     cursor: pointer;
 }
@@ -226,14 +226,14 @@
 .bt-contact-card:focus-visible,
 .bt-chip:focus-visible,
 .bt-back-btn:focus-visible {
-    outline: 2px solid #2e7d32;
+    outline: 2px solid #167a55;
     outline-offset: 2px;
 }
 
 .bt-faq-caret {
     font-size: 20px;
     line-height: 1;
-    color: #2e7d32;
+    color: #167a55;
     flex-shrink: 0;
     transition: transform 0.2s ease;
 }
@@ -251,13 +251,13 @@
     margin: 8px 0 0;
     font-size: 13.5px;
     line-height: 1.6;
-    color: #3b4a2c;
+    color: #182721;
 }
 
 .bt-faq-tag {
     display: inline-block;
-    background: #eaf7e5;
-    color: #1b4d2e;
+    background: #e6f4ed;
+    color: #167a55;
     font-size: 11px;
     font-weight: 700;
     padding: 3px 10px;
@@ -268,7 +268,7 @@
 .bt-empty {
     text-align: center;
     background: #ffffff;
-    border: 1px dashed #d9d2b0;
+    border: 1px dashed #cbd7d0;
     border-radius: 16px;
     padding: 28px 20px;
 }
@@ -281,14 +281,14 @@
     margin: 8px 0 4px;
     font-weight: 700;
     font-size: 14px;
-    color: #1b1f16;
+    color: #182721;
     overflow-wrap: anywhere;
 }
 
 .bt-empty-text {
     margin: 0;
     font-size: 13px;
-    color: #55603f;
+    color: #6d7c75;
     line-height: 1.5;
 }
 
@@ -304,7 +304,7 @@
     align-items: center;
     gap: 12px;
     background: #ffffff;
-    border: 1px solid #eee6c9;
+    border: 1px solid #e2e9e5;
     border-radius: 16px;
     padding: 13px 16px;
     text-decoration: none;
@@ -313,7 +313,7 @@
 }
 
 .bt-contact-card:hover {
-    border-color: #2e7d32;
+    border-color: #167a55;
     transform: translateY(-1px);
 }
 
@@ -321,7 +321,7 @@
     width: 40px;
     height: 40px;
     border-radius: 12px;
-    background: #eaf7e5;
+    background: #e6f4ed;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -338,20 +338,20 @@
 
 .bt-contact-label {
     font-size: 12px;
-    color: #6b7259;
+    color: #6d7c75;
 }
 
 .bt-contact-value {
     font-size: 14px;
     font-weight: 600;
-    color: #1b1f16;
+    color: #182721;
     overflow-wrap: anywhere;
 }
 
 .bt-contact-hours {
     margin: 12px 4px 0;
     font-size: 12.5px;
-    color: #55603f;
+    color: #6d7c75;
 }
 
 @media (prefers-reduced-motion: reduce) {
