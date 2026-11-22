@@ -2441,22 +2441,25 @@ export default function DriverDashboard({
         </div>
 
         {malfunctionNotice && (
-          <div className="mapdash-location-notice is-error" role="status" aria-live="polite">
-            <span>{malfunctionNotice}</span>
-            <button
-              type="button"
-              className="mapdash-notif-close"
-              aria-label="Tutup notifikasi"
-              onClick={() => {
-                setMalfunctionNotice("");
-                if (malfunctionNoticeTimerRef.current) {
-                  window.clearTimeout(malfunctionNoticeTimerRef.current);
-                  malfunctionNoticeTimerRef.current = null;
-                }
-              }}
-            >
-              <FiX aria-hidden="true" />
-            </button>
+          <div className="mapdash-modal-backdrop" role="presentation">
+            <div className="mapdash-alert" role="alertdialog" aria-modal="true" aria-label={malfunctionNotice}>
+              <div className="mapdash-alert-icon" aria-hidden="true">!</div>
+              <strong>{malfunctionNotice}</strong>
+              <p>Sesi charging dihentikan dan laporan gangguan berhasil dikirim.</p>
+              <button
+                type="button"
+                className="mapdash-alert-button"
+                onClick={() => {
+                  setMalfunctionNotice("");
+                  if (malfunctionNoticeTimerRef.current) {
+                    window.clearTimeout(malfunctionNoticeTimerRef.current);
+                    malfunctionNoticeTimerRef.current = null;
+                  }
+                }}
+              >
+                OK
+              </button>
+            </div>
           </div>
         )}
 
