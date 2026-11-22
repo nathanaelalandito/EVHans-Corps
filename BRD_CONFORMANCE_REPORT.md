@@ -23,7 +23,7 @@ Hitungan status (audit kode + test): ✅ 48 (47 FR + 1 NFR), ⚠️ 12 (9 FR + 3
 | FR-09 | 1 | ✅ | `StationController.php` + frontend filter |
 | FR-10 | 1 | ✅ | `StationController::show` |
 | FR-11 | 1 | ✅ | `presentStation` |
-| FR-12 | 2 | ⚠️ | filter UI ada; backend search terbatas |
+| FR-12 | 2 | ✅ | backend filter q/connector/availability/min_power/max_tariff + frontend |
 | FR-13 | 2 | ⚠️ | navigasi frontend, tidak diuji browser |
 | FR-14 | 1 | ✅ | `OperationsController.php` |
 | FR-15 | 1 | ✅ | `createStation` |

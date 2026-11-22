@@ -30,6 +30,11 @@ class StationController extends Controller
                 ->all();
         }
 
+        $keyword = trim((string) $request->query('q', ''));
+        $availability = strtolower(trim((string) $request->query('availability', '')));
+        $minPower = is_numeric($request->query('min_power')) ? (float) $request->query('min_power') : null;
+        $maxTariff = is_numeric($request->query('max_tariff')) ? (float) $request->query('max_tariff') : null;
+
         $stations = Location::query()
             ->with([
                 'chargers.ports' => fn ($query) => $query->orderBy('nomor_port'),
@@ -43,9 +48,37 @@ class StationController extends Controller
                     $portQuery->whereRaw("LOWER(REPLACE(tipe_konektor, ' ', '')) = ?", [$cleanConnector]);
                 });
             })
+            ->when($keyword !== '', function ($query) use ($keyword): void {
+                $query->where(function ($subQuery) use ($keyword): void {
+                    $subQuery->where('nama_lokasi', 'like', "%{$keyword}%")
+                        ->orWhere('alamat', 'like', "%{$keyword}%")
+                        ->orWhere('kode_station', 'like', "%{$keyword}%");
+                });
+            })
             ->orderBy('nama_lokasi')
             ->get()
             ->map(fn (Location $location) => $this->presentStation($location, $driverLat, $driverLng))
+            ->filter(function (array $station) use ($availability, $minPower, $maxTariff): bool {
+                if ($availability !== '' && strtolower((string) ($station['status'] ?? '')) !== $availability) {
+                    return false;
+                }
+
+                if ($minPower !== null) {
+                    $stationPower = (float) ($station['daya_kw_max'] ?? 0);
+                    if ($stationPower < $minPower) {
+                        return false;
+                    }
+                }
+
+                if ($maxTariff !== null) {
+                    $stationTariff = (float) ($station['tarif_per_kwh'] ?? 0);
+                    if ($stationTariff > $maxTariff) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
             ->sortBy('jarak_km')
             ->values();
 
