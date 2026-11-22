@@ -421,6 +421,7 @@ export default function DriverDashboard({
   }, [showInterruptModal, stoppingSession]);
   const [sessionSyncError, setSessionSyncError] = useState("");
   const [sessionNotice, setSessionNotice] = useState("");
+  const [malfunctionNotice, setMalfunctionNotice] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [selectedStationId, setSelectedStationId] = useState(null);
   const [showSessionStatus, setShowSessionStatus] = useState(!!DUMMY_ACTIVE_SESSION);
@@ -1015,6 +1016,7 @@ export default function DriverDashboard({
           if (cancelled) return;
           setSessionSyncError("");
           if (!session) {
+            setMalfunctionNotice("");
             simulatedFailureRef.current = null;
             setActiveSession(null);
             setShowSessionStatus(false);
@@ -1205,6 +1207,7 @@ export default function DriverDashboard({
     if (!activeSession || stoppingSession) return;
     setStoppingSession(true);
     setSessionError("");
+    setMalfunctionNotice("Laporan Terkirim");
     try {
       const interruptedInvoice = await interruptChargingSession(
         activeSession.id_session,
@@ -1216,8 +1219,14 @@ export default function DriverDashboard({
       setShowInterruptModal(false);
       setInterruptReason("");
       afterSessionSettled(interruptedInvoice)
-        .then(() => setSessionError("Laporan gangguan terkirim."))
-        .catch(() => setSessionError("Laporan gangguan terkirim."));
+        .then(() => {
+          setMalfunctionNotice("");
+          setSessionError("Laporan gangguan terkirim.");
+        })
+        .catch(() => {
+          setMalfunctionNotice("");
+          setSessionError("Laporan gangguan terkirim.");
+        });
     } catch (err) {
       setSessionError(
         extractErrorMessage(err, "Gagal memproses gangguan sesi charging."),
@@ -2412,6 +2421,12 @@ export default function DriverDashboard({
             </button>
           </div>
         </div>
+
+        {malfunctionNotice && activeSession && (
+          <div className="mapdash-location-notice is-error" role="status" aria-live="polite">
+            <span>{malfunctionNotice}</span>
+          </div>
+        )}
 
         {showSessionStatus && activeSession && (
           <div className="mapdash-notif mapdash-session-status" role="status" aria-label="Status sesi charging">
