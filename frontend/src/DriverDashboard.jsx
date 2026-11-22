@@ -2440,28 +2440,7 @@ export default function DriverDashboard({
           </div>
         </div>
 
-        {malfunctionNotice && (
-          <div className="mapdash-modal-backdrop" role="presentation">
-            <div className="mapdash-alert" role="alertdialog" aria-modal="true" aria-label={malfunctionNotice}>
-              <div className="mapdash-alert-icon" aria-hidden="true">!</div>
-              <strong>{malfunctionNotice}</strong>
-              <p>Sesi charging dihentikan dan laporan gangguan berhasil dikirim.</p>
-              <button
-                type="button"
-                className="mapdash-alert-button"
-                onClick={() => {
-                  setMalfunctionNotice("");
-                  if (malfunctionNoticeTimerRef.current) {
-                    window.clearTimeout(malfunctionNoticeTimerRef.current);
-                    malfunctionNoticeTimerRef.current = null;
-                  }
-                }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {showSessionStatus && activeSession && (
           <div className="mapdash-notif mapdash-session-status" role="status" aria-label="Status sesi charging">
@@ -3520,6 +3499,29 @@ export default function DriverDashboard({
           onClose={() => setDetailStationId(null)}
           onShowRoute={handleRouteFromDetail}
         />
+      )}
+
+      {malfunctionNotice && (
+        <div className="mapdash-modal-backdrop" role="presentation">
+          <div className="mapdash-alert" role="alertdialog" aria-modal="true" aria-label={malfunctionNotice}>
+            <div className="mapdash-alert-icon" aria-hidden="true">!</div>
+            <strong>{malfunctionNotice}</strong>
+            <p>Sesi charging dihentikan dan laporan gangguan berhasil dikirim.</p>
+            <button
+              type="button"
+              className="mapdash-alert-button"
+              onClick={() => {
+                setMalfunctionNotice("");
+                if (malfunctionNoticeTimerRef.current) {
+                  window.clearTimeout(malfunctionNoticeTimerRef.current);
+                  malfunctionNoticeTimerRef.current = null;
+                }
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
