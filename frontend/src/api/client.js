@@ -37,6 +37,12 @@ api.interceptors.response.use(
             localStorage.removeItem('ev_user');
             window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
         }
+        // Backend mati / tidak terjangkau: beri pesan yang ramah, bukan error teknis.
+        if (!error.response) {
+            error.response = {
+                data: { message: 'Layanan sedang tidak tersedia. Coba lagi beberapa saat.' },
+            };
+        }
         return Promise.reject(error);
     }
 );
