@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FiBarChart2, FiCheck, FiZap } from 'react-icons/fi';
 import './startCharging.css';
 import { getStationDetail, konektorLabel, sameConnector, portStatusLabel, chargerStatusLabel } from './api/station';
@@ -95,27 +95,29 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     const connector = vehicle?.tipe_konektor ?? null;
 
     // Kumpulkan semua port dari seluruh charger di lokasi ini yang sesuai dengan tipe konektor mobil & statusnya Available
-    const availablePorts = [];
-    if (detail?.chargers) {
-        detail.chargers.forEach((charger) => {
-            if (charger.ports) {
-                charger.ports.forEach((port) => {
-                    // Cek kecocokan konektor (case-insensitive) dan status port 'Available' / 'Tersedia'
-                    const matchConnector = connector ? sameConnector(port.tipe_konektor, connector) : true;
-                    const isAvailable = portStatusLabel(port.status_port).text === 'Tersedia';
-                    const machineOk = !charger.status_mesin || chargerStatusLabel(charger.status_mesin).text === 'Tersedia';
-                    
-                    if (matchConnector && isAvailable && machineOk) {
-                        availablePorts.push({
-                            ...port,
-                            kode_perangkat: charger.kode_perangkat,
-                            merek_model: charger.merek_model,
-                        });
-                    }
-                });
-            }
-        });
-    }
+    const availablePorts = useMemo(() => {
+        const ports = [];
+        if (detail?.chargers) {
+            detail.chargers.forEach((charger) => {
+                if (charger.ports) {
+                    charger.ports.forEach((port) => {
+                        const matchConnector = connector ? sameConnector(port.tipe_konektor, connector) : true;
+                        const isAvailable = portStatusLabel(port.status_port).text === 'Tersedia';
+                        const machineOk = !charger.status_mesin || chargerStatusLabel(charger.status_mesin).text === 'Tersedia';
+
+                        if (matchConnector && isAvailable && machineOk) {
+                            ports.push({
+                                ...port,
+                                kode_perangkat: charger.kode_perangkat,
+                                merek_model: charger.merek_model,
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        return ports;
+    }, [detail, connector]);
 
     const chosenPort = availablePorts.find((p) => p.id_port === selectedPortId) ?? null;
 
@@ -124,7 +126,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
         if (availablePorts.length === 1 && selectedPortId == null) {
             setSelectedPortId(availablePorts[0].id_port);
         }
-    }, [detail, availablePorts, selectedPortId]);
+    }, [availablePorts, selectedPortId]);
 
     const minKwh = prep?.min_target_kwh ?? 0.5;
     const maxKwh = prep?.max_target_kwh ?? 100;
