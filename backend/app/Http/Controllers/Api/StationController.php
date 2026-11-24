@@ -32,8 +32,8 @@ class StationController extends Controller
 
         $keyword = trim((string) $request->query('q', ''));
         $availability = strtolower(trim((string) $request->query('availability', '')));
-        $minPower = is_numeric($request->query('min_power')) ? (float) $request->query('min_power') : null;
-        $maxTariff = is_numeric($request->query('max_tariff')) ? (float) $request->query('max_tariff') : null;
+        $minPower = is_numeric($request->query('min_power')) && (float) $request->query('min_power') >= 0 ? (float) $request->query('min_power') : null;
+        $maxTariff = is_numeric($request->query('max_tariff')) && (float) $request->query('max_tariff') >= 0 ? (float) $request->query('max_tariff') : null;
 
         $stations = Location::query()
             ->with([
@@ -59,8 +59,14 @@ class StationController extends Controller
             ->get()
             ->map(fn (Location $location) => $this->presentStation($location, $driverLat, $driverLng))
             ->filter(function (array $station) use ($availability, $minPower, $maxTariff): bool {
-                if ($availability !== '' && strtolower((string) ($station['status'] ?? '')) !== $availability) {
-                    return false;
+                if ($availability !== '') {
+                    if (in_array($availability, ['tersedia', 'available', 'aktif'], true)) {
+                        if (! (bool) ($station['can_start'] ?? false)) {
+                            return false;
+                        }
+                    } elseif (strtolower((string) ($station['status'] ?? '')) !== $availability) {
+                        return false;
+                    }
                 }
 
                 if ($minPower !== null) {
