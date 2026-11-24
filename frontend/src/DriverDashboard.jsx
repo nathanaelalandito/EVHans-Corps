@@ -421,6 +421,14 @@ export default function DriverDashboard({
   }, [showInterruptModal, stoppingSession]);
   const [sessionSyncError, setSessionSyncError] = useState("");
   const [sessionNotice, setSessionNotice] = useState("");
+  const [malfunctionNotice, setMalfunctionNotice] = useState("");
+  const malfunctionNoticeTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (malfunctionNoticeTimerRef.current) window.clearTimeout(malfunctionNoticeTimerRef.current);
+    };
+  }, []);
   const [elapsed, setElapsed] = useState(0);
   const [selectedStationId, setSelectedStationId] = useState(null);
   const [showSessionStatus, setShowSessionStatus] = useState(!!DUMMY_ACTIVE_SESSION);
@@ -1015,6 +1023,7 @@ export default function DriverDashboard({
           if (cancelled) return;
           setSessionSyncError("");
           if (!session) {
+            setMalfunctionNotice("");
             simulatedFailureRef.current = null;
             setActiveSession(null);
             setShowSessionStatus(false);
@@ -1036,6 +1045,12 @@ export default function DriverDashboard({
 
           if (isSimulatedFailureTarget && simulatedFailureRef.current !== session.id_session) {
             simulatedFailureRef.current = session.id_session;
+            setMalfunctionNotice("Laporan Terkirim");
+            if (malfunctionNoticeTimerRef.current) window.clearTimeout(malfunctionNoticeTimerRef.current);
+            malfunctionNoticeTimerRef.current = window.setTimeout(() => {
+              setMalfunctionNotice("");
+              malfunctionNoticeTimerRef.current = null;
+            }, 4000);
             interruptChargingSession(session.id_session, {
               status: "gagal",
               alasan: "Simulasi gangguan charger saat pengisian berlangsung.",
@@ -1205,6 +1220,12 @@ export default function DriverDashboard({
     if (!activeSession || stoppingSession) return;
     setStoppingSession(true);
     setSessionError("");
+    setMalfunctionNotice("Laporan Terkirim");
+    if (malfunctionNoticeTimerRef.current) window.clearTimeout(malfunctionNoticeTimerRef.current);
+    malfunctionNoticeTimerRef.current = window.setTimeout(() => {
+      setMalfunctionNotice("");
+      malfunctionNoticeTimerRef.current = null;
+    }, 4000);
     try {
       const interruptedInvoice = await interruptChargingSession(
         activeSession.id_session,
@@ -1216,8 +1237,14 @@ export default function DriverDashboard({
       setShowInterruptModal(false);
       setInterruptReason("");
       afterSessionSettled(interruptedInvoice)
-        .then(() => setSessionError("Laporan gangguan terkirim."))
-        .catch(() => setSessionError("Laporan gangguan terkirim."));
+        .then(() => {
+          setMalfunctionNotice("");
+          setSessionError("Laporan gangguan terkirim.");
+        })
+        .catch(() => {
+          setMalfunctionNotice("");
+          setSessionError("Laporan gangguan terkirim.");
+        });
     } catch (err) {
       setSessionError(
         extractErrorMessage(err, "Gagal memproses gangguan sesi charging."),
@@ -2413,6 +2440,8 @@ export default function DriverDashboard({
           </div>
         </div>
 
+
+
         {showSessionStatus && activeSession && (
           <div className="mapdash-notif mapdash-session-status" role="status" aria-label="Status sesi charging">
               <span>
@@ -3470,6 +3499,29 @@ export default function DriverDashboard({
           onClose={() => setDetailStationId(null)}
           onShowRoute={handleRouteFromDetail}
         />
+      )}
+
+      {malfunctionNotice && (
+        <div className="mapdash-modal-backdrop" role="presentation">
+          <div className="mapdash-alert" role="alertdialog" aria-modal="true" aria-label={malfunctionNotice}>
+            <div className="mapdash-alert-icon" aria-hidden="true">!</div>
+            <strong>{malfunctionNotice}</strong>
+            <p>Sesi charging dihentikan dan laporan gangguan berhasil dikirim.</p>
+            <button
+              type="button"
+              className="mapdash-alert-button"
+              onClick={() => {
+                setMalfunctionNotice("");
+                if (malfunctionNoticeTimerRef.current) {
+                  window.clearTimeout(malfunctionNoticeTimerRef.current);
+                  malfunctionNoticeTimerRef.current = null;
+                }
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

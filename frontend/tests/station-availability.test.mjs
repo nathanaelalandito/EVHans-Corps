@@ -19,7 +19,7 @@ test('station badges preserve server status and next opening time', () => {
 test('closed stations are excluded from recommendations and available filter, and ports cannot start', () => {
   assert.match(dashboard, /station\.can_start && station\.port_tersedia > 0/);
   assert.match(dashboard, /\.filter\(\(station\) => station\.can_start\)/);
-  assert.match(dashboard, /disabled=\{!s\.can_start \|\| chargerBadge\.tone !== "ok"\}/);
+  assert.match(dashboard, /disabled=\{isStationClosed\(s\) \|\| !s\.can_start \|\| chargerBadge\.tone !== "ok"\}/);
   assert.match(dashboard, /Number\(Boolean\(second\.can_start\)\) - Number\(Boolean\(first\.can_start\)\)/);
 });
 
@@ -39,7 +39,7 @@ test('port and charger status labels are Indonesian and unknown server strings s
   assert.deepEqual(portStatusLabel('Vendor status xyz'), { text: 'Status tidak diketahui', tone: 'neutral' });
   assert.equal(chargerStatusLabel('Offline').text, 'Offline');
   assert.equal(chargerStatusLabel('Out of Order').text, 'Gangguan');
-  assert.match(dashboard, /portStatusLabel\(activeSession\.status_port\)/);
+  assert.match(dashboard, /portStatusLabel\(activeSession\.status_port \|\| "Charging"\)/);
   assert.match(dashboard, /chargerStatusLabel\(item\.status\)/);
   assert.match(start, /portStatusLabel\(port\.status_port\)/);
   assert.match(detail, /charger\.jumlah_port/);
