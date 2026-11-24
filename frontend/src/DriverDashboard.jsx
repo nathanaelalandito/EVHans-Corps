@@ -422,6 +422,7 @@ export default function DriverDashboard({
   const [sessionSyncError, setSessionSyncError] = useState("");
   const [sessionNotice, setSessionNotice] = useState("");
   const [malfunctionNotice, setMalfunctionNotice] = useState("");
+  const [sessionStoppedNotice, setSessionStoppedNotice] = useState(false);
   const malfunctionNoticeTimerRef = useRef(null);
 
   useEffect(() => {
@@ -1202,7 +1203,13 @@ export default function DriverDashboard({
       const finishedInvoice = await finishChargingSession(
         activeSession.id_session,
       );
-      await afterSessionSettled(finishedInvoice);
+      setSessionStoppedNotice(true);
+      try {
+        await afterSessionSettled(finishedInvoice);
+      } catch (settleErr) {
+        setSessionStoppedNotice(false);
+        throw settleErr;
+      }
     } catch (err) {
       setSessionError(
         extractErrorMessage(
@@ -1256,6 +1263,7 @@ export default function DriverDashboard({
 
   /** Menyimpan sesi baru ke state dan membuka pemantauan progresnya. */
   const handleSessionStarted = (session) => {
+    setSessionStoppedNotice(false);
     setShowStartCharging(false);
     setStartPortId(null);
     clearRoute();
@@ -3517,6 +3525,23 @@ export default function DriverDashboard({
                   malfunctionNoticeTimerRef.current = null;
                 }
               }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sessionStoppedNotice && (
+        <div className="mapdash-modal-backdrop" role="presentation">
+          <div className="mapdash-alert" role="alertdialog" aria-modal="true" aria-label="Sesi Charging Telah Berhenti">
+            <div className="mapdash-alert-icon" aria-hidden="true">✓</div>
+            <strong>Sesi Charging Telah Berhenti</strong>
+            <p>Sesi charging kamu telah dihentikan.</p>
+            <button
+              type="button"
+              className="mapdash-alert-button"
+              onClick={() => setSessionStoppedNotice(false)}
             >
               OK
             </button>
