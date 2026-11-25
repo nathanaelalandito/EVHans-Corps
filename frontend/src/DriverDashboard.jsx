@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { sessionStatusTone } from "./utils/sessionStatus";
 import { API_BASE_URL } from "./api/client";
@@ -349,7 +349,6 @@ export default function DriverDashboard({
             }
             setShowInterruptModal(false);
             setInterruptReason("");
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSessionNotice("Sesi dilanjutkan otomatis karena batas waktu jeda habis.");
             if (activeSession?.id_session) {
               try {
@@ -414,13 +413,14 @@ export default function DriverDashboard({
       }
     };
     document.addEventListener("keydown", handleKeyDown);
+    const trigger = interruptTriggerRef.current;
     return () => {
       document.body.style.overflow = previousOverflow;
       clearTimeout(focusTimer);
       document.removeEventListener("keydown", handleKeyDown);
-      interruptTriggerRef.current?.focus();
+      trigger?.focus();
     };
-  }, [showInterruptModal, stoppingSession]);
+    }, [showInterruptModal, stoppingSession, activeSession?.id_session]);
   const [sessionSyncError, setSessionSyncError] = useState("");
   const [malfunctionNotice, setMalfunctionNotice] = useState("");
   const [sessionStoppedNotice, setSessionStoppedNotice] = useState(false);
@@ -619,9 +619,6 @@ export default function DriverDashboard({
 
   const activeVehicle =
     vehicles.find((v) => v.id_vehicle === activeVehicleId) ?? null;
-  const posKey = driverPosition
-    ? `${driverPosition.lat.toFixed(2)},${driverPosition.lng.toFixed(2)}`
-    : "unknown";
 
   // Normalisasi stasiun untuk menghitung port dan ringkasan konektor yang kompatibel
   const stations = useMemo(
@@ -663,7 +660,7 @@ export default function DriverDashboard({
           tipe_konektor_list: uniqueConnectors,
         };
       }),
-    [rawStations, posKey, locationStatus],
+    [rawStations, locationStatus, driverPosition],
   );
 
   useEffect(() => {
@@ -705,10 +702,10 @@ export default function DriverDashboard({
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, []);
+  }, [stationKeyword, connectorFilter, availabilityFilter, minimumPowerFilter, maximumPriceFilter]);
 
   /** Memuat ulang daftar station berdasarkan posisi GPS yang sudah terverifikasi. */
-  const reloadStations = async () => {
+  const reloadStations = useCallback(async () => {
     setStationsLoading(true);
     setStationsError("");
     try {
@@ -727,7 +724,7 @@ export default function DriverDashboard({
     } finally {
       setStationsLoading(false);
     }
-  };
+  }, [stationKeyword, connectorFilter, availabilityFilter, minimumPowerFilter, maximumPriceFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -767,11 +764,8 @@ export default function DriverDashboard({
     );
     if (station && !isStationClosed(station)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedStationId(station.id_location);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStartPortId(resumeChargingContext.portId ?? null);
-      setShowStartCharging(true);
     }
     onResumeChargingHandled?.();
   }, [
@@ -1006,10 +1000,9 @@ export default function DriverDashboard({
       routeAbortRef.current ||
       routeStatus !== "idle"
     ) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       clearRoute();
     }
-  }, [selectedStationId]);
+  }, [selectedStationId, routeStatus]);
 
   useEffect(() => () => routeAbortRef.current?.abort(), []);
 
@@ -1027,7 +1020,6 @@ export default function DriverDashboard({
     const id = setTimeout(() => {
       mapRef.current.invalidateSize();
       if (pendingFocusStationRef.current) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         handleFocusStation(pendingFocusStationRef.current);
         pendingFocusStationRef.current = null;
       }
@@ -1053,9 +1045,7 @@ export default function DriverDashboard({
             setShowSessionStatus(false);
             reloadStations();
             fetchWallet();
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             fetchTransactionHistory();
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSessionNotice(
               "Sesi charging sudah berakhir. Saldo dan riwayat transaksi diperbarui.",
             );
@@ -1112,7 +1102,7 @@ export default function DriverDashboard({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [activeSessionId]);
+    }, [activeSessionId, reloadStations]);
 
   const sessionProgressPct =
     activeSession && activeSession.target_kwh > 0

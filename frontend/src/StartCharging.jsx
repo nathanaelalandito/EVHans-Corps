@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiBarChart2, FiCheck, FiZap } from 'react-icons/fi';
 import './startCharging.css';
 import { getStationDetail, konektorLabel, sameConnector, portStatusLabel, chargerStatusLabel } from './api/station';
@@ -79,18 +79,18 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     }, [station.id_location]);
 
     /** Menutup wizard dan melepas efek antarmuka yang sedang aktif. */
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         if (busy) return;
         if (session) onStarted(session);
         else onClose();
-    };
+    }, [busy, session, onStarted, onClose]);
 
     useEffect(() => {
         /** Menutup wizard saat tombol Escape ditekan. */
         const onKey = (e) => e.key === 'Escape' && handleClose();
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [busy, session]);
+    }, [busy, session, handleClose]);
 
     const connector = vehicle?.tipe_konektor ?? null;
 
