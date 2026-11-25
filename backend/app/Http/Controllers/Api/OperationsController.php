@@ -627,7 +627,7 @@ class OperationsController extends Controller
 
         $data = $request->validate([
             'nama_lengkap' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'regex:/^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*@ops\.ac\.id$/i', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'regex:/^(?=.*[A-Za-z])(?=.*\d).+$/'],
             'nomor_telepon' => ['required', 'string', 'regex:/^[0-9]{8,15}$/'],
             'id_locations' => ['sometimes', 'array'],
@@ -640,6 +640,7 @@ class OperationsController extends Controller
             $user = User::create([
                 'id_user' => $this->nextUserId('OPS'),
                 'email' => $data['email'],
+                'email_verified_at' => now(),
                 'password' => Hash::make($data['password']),
                 'peran' => 'operator',
                 'status_akun' => 'Aktif', // Format Kapital
