@@ -817,50 +817,16 @@ export default function DriverDashboard({
   const hasCenteredOnRealPosRef = useRef(false);
   const pendingFocusStationRef = useRef(null);
 
-  const filteredStations = stations
-    .filter((station) => {
-      const matchesConnector =
-        connectorFilter === "Semua" ||
-        station.tipe_konektor_list?.some((type) =>
-          sameConnector(type, connectorFilter),
-        );
-      const searchable =
-        `${station.nama_lokasi ?? ""} ${station.kode_station ?? ""} ${station.alamat ?? ""}`.toLocaleLowerCase(
+  const filteredStations = [...stations].sort((first, second) =>
+    Number(Boolean(second.can_start)) - Number(Boolean(first.can_start)) ||
+    (locationStatus === "live"
+      ? (first.jarak_km ?? Number.POSITIVE_INFINITY) -
+        (second.jarak_km ?? Number.POSITIVE_INFINITY)
+      : String(first.nama_lokasi ?? "").localeCompare(
+          String(second.nama_lokasi ?? ""),
           "id-ID",
-        );
-      const matchesKeyword = searchable.includes(
-        stationKeyword.trim().toLocaleLowerCase("id-ID"),
-      );
-      const matchesAvailability =
-        availabilityFilter === "all" ||
-        (availabilityFilter === "available"
-          ? station.can_start && station.port_tersedia > 0
-          : station.status === "Penuh");
-      const matchesPower =
-        minimumPowerFilter === "all" ||
-        Number(station.daya_kw_max ?? 0) >= Number(minimumPowerFilter);
-      const matchesPrice =
-        maximumPriceFilter === "all" ||
-        (station.tarif_per_kwh != null &&
-          Number(station.tarif_per_kwh) <= Number(maximumPriceFilter));
-      return (
-        matchesConnector &&
-        matchesKeyword &&
-        matchesAvailability &&
-        matchesPower &&
-        matchesPrice
-      );
-    })
-    .sort((first, second) =>
-      Number(Boolean(second.can_start)) - Number(Boolean(first.can_start)) ||
-      (locationStatus === "live"
-        ? (first.jarak_km ?? Number.POSITIVE_INFINITY) -
-          (second.jarak_km ?? Number.POSITIVE_INFINITY)
-        : String(first.nama_lokasi ?? "").localeCompare(
-            String(second.nama_lokasi ?? ""),
-            "id-ID",
-          )),
-    );
+        )),
+  );
   const activeStationFilterCount = [
     connectorFilter !== "Semua",
     availabilityFilter !== "all",
