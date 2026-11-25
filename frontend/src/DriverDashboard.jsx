@@ -666,7 +666,13 @@ export default function DriverDashboard({
     /** Memuat ulang status station saat halaman dibuka atau kembali aktif. */
     const loadStationList = (showLoading = false) => {
       if (showLoading) setStationsLoading(true);
-      getStations()
+      getStations(null, {
+        keyword: stationKeyword,
+        connector: connectorFilter,
+        availability: availabilityFilter,
+        minPower: minimumPowerFilter,
+        maxTariff: maximumPriceFilter,
+      })
         .then((list) => {
           if (!cancelled) {
             setRawStations(list);
@@ -701,7 +707,13 @@ export default function DriverDashboard({
     setStationsLoading(true);
     setStationsError("");
     try {
-      const list = await getStations();
+      const list = await getStations(null, {
+        keyword: stationKeyword,
+        connector: connectorFilter,
+        availability: availabilityFilter,
+        minPower: minimumPowerFilter,
+        maxTariff: maximumPriceFilter,
+      });
       setRawStations(list);
     } catch (err) {
       setStationsError(

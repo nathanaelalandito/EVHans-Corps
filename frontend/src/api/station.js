@@ -40,9 +40,27 @@ function toDashboardStation(s) {
     };
 }
 
+const CONNECTOR_CODE = {
+    'CCS2': 'ccs2',
+    'Type 2': 'type_2',
+    'CHAdeMO': 'chademo',
+    'GB/T': 'gbt',
+};
+
 /** Mengambil station dan menormalkan tiap record untuk peta/daftar driver. */
-export async function getStations(position = null) {
+export async function getStations(position = null, filters = {}) {
     const params = position ? { lat: position.lat, lng: position.lng } : {};
+    if (filters.keyword) params.q = filters.keyword;
+    if (filters.connector && filters.connector !== 'Semua') {
+        params.connector = CONNECTOR_CODE[filters.connector] ?? String(filters.connector).toLowerCase();
+    }
+    if (filters.availability && filters.availability !== 'all') {
+        params.availability = filters.availability === 'available'
+            ? 'tersedia'
+            : (filters.availability === 'full' ? 'penuh' : filters.availability);
+    }
+    if (filters.minPower && filters.minPower !== 'all') params.min_power = filters.minPower;
+    if (filters.maxTariff && filters.maxTariff !== 'all') params.max_tariff = filters.maxTariff;
     const { data } = await api.get('/stations', { params });
     return (data.data ?? data).map(toDashboardStation);
 }
