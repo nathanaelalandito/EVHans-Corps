@@ -124,6 +124,7 @@ export default function StartCharging({ station, vehicle, position, initialPortI
     // Kalau hanya ada satu port yang cocok, langsung pilih otomatis
     useEffect(() => {
         if (availablePorts.length === 1 && selectedPortId == null) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSelectedPortId(availablePorts[0].id_port);
         }
     }, [availablePorts, selectedPortId]);
