@@ -74,7 +74,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'joko.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'Suspend',
+                'status_akun' => 'Nonaktif',
                 'nama_lengkap' => 'Joko Prasetyo',
                 'nomor_telepon' => '081699887766',
                 'alamat' => null,
@@ -83,7 +83,7 @@ class UserSeeder extends Seeder
             [
                 'email' => 'rina.driver@ac.id',
                 'peran' => 'driver',
-                'status_akun' => 'Banned',
+                'status_akun' => 'Nonaktif',
                 'nama_lengkap' => 'Rina Amelia',
                 'nomor_telepon' => '081777889900',
                 'alamat' => 'Jl. Veteran No. 12, Purwokerto',

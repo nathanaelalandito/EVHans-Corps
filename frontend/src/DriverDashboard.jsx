@@ -3088,7 +3088,7 @@ export default function DriverDashboard({
                 <p className="profile-email-sub">{profile.email}</p>
                 <div className="profile-hero-chips">
                   <span
-                    className={`dash-status-badge ${profile.status_akun === "aktif" ? "ok" : "danger"}`}
+                                className={`dash-status-badge ${String(profile.status_akun).toLowerCase() === "aktif" ? "ok" : "danger"}`}
                   >
                     {capitalize(profile.status_akun)}
                   </span>
@@ -3416,7 +3416,7 @@ export default function DriverDashboard({
                         {profile.nama_lengkap}
                       </p>
                       <span
-                        className={`dash-status-badge ${profile.status_akun === "aktif" ? "ok" : "danger"}`}
+                    className={`dash-status-badge ${String(profile.status_akun).toLowerCase() === "aktif" ? "ok" : "danger"}`}
                       >
                         {profile.status_akun}
                       </span>

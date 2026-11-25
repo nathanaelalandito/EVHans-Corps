@@ -831,7 +831,7 @@ class OperationsController extends Controller
         $user = User::where('id_user', $operator)->where('peran', 'operator')->firstOrFail();
 
         $data = $request->validate([
-            'status_akun' => ['required', Rule::in(['Aktif', 'Nonaktif', 'Suspend', 'Banned'])],
+            'status_akun' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
         ]);
 
         if ($data['status_akun'] !== 'Aktif') {

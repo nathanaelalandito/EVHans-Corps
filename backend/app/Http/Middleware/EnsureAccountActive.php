@@ -12,7 +12,7 @@ class EnsureAccountActive
         $user = $request->user() ?? auth('sanctum')->user();
 
         if ($user && $user->status_akun !== 'Aktif') {
-            return response()->json(['message' => 'Akun tidak aktif.'], 403);
+            return response()->json(['message' => 'Akun Anda sedang dinonaktifkan.'], 403);
         }
 
         return $next($request);

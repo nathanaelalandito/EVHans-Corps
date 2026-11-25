@@ -456,10 +456,7 @@
     white-space: nowrap;
 }
 
-.ops-status-nonaktif,
-.ops-status-offline,
-.ops-status-suspend,
-.ops-status-banned { background: #fff0ef; color: #a53d36; }
+.ops-status-nonaktif { background: #fff0ef; color: #a53d36; }
 .ops-status-maintenance,
 .ops-status-pending,
 .ops-status-berlangsung { background: #fff5df; color: #8b6412; }

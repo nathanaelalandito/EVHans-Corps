@@ -339,10 +339,8 @@ class DriverManagementTest extends TestCase
             'password' => 'password',
         ]);
 
-        $response->assertUnauthorized()
-            ->assertJsonPath('message', 'Email atau password salah.')
-            ->assertJsonMissing(['message' => 'Akun tidak aktif.']);
-        $this->assertStringNotContainsString('nonaktif', strtolower($response->getContent()));
+        $response->assertForbidden()
+            ->assertJsonPath('message', 'Akun Anda sedang dinonaktifkan.');
     }
 
     public function test_f_token_issued_before_deactivation_is_rejected_afterward(): void
@@ -471,10 +469,6 @@ class DriverManagementTest extends TestCase
 
         $this->putJson("/api/operations/drivers/{$driver->id_user}/status", [
             'status_akun' => 'Suspend',
-        ])->assertUnprocessable()->assertJsonValidationErrors('status_akun');
-
-        $this->putJson("/api/operations/drivers/{$driver->id_user}/status", [
-            'status_akun' => 'Banned',
         ])->assertUnprocessable()->assertJsonValidationErrors('status_akun');
 
         $this->assertDatabaseHas('users', [
