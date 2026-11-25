@@ -706,7 +706,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         const hasSelectedOperator = stationCreationOperatorIds.length > 0;
         const newOperatorComplete = Boolean(
             stationCreationNewOperator.nama_lengkap.trim()
-            && /^[a-zA-Z0-9]+(?:[._-][a-zA-Z0-9]+)*$/.test(stationCreationNewOperator.email.trim())
+                && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(stationCreationNewOperator.email.trim())
             && stationCreationNewOperator.password.length >= 6
             && stationCreationNewOperator.nomor_telepon.trim()
         );
@@ -758,7 +758,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                     await assignOperatorStation(selectedOperatorId, assignments);
                 }
                 if (hasNewOperator) {
-                    await createOperator({ ...stationCreationNewOperator, email: `${stationCreationNewOperator.email.trim()}@ops.ac.id`, id_locations: [Number(stationId)] });
+                    await createOperator({ ...stationCreationNewOperator, email: stationCreationNewOperator.email.trim(), id_locations: [Number(stationId)] });
                 }
                 setStationCreationOperatorDone(true);
             }
@@ -1007,7 +1007,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
         setOperatorSubmitting(true);
         const operatorName = operatorForm.nama_lengkap.trim();
         try {
-            await createOperator({ ...operatorForm, email: `${operatorForm.email.trim()}@ops.ac.id`, id_locations: operatorForm.id_locations.map(Number) });
+            await createOperator({ ...operatorForm, email: operatorForm.email.trim(), id_locations: operatorForm.id_locations.map(Number) });
             setOperatorForm({ nama_lengkap: '', email: '', password: '', nomor_telepon: '', id_locations: [] });
             setOperatorNotice({ type: 'success', message: `Akun Operator ${operatorName} berhasil dibuat.` });
 
@@ -1182,7 +1182,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                                         <div className="ops-form-title"><strong>Akun Operator baru</strong><span>Akun dan penugasannya akan dibuat bersamaan saat station disimpan.</span></div>
                                         <div className="ops-edit-grid">
                                             <label>Nama lengkap<input required value={stationCreationNewOperator.nama_lengkap} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, nama_lengkap: event.target.value }))} /></label>
-                                            <label>Nama email Operator<div className="ops-email-field"><input required type="text" name="operator-local-part-station" autoComplete="new-password" autoCapitalize="none" spellCheck={false} pattern="[A-Za-z0-9]+([._-][A-Za-z0-9]+)*" title="Gunakan huruf/angka; titik, garis bawah, dan tanda hubung hanya di antara teks." placeholder="nama.operator" value={stationCreationNewOperator.email} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, email: event.target.value }))} /><span>@ops.ac.id</span></div></label>
+                                            <label>Email Operator<input required type="email" name="operator-email-station" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="contoh: operator.jakarta@evcharge.id" value={stationCreationNewOperator.email} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, email: event.target.value }))} /></label>
                                             <label>Password awal<input required type="password" minLength="6" value={stationCreationNewOperator.password} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, password: event.target.value }))} /></label>
                                             <label>Nomor telepon<input required type="tel" inputMode="numeric" pattern={PHONE_PATTERN} maxLength={PHONE_MAX_DIGITS} title={PHONE_VALIDATION_MESSAGE} placeholder="08xxxxxxxxxx" value={stationCreationNewOperator.nomor_telepon} onChange={(event) => setStationCreationNewOperator((form) => ({ ...form, nomor_telepon: normalizeOperatorPhone(event.target.value) }))} /></label><small>{PHONE_VALIDATION_MESSAGE}</small>
                                         </div>
@@ -1491,7 +1491,7 @@ export default function OperatorAdminDashboard({ user, onLogout }) {
                         {operatorNotice && <div className={`ops-operator-notice is-${operatorNotice.type}`} role={operatorNotice.type === 'error' ? 'alert' : 'status'}>{operatorNotice.message}</div>}
                         <div className="ops-operator-fields">
                             <label>Nama lengkap<input placeholder="Nama Operator" value={operatorForm.nama_lengkap} onChange={(e) => setOperatorForm((p) => ({ ...p, nama_lengkap: e.target.value }))} required /></label>
-                            <label>Nama email Operator<div className="ops-email-field"><input required type="text" name="operator-local-part-admin" autoComplete="new-password" autoCapitalize="none" spellCheck={false} pattern="[A-Za-z0-9]+([._-][A-Za-z0-9]+)*" title="Gunakan huruf/angka; titik, garis bawah, dan tanda hubung hanya di antara teks." placeholder="nama.operator" value={operatorForm.email} onChange={(e) => setOperatorForm((p) => ({ ...p, email: e.target.value }))} /><span>@ops.ac.id</span></div></label>
+                            <label>Email Operator<input required type="email" name="operator-email-admin" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="contoh: operator.jakarta@evcharge.id" value={operatorForm.email} onChange={(e) => setOperatorForm((p) => ({ ...p, email: e.target.value }))} /></label>
                             <label>Password awal<input placeholder="Minimal 6 karakter" type="password" value={operatorForm.password} onChange={(e) => setOperatorForm((p) => ({ ...p, password: e.target.value }))} required /></label>
                             <label>Nomor telepon<input type="tel" inputMode="numeric" pattern={PHONE_PATTERN} maxLength={PHONE_MAX_DIGITS} title={PHONE_VALIDATION_MESSAGE} placeholder="08xxxxxxxxxx" value={operatorForm.nomor_telepon} onChange={(e) => setOperatorForm((p) => ({ ...p, nomor_telepon: normalizeOperatorPhone(e.target.value) }))} required /></label><small>{PHONE_VALIDATION_MESSAGE}</small>
                         </div>

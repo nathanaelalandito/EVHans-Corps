@@ -224,6 +224,7 @@ export default function DriverDashboard({
   const [pausingSession, setPausingSession] = useState(false);
   const [showInterruptModal, setShowInterruptModal] = useState(false);
   const [interruptReason, setInterruptReason] = useState("");
+  const [interruptPreset, setInterruptPreset] = useState("");
   const [pauseCountdown, setPauseCountdown] = useState(0);
   const interruptPanelRef = useRef(null);
   const interruptTriggerRef = useRef(null);
@@ -300,14 +301,18 @@ export default function DriverDashboard({
             }
           : prev,
       );
-      setPauseCountdown(paused?.sisa_jeda_detik ?? 0);
-      setShowInterruptModal(true);
+          setPauseCountdown(paused?.sisa_jeda_detik ?? 0);
+          setInterruptPreset("");
+          setInterruptReason("");
+          setShowInterruptModal(true);
     } catch (err) {
       setSessionError(
         extractErrorMessage(err, "Sesi belum dapat dijeda. Modal tetap dapat dibuka."),
       );
-      setPauseCountdown(0);
-      setShowInterruptModal(true);
+        setPauseCountdown(0);
+        setInterruptPreset("");
+        setInterruptReason("");
+        setShowInterruptModal(true);
     } finally {
       setPausingSession(false);
     }
@@ -346,8 +351,11 @@ export default function DriverDashboard({
             } catch {
               // ignore
             }
-            setShowInterruptModal(false);
-            setInterruptReason("");
+                        setShowInterruptModal(false);
+                        setInterruptReason("");
+                        setInterruptPreset("");
+                          setInterruptPreset("");
+            setInterruptPreset("");
             setSessionNotice("Sesi dilanjutkan otomatis karena batas waktu jeda habis.");
             if (activeSession?.id_session) {
               try {
@@ -1243,6 +1251,7 @@ export default function DriverDashboard({
       );
       setShowInterruptModal(false);
       setInterruptReason("");
+      setInterruptPreset("");
       afterSessionSettled(interruptedInvoice)
         .then(() => {
           setMalfunctionNotice("");
@@ -1985,33 +1994,34 @@ export default function DriverDashboard({
                         <button
                           key={chip}
                           type="button"
-                          className="interrupt-chip"
+                          className={`interrupt-chip ${interruptPreset === chip ? "is-active" : ""}`}
                           disabled={stoppingSession}
-                          onClick={() =>
-                            setInterruptReason((prev) =>
-                              prev ? `${prev}\\n${chip}` : chip,
-                            )
-                          }
+                          onClick={() => {
+                            setInterruptPreset(chip);
+                            if (chip !== "Lainnya") setInterruptReason("");
+                          }}
                         >
                           {chip}
                         </button>
                       ))}
                     </div>
-                    <label className="interrupt-field">
-                      <span>Deskripsi gangguan</span>
-                      <textarea
-                        value={interruptReason}
-                        onChange={(e) => setInterruptReason(e.target.value)}
-                        placeholder="Contoh: charger berhenti mendadak..."
-                        maxLength={160}
-                        disabled={stoppingSession}
-                        rows={4}
-                      />
-                      <div className="interrupt-field-meta">
-                        <span>Minimal 5 karakter</span>
-                        <span>{interruptReason.length}/160</span>
-                      </div>
-                    </label>
+                    {interruptPreset === "Lainnya" && (
+                      <label className="interrupt-field">
+                        <span>Deskripsi gangguan</span>
+                        <textarea
+                          value={interruptReason}
+                          onChange={(e) => setInterruptReason(e.target.value)}
+                          placeholder="Contoh: charger berhenti mendadak..."
+                          maxLength={160}
+                          disabled={stoppingSession}
+                          rows={4}
+                        />
+                        <div className="interrupt-field-meta">
+                          <span>Minimal 5 karakter</span>
+                          <span>{interruptReason.length}/160</span>
+                        </div>
+                      </label>
+                    )}
                     {sessionError && (
                       <p className="interrupt-error" role="alert">
                         {sessionError}
@@ -2049,8 +2059,8 @@ export default function DriverDashboard({
                     <button
                       type="button"
                       className="interrupt-btn-primary"
-                      onClick={() => handleInterruptSession(interruptReason)}
-                      disabled={stoppingSession || interruptReason.trim().length < 5}
+                      onClick={() => handleInterruptSession(interruptPreset === "Lainnya" ? interruptReason : interruptPreset)}
+                      disabled={stoppingSession || !interruptPreset || (interruptPreset === "Lainnya" && interruptReason.trim().length < 5)}
                     >
                       {stoppingSession ? (
                         <>

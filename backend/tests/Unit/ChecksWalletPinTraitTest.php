@@ -75,5 +75,7 @@ class ChecksWalletPinTraitTest extends TestCase
         $res=$tester->check($wallet,'0000');
         $this->assertSame(423,$res->getStatusCode());
         $this->assertNotNull($wallet->fresh()->locked_until);
+        $this->assertSame('Terlalu banyak percobaan salah. Dompet dikunci selama 30 detik.', $res->getData()->message);
+        $this->assertTrue($wallet->fresh()->locked_until->lessThanOrEqualTo(now()->addSeconds(31)));
     }
 }

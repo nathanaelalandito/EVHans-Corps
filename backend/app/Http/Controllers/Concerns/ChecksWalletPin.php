@@ -14,8 +14,8 @@ trait ChecksWalletPin
     /** Batas percobaan PIN salah sebelum dompet dikunci sementara. */
     protected int $maxAttempt = 3;
 
-    /** Lama waktu kunci (menit) setelah percobaan salah melebihi batas. */
-    protected int $lockMinutes = 15;
+    /** Lama waktu kunci (detik) setelah percobaan salah melebihi batas. */
+    protected int $lockSeconds = 30;
 
     /**
      * Cek PIN untuk sebuah transaksi. Mengembalikan null kalau PIN valid,
@@ -65,12 +65,12 @@ trait ChecksWalletPin
         $wallet->percobaan_pin_gagal += 1;
 
         if ($wallet->percobaan_pin_gagal >= $this->maxAttempt) {
-            $wallet->locked_until = now()->addMinutes($this->lockMinutes);
+            $wallet->locked_until = now()->addSeconds($this->lockSeconds);
             $wallet->percobaan_pin_gagal = 0;
             $wallet->save();
 
             return response()->json([
-                'message' => "Terlalu banyak percobaan salah. Dompet dikunci selama {$this->lockMinutes} menit.",
+                'message' => "Terlalu banyak percobaan salah. Dompet dikunci selama {$this->lockSeconds} detik.",
                 'terkunci_sampai' => $wallet->locked_until,
             ], 423);
         }
