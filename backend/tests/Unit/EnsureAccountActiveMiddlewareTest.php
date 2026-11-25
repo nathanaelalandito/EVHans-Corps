@@ -27,6 +27,7 @@ class EnsureAccountActiveMiddlewareTest extends TestCase
         $mw=new EnsureAccountActive();
         $res=$mw->handle($request, fn($r)=>'next');
         $this->assertSame(403,$res->getStatusCode());
+        $this->assertSame('Akun Anda sedang dinonaktifkan.', $res->getData()->message);
     }
 
     public function test_no_user_passes(): void
