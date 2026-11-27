@@ -39,6 +39,21 @@ class NotificationServiceTest extends TestCase
         $this->assertSame(1, Notifikasi::where('id_user',$user->id_user)->count());
     }
 
+    public function test_notify_session_stopped_by_operator(): void
+    {
+        $user=$this->makeUser('DRV4');
+        $session=(object)['id_user'=>$user->id_user,'id_session'=>'SES4'];
+        app(NotificationService::class)->notifySessionStoppedByOperator($session,100,50,'Perawatan darurat');
+        $this->assertDatabaseHas('notifikasi',[
+            'id_user'=>$user->id_user,
+            'tipe'=>'charging_selesai',
+            'judul'=>'Charging dihentikan operator',
+        ]);
+        $n = Notifikasi::where('id_user',$user->id_user)->first();
+        $this->assertStringContainsString('dihentikan oleh operator', (string) $n->pesan);
+        $this->assertStringContainsString('Perawatan darurat', (string) $n->pesan);
+    }
+
     public function test_notify_topup_failed(): void
     {
         $user=$this->makeUser('DRV3');

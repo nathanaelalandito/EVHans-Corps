@@ -421,7 +421,7 @@ class ChargingSessionController extends Controller
         $actualCost = $payment ? (int) $payment->total_bayar : 0;
         $refund = max(0, (int) $settled->saldo_hold - $actualCost);
         try {
-            app(NotificationService::class)->notifySessionFailed($settled, $finalStatus, $actualCost, $refund);
+            app(NotificationService::class)->notifySessionStoppedByOperator($settled, $actualCost, $refund, $data['alasan'] ?? null);
         } catch (\Throwable $e) {
             logger()->warning('Gagal mengirim notifikasi sesi: '.$e->getMessage());
         }

@@ -16,6 +16,16 @@ class NotificationService
         $this->safeCreate($session->id_user, 'charging_selesai', 'Charging selesai', "Sesi charging selesai. Biaya aktual Rp{$actualCost}, sisa hold Rp{$refund} dikembalikan.", $session->id_session, 'charging_session', "session_completed:{$session->id_session}");
     }
 
+    public function notifySessionStoppedByOperator($session, int $actualCost, int $refund, ?string $reason = null): void
+    {
+        $message = "Sesi charging Anda dihentikan oleh operator. Biaya aktual Rp{$actualCost}, sisa hold Rp{$refund} dikembalikan.";
+        if ($reason) {
+            $message .= " Alasan: {$reason}.";
+        }
+
+        $this->safeCreate($session->id_user, 'charging_selesai', 'Charging dihentikan operator', $message, $session->id_session, 'charging_session', "session_stopped_by_operator:{$session->id_session}");
+    }
+
     public function notifySessionFailed($session, string $status, int $actualCost, int $refund): void
     {
         $this->safeCreate($session->id_user, 'charging_gagal', "Charging {$status}", "Sesi charging {$status}. Biaya aktual Rp{$actualCost}, sisa hold Rp{$refund} dikembalikan.", $session->id_session, 'charging_session', "session_failed:{$session->id_session}:{$status}");
