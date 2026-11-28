@@ -34,7 +34,7 @@ class DriverManagementTest extends TestCase
     {
         return User::create([
             'id_user' => $id,
-            'email' => strtolower($id).'@test.ac.id',
+            'email' => strtolower($id) . '@test.ac.id',
             'password' => bcrypt('password'),
             'peran' => 'admin',
             'status_akun' => 'Aktif',
@@ -45,7 +45,7 @@ class DriverManagementTest extends TestCase
     {
         return User::create([
             'id_user' => $id,
-            'email' => strtolower($id).'@test.ac.id',
+            'email' => strtolower($id) . '@test.ac.id',
             'password' => bcrypt('password'),
             'peran' => 'operator',
             'status_akun' => 'Aktif',
