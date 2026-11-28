@@ -67,7 +67,7 @@ const FAQ = [
         id: 'pin-salah',
         kategori: 'Dompet & PIN',
         q: 'Dompet saya terkunci karena salah PIN. Bagaimana?',
-        a: 'Setelah 5 kali salah memasukkan PIN, dompet dikunci sementara selama 15 menit demi keamanan. Tunggu sampai waktu kunci berakhir, lalu coba lagi dengan PIN yang benar.',
+        a: 'Setelah 3 kali salah memasukkan PIN, dompet dikunci sementara selama 30 detik demi keamanan. Tunggu sampai waktu kunci berakhir, lalu coba lagi dengan PIN yang benar.',
     },
     {
         id: 'pin-lupa',
