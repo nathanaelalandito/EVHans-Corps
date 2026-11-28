@@ -224,7 +224,7 @@ export default function DriverDashboard({
   const [pausingSession, setPausingSession] = useState(false);
   const [showInterruptModal, setShowInterruptModal] = useState(false);
   const [interruptReason, setInterruptReason] = useState("");
-  const [interruptPreset, setInterruptPreset] = useState("");
+  const [interruptPresets, setInterruptPresets] = useState([]);
   const [pauseCountdown, setPauseCountdown] = useState(0);
   const interruptPanelRef = useRef(null);
   const interruptTriggerRef = useRef(null);
@@ -302,7 +302,7 @@ export default function DriverDashboard({
           : prev,
       );
           setPauseCountdown(paused?.sisa_jeda_detik ?? 0);
-          setInterruptPreset("");
+          setInterruptPresets([]);
           setInterruptReason("");
           setShowInterruptModal(true);
     } catch (err) {
@@ -310,7 +310,7 @@ export default function DriverDashboard({
         extractErrorMessage(err, "Sesi belum dapat dijeda. Modal tetap dapat dibuka."),
       );
         setPauseCountdown(0);
-        setInterruptPreset("");
+        setInterruptPresets([]);
         setInterruptReason("");
         setShowInterruptModal(true);
     } finally {
@@ -353,9 +353,9 @@ export default function DriverDashboard({
             }
                         setShowInterruptModal(false);
                         setInterruptReason("");
-                        setInterruptPreset("");
-                          setInterruptPreset("");
-            setInterruptPreset("");
+                        setInterruptPresets([]);
+                          setInterruptPresets([]);
+            setInterruptPresets([]);
             setSessionNotice("Sesi dilanjutkan otomatis karena batas waktu jeda habis.");
             if (activeSession?.id_session) {
               try {
@@ -1251,7 +1251,7 @@ export default function DriverDashboard({
       );
       setShowInterruptModal(false);
       setInterruptReason("");
-      setInterruptPreset("");
+      setInterruptPresets([]);
       afterSessionSettled(interruptedInvoice)
         .then(() => {
           setMalfunctionNotice("");
@@ -1994,18 +1994,20 @@ export default function DriverDashboard({
                         <button
                           key={chip}
                           type="button"
-                          className={`interrupt-chip ${interruptPreset === chip ? "is-active" : ""}`}
+                          className={`interrupt-chip ${interruptPresets.includes(chip) ? "is-active" : ""}`}
                           disabled={stoppingSession}
                           onClick={() => {
-                            setInterruptPreset(chip);
-                            if (chip !== "Lainnya") setInterruptReason("");
+                            setInterruptPresets((prev) =>
+                              prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip]
+                            );
+                            if (chip === "Lainnya" && interruptPresets.includes(chip)) setInterruptReason("");
                           }}
                         >
                           {chip}
                         </button>
                       ))}
                     </div>
-                    {interruptPreset === "Lainnya" && (
+                    {interruptPresets.includes("Lainnya") && (
                       <label className="interrupt-field">
                         <span>Deskripsi gangguan</span>
                         <textarea
@@ -2059,8 +2061,12 @@ export default function DriverDashboard({
                     <button
                       type="button"
                       className="interrupt-btn-primary"
-                      onClick={() => handleInterruptSession(interruptPreset === "Lainnya" ? interruptReason : interruptPreset)}
-                      disabled={stoppingSession || !interruptPreset || (interruptPreset === "Lainnya" && interruptReason.trim().length < 5)}
+                      onClick={() => {
+                        const reasons = interruptPresets.filter((c) => c !== "Lainnya");
+                        if (interruptPresets.includes("Lainnya") && interruptReason.trim()) reasons.push(interruptReason.trim());
+                        handleInterruptSession(reasons.join("; "));
+                      }}
+                      disabled={stoppingSession || interruptPresets.length === 0 || (interruptPresets.includes("Lainnya") && interruptReason.trim().length < 5)}
                     >
                       {stoppingSession ? (
                         <>
