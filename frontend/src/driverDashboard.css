@@ -5443,12 +5443,21 @@
   font-weight: 600;
   cursor: pointer;
   transition: all var(--ev-transition-fast, 160ms ease);
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .interrupt-chip:hover:not(:disabled) {
   border-color: var(--ev-primary, #167a55);
   color: var(--ev-primary, #167a55);
   background: var(--ev-primary-soft, #e6f4ed);
+}
+
+.interrupt-chip.is-active {
+  border-color: var(--ev-primary, #167a55);
+  background: var(--ev-primary-soft, #e6f4ed);
+  color: var(--ev-primary, #167a55);
 }
 
 .interrupt-chip:disabled {
